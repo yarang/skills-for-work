@@ -1,14 +1,14 @@
-%% 구현 상태 (2026-11-04): 규칙 문서·테스트는 끝났고, 스크립트 6개는 zai 인증 실패로 막혀 있다
+%% 구현 상태 (2026-11-04, v0.2.0): 스크립트 6개가 들어와 수용 테스트 171건이 통과한다. 남은 것은 리뷰 반영과 종단 시험이다
 flowchart LR
   subgraph DONE["완료"]
     direction TB
     D1["설계·매뉴얼<br/>docs/design.md<br/>docs/manual.md"]
     D2["에이전트 4개<br/>analyst · researcher<br/>writer · reviewer"]
     D3["스킬 13개<br/>절차 2 · 공통 1<br/>디자인 4 · 형식 4<br/>도구 1 · newdoc 1"]
-    D4["수용 테스트<br/>6개 파일 · 171건<br/>(지금 통과 49는 거짓 양성)"]
+    D4["수용 테스트<br/>6개 파일 · 171건"]
     D5["작업 지시서 5개<br/>docs/briefs/"]
   end
-  subgraph BLOCKED["막힘 — 스크립트 없음"]
+  subgraph IMPL["완료 — 스크립트 6개"]
     direction TB
     S1["hooks/write_guard.py<br/>hooks.json"]
     S2["profile_extract.py"]
@@ -16,27 +16,24 @@ flowchart LR
     S4["patch_pptx.py"]
     S5["render.py<br/>doc_verify.py"]
   end
-  Z{{"zai (opencode)<br/>인증 실패<br/>재로그인 필요"}}
-  subgraph TODO["대기"]
+  P{{"171건 통과<br/>Gitea push 완료"}}
+  subgraph TODO["남은 일"]
     direction TB
-    T1["테스트 171건 통과"]
+    T1["codex · agy 리뷰 반영"]
     T2["종단 시험<br/>HWPX·DOCX·PPTX<br/>× sample·form·update"]
-    T3["codex · agy 리뷰"]
-    T4["Gitea push<br/>git.agentthread.dev"]
+    T3["알려진 한계<br/>slide_dup 차트·노트<br/>Bash 쓰기는 hook 밖"]
   end
-  D4 -->|명세| BLOCKED
-  D5 --> Z
-  Z -.->|구현| BLOCKED
-  BLOCKED --> T1 --> T2 --> T3 --> T4
+  D4 -->|명세| IMPL
+  D5 -->|지시서| IMPL
+  IMPL --> P --> T1 --> T2
+  T2 -.-> T3
 
   classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
-  classDef blocked fill:#FBE3E1,stroke:#B23B32,color:#4A1410
   classDef todo fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
   classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
-  class D1,D2,D3,D4,D5 done
-  class S1,S2,S3,S4,S5 blocked
-  class T1,T2,T3,T4 todo
-  class Z gate
+  class D1,D2,D3,D4,D5,S1,S2,S3,S4,S5 done
+  class T1,T2,T3 todo
+  class P gate
   style DONE fill:#F7FBF6,stroke:#4C8C4A
-  style BLOCKED fill:#FDF5F4,stroke:#B23B32
+  style IMPL fill:#F7FBF6,stroke:#4C8C4A
   style TODO fill:#F7F8FA,stroke:#6B7B8C

@@ -2,25 +2,25 @@
 
 견본·양식 파일을 주면 **견본의 모양은 그대로 두고 내용만** 채워 주는 Claude Code 플러그인입니다. 이 매뉴얼은 설치, 요청하는 법, 중간에 사용자가 답할 곳, 결과를 읽는 법을 다룹니다. 설계 배경은 [design.md](design.md)에 있습니다.
 
-## 1. 현재 상태 (v0.1.0, 2026-11-04)
+## 1. 현재 상태 (v0.2.0, 2026-11-04)
 
-> **아직 끝까지 돌릴 수 없습니다.** 규칙 문서(스킬 13개·에이전트 4개)와 수용 테스트 171건은 준비됐습니다. 그러나 파이프라인이 부르는 스크립트 6개가 아직 없습니다. 스크립트 구현은 zai(opencode) 에이전트에 맡기는데, 인증이 실패해 멈춰 있습니다.
+> **스크립트 6개가 들어와 수용 테스트 171건이 모두 통과합니다.** 다만 실제 업무 문서로 처음부터 끝까지 돌려 보는 종단 시험은 아직 하지 않았습니다. 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 규칙 | 에이전트 4개, 스킬 13개(newdoc은 자리만) | 완료 |
-| 테스트 | `tests/` 6개 파일, 171건 | 작성 완료. 현재 49 통과 · 104 실패 · 18 오류 (통과는 거짓 양성, 10장) |
-| 스크립트 | `hooks/write_guard.py`·`hooks.json`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py` | **없음** |
+| 테스트 | `tests/` 6개 파일, 171건 | **171 통과** (10장) |
+| 스크립트 | `hooks/write_guard.py`·`hooks.json`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py` | 완료 |
 | 시험 | HWPX·DOCX·PPTX × sample·form·update 종단 시험 | 대기 |
-| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 대기 |
+| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 리뷰 진행, push 완료 |
 
-스크립트가 없는 지금 할 수 있는 것과 없는 것은 다음과 같습니다.
+알아 둘 한계는 다음과 같습니다.
 
-- **할 수 있음**: ① 요구사항·모드 판별, ③ 근거 조사(researcher는 스크립트를 쓰지 않음). HWPX의 작성·렌더 자체는 kordoc MCP가 맡으므로 스크립트 없이도 돕니다.
-- **할 수 없음**: ② 견본 분석. 형식과 상관없이 표 번호 목록(`profile_extract.py tables`)과 프로파일 점검(`check`)이 필요합니다. DOCX·PPTX 작성(`patch_*.py`)과 ⑥ 결정적 검증(`doc_verify.py`)도 없습니다. ②·⑥은 생략할 수 없는 단계라서 **어떤 형식이든 끝까지 통과하지 못합니다.**
-- **견본 보호**: hook이 없으므로 사전 차단이 없습니다. 견본은 반드시 복사본을 주십시오.
+- **종단 시험 전**: 테스트는 코드로 만든 작은 견본을 씁니다. 병합 셀이 많은 표, 글상자가 많은 HWPX처럼 실제 문서에서만 나오는 경우는 아직 확인하지 못했습니다.
+- **PPTX 슬라이드 복제(`slide_dup`)**: 차트는 원본과 같은 차트 데이터를 가리키고, 애니메이션·전환 효과와 발표자 노트는 복사되지 않습니다.
+- **견본 보호**: hook이 `docu-writer:*` 에이전트의 쓰기를 막지만 `Bash`로 쓴 것은 보지 못합니다. ⑥의 해시 대조가 마지막 그물입니다.
 
 ## 2. 설치
 
@@ -164,8 +164,8 @@ cp -p ".docu-writer/backup/사업계획.20261104-153012.pptx" "/경로/사업계
 |---|---|---|
 | HWPX | kordoc MCP (`patch_document`·`fill_form`·`render_document`) | kordoc 렌더는 근사입니다. 최종 쪽 나눔은 한컴오피스에서 확인하십시오. `<결과>.rewrite.hwpx`가 생기면 제자리 반영에 실패한 것이라 ⑥이 막습니다 |
 | HWP | kordoc `convert_to_hwpx`로 바꾼 뒤 HWPX와 같음 | 결과는 HWPX로 나옵니다. 원본 HWP와 변환본 해시를 둘 다 대조합니다 |
-| DOCX | `patch_docx.py` (구현 예정) | 글상자·필드·SmartArt는 고치지 못하고 보고만 합니다. 목차는 Word에서 필드 업데이트가 필요합니다 |
-| PPTX | `patch_pptx.py` (구현 예정) | 차트 데이터·SmartArt는 PowerPoint에서 고쳐야 합니다. 발표자 노트는 ④에서 내용으로 다룰지 정합니다 |
+| DOCX | `patch_docx.py` | 글상자·필드·SmartArt는 고치지 못하고 보고만 합니다. 목차는 Word에서 필드 업데이트가 필요합니다 |
+| PPTX | `patch_pptx.py` | 차트 데이터·SmartArt는 PowerPoint에서 고쳐야 합니다. 발표자 노트는 ④에서 내용으로 다룰지 정합니다 |
 | Markdown | 직접 편집, 렌더는 pandoc → soffice | 쪽 개념이 없어 쪽·서체 검사는 `skip`입니다 |
 | PDF | 견본으로만 읽음 | 고칠 수 없습니다. 원본(HWPX·DOCX 등)을 주십시오 |
 
@@ -184,9 +184,9 @@ cp -p ".docu-writer/backup/사업계획.20261104-153012.pptx" "/경로/사업계
 
 **글자 크기나 여백을 줄여서 맞추지 않습니다.** 표를 한 쪽에 넣으려고 토큰을 바꾸면 R5 위반입니다.
 
-## 9. 스크립트 직접 실행 (구현 예정)
+## 9. 스크립트 직접 실행
 
-> 아래 스크립트는 아직 없습니다. 계약(인자·종료 코드)은 확정돼 있고 `tests/`가 그 계약을 검사합니다.
+> 인자와 종료 코드는 각 스킬의 `SKILL.md`가 계약이고, `tests/`가 그 계약을 검사합니다.
 
 플러그인 안에서는 `${CLAUDE_SKILL_DIR}`가 각 스킬 디렉터리를 가리킵니다. 직접 실행할 때는 실제 경로로 바꿉니다.
 
@@ -225,11 +225,13 @@ cd <이 저장소>/docu-writer
 uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf pytest tests
 ```
 
-2026-11-04 실행 결과는 `104 failed, 49 passed, 18 errors`입니다. 스크립트가 없는 RED 단계라 실패는 정상입니다.
+2026-11-04 실행 결과는 `171 passed`입니다(약 40초, `test_render.py`는 `soffice`·`pandoc`이 있어야 합니다).
 
-**통과 49건은 믿으면 안 됩니다.** 모두 「거부되는가(종료 코드 ≠ 0 또는 2)」를 보는 테스트입니다. 예를 들어 `test_write_guard.py`의 차단 테스트, 각 스크립트의 `exit_2` 테스트가 그렇습니다. 그런데 `uv run`은 스크립트 파일이 없어도 종료 코드 2로 끝나므로 이 테스트들이 저절로 통과합니다. 스크립트가 들어온 뒤의 결과만 의미가 있습니다. 해결하려면 `conftest.py`에서 스크립트 파일이 있는지 먼저 확인하고, 없으면 실패시키면 됩니다.
+`samples` 픽스처가 DOCX·PPTX·MD 견본을 한꺼번에 만들므로, 한 파일만 돌릴 때도 `--with`에 `python-docx`와 `python-pptx`를 모두 넣어야 합니다. 각 스크립트는 자기 의존성을 PEP 723 블록에 적어 두므로 `--with` 목록은 pytest 쪽에만 필요합니다.
 
-스크립트별 작업 지시서(zai 위임용)는 [briefs/](briefs/)에 있습니다.
+스크립트가 없을 때 `uv run`은 종료 코드 2로 끝납니다. 그래서 「거부·exit 2」를 기대하는 테스트가 저절로 통과하는 거짓 양성이 있었습니다(49건). 지금은 `conftest.py`의 `uv()`와 `test_write_guard.py`의 `run_guard()`가 스크립트 파일이 있는지 먼저 확인합니다.
+
+스크립트를 만들 때 쓴 작업 지시서는 [briefs/](briefs/)에 있습니다. 스크립트를 고칠 때도 이 지시서와 각 `SKILL.md`가 계약입니다.
 
 | 지시서 | 대상 |
 |---|---|
@@ -243,13 +245,12 @@ uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf p
 
 | 증상 | 원인과 조치 |
 |---|---|
-| 「스크립트를 찾을 수 없음」 | 현재 v0.1.0에는 스크립트가 없습니다(1장). 스크립트가 들어올 때까지 파이프라인은 ②에서 멈춥니다 |
+| `uv`가 의존성을 받지 못함 | 처음 실행할 때 python-docx·python-pptx·pymupdf를 내려받습니다. 네트워크를 확인하거나 한 번 직접 실행해 캐시를 채우십시오 |
 | HWPX 작업이 시작되지 않음 | kordoc MCP가 연결되지 않았습니다. `moai-officer` 플러그인을 켜고 `/mcp`로 확인하십시오 |
 | DOCX·PPTX 렌더 실패 (종료 코드 2) | `soffice`가 PATH에 없습니다. LibreOffice를 설치하십시오 |
 | 결과에 `○○`가 많음 | 근거 자료가 부족합니다. ④에서 값을 직접 주거나 자료 위치를 더 알려 주십시오 |
 | 같은 지적으로 멈춤 | ⑦에서 같은 지적이 세 번 반복되면 멈추고 보고합니다. 견본 자체의 한계(예: 표 칸 부족)인 경우가 많습니다 |
 | update 교체가 거부됨 | ① 이후 원본이 바뀌었습니다. 다른 사람이 고친 것인지 확인한 뒤 처음부터 다시 하십시오 |
-| zai 「身份验证失败」 | Z.AI 인증 만료입니다. 터미널에서 `opencode auth login`으로 다시 로그인하십시오 |
 
 ## 12. 제한 사항
 

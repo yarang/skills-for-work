@@ -63,4 +63,4 @@ claude --plugin-dir /path/to/skills_for_work/docu-writer
 
 사용법은 [docs/manual.md](docs/manual.md), 설계 배경은 [docs/design.md](docs/design.md)에 있습니다.
 
-> **v0.1.0 상태**: 규칙 문서와 수용 테스트는 준비됐지만 스크립트 6개(`hooks/`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`)가 아직 없어 파이프라인이 끝까지 돌지 않습니다. [매뉴얼 1장](docs/manual.md#1-현재-상태-v010-2026-11-04)을 보십시오.
+> **v0.2.0 상태**: 스크립트 6개(`hooks/`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`)가 들어와 수용 테스트 171건이 통과합니다. 실제 문서로 하는 종단 시험은 아직입니다. [매뉴얼 1장](docs/manual.md#1-현재-상태-v020-2026-11-04)을 보십시오.
