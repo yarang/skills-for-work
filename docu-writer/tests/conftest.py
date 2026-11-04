@@ -52,6 +52,8 @@ def run(cmd, **kw):
 
 
 def uv(script, *args, **kw):
+    # 스크립트가 없으면 uv가 종료 코드 2를 내 "거부·exit 2" 기대 테스트가 거짓으로 통과한다.
+    assert Path(script).is_file(), f"스크립트 없음: {script}"
     return run(["uv", "run", "--quiet", "--python", "3.13", script, *args], **kw)
 
 

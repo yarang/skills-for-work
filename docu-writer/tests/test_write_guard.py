@@ -17,6 +17,7 @@ KORDOC = "mcp__plugin_moai-officer_kordoc__"
 
 
 def run_guard(payload) -> subprocess.CompletedProcess:
+    assert GUARD.is_file(), f"스크립트 없음: {GUARD}"
     data = payload if isinstance(payload, str) else json.dumps(payload)
     return subprocess.run(
         [sys.executable, str(GUARD)], input=data, capture_output=True, text=True, timeout=10
