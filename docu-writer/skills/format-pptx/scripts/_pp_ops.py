@@ -141,7 +141,7 @@ class Planner:
         ref = self._ref(edit["at"])
         t = _text_target(ref, ("frame", "para"))
         orig = body_text(t.el) if t.kind == "frame" else para_text(t.el)
-        if len(text) > OVERFLOW_RATIO * len(orig):
+        if orig and len(text) > OVERFLOW_RATIO * len(orig):  # 빈 칸(양식)은 비교할 길이가 없음
             self.warnings.append(f"overflow? {ref.loc}: {len(text)} chars vs {len(orig)}")
         if t.kind == "frame":
             return lambda: set_body_text(ref.target.el, text)

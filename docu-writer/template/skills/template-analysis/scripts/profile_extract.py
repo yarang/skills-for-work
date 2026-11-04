@@ -52,6 +52,12 @@ def cmd_tables(args) -> int:
     return 0
 
 
+def drop_field_labels(cands: list, fields: list) -> list:
+    """칸 이름표는 견본 문구가 아니라 양식 뼈대이므로 후보에서 뺌 (공백 무시 비교)."""
+    labels = {"".join(str(f.get("label") or "").split()) for f in fields}
+    return [c for c in cands if "".join(c.split()) not in labels]
+
+
 def assemble_profile(sample: Path, fmt: str, mode: str, parts: dict) -> dict:
     """형식 모듈이 뽑은 조각을 설계서 §5 순서의 프로파일 초안으로 묶음."""
     profile = {
@@ -62,7 +68,7 @@ def assemble_profile(sample: Path, fmt: str, mode: str, parts: dict) -> dict:
         "fields": parts["fields"],
         "design": parts["design"],
         "sample_text": [],
-        "sample_text_candidates": parts["candidates"],
+        "sample_text_candidates": drop_field_labels(parts["candidates"], parts["fields"]),
         "objects": parts["objects"],
         "warnings": list(parts["warnings"]),
     }

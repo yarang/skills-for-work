@@ -14,7 +14,7 @@ import yaml
 
 from conftest import BODY_SENTENCE, DOC_VERIFY, uv
 
-IDS = ["hash", "residue", "placeholder", "fields", "scope", "r4_headings", "r5_tokens",
+IDS = ["hash", "residue", "markup", "placeholder", "fields", "scope", "r4_headings", "r5_tokens",
        "r6_numbering", "table_header", "length", "r1_tables", "rewrite"]
 ALLOWED = ["Normal", "Title", "Heading 1", "List Bullet"]
 BULLET = "준비 단계는 1월에 기획팀이 맡는다"
@@ -122,7 +122,7 @@ def test_clean_copy_report_shape(samples, tmp_path):
         assert e["status"] in {"pass", "fail", "warn", "skip"}
         assert isinstance(e["locations"], list)
     assert "### 문서 검증" in proc.stdout
-    want = {"hash": "pass", "placeholder": "skip", "fields": "skip", "scope": "skip",
+    want = {"hash": "pass", "markup": "pass", "placeholder": "skip", "fields": "skip", "scope": "skip",
             "r4_headings": "pass", "r5_tokens": "pass", "r6_numbering": "pass",
             "table_header": "pass", "length": "skip", "r1_tables": "skip", "rewrite": "skip"}
     assert {k: r[k]["status"] for k in want} == want
@@ -147,6 +147,41 @@ def test_residue(samples, tmp_path):
     out = output(samples, tmp_path, replace_body("신청 건수는 135건이다."))
     _, r = verify(samples, tmp_path, prof, out)
     assert r["residue"]["status"] == "pass"
+
+
+# --- markup (종단 시험 F12) ---------------------------------------------------------
+
+@pytest.mark.parametrize("text", ["> 신청 건수는 135건이다.", "## 추진 배경", "신청 **135건** 접수",
+                                  "신청 건수 135건\\~140건", "| 구분 | 내용 |"])
+def test_markup_leak_fails(samples, tmp_path, text):
+    """kordoc patch_document가 요약 상자 글 앞에 「> 」를 남긴 사례처럼 마크다운 표지가 글자로 남으면 실패."""
+    _, r = verify(samples, tmp_path, profile(samples), output(samples, tmp_path, replace_body(text)))
+    assert r["markup"]["status"] == "fail", r["markup"]
+    assert r["markup"]["locations"]
+
+
+def test_markup_plain_text_passes(samples, tmp_path):
+    out = output(samples, tmp_path, replace_body("신청 건수는 135건(전년 대비 12% 증가)이다. a>b, 3*4"))
+    _, r = verify(samples, tmp_path, profile(samples), out)
+    assert r["markup"]["status"] == "pass", r["markup"]
+
+
+def test_markup_kind_in_source_is_document_text(samples, tmp_path):
+    """견본에도 같은 꼴(「> 」로 시작하는 줄)이 있으면 그 종류는 문서 고유의 글로 봅니다."""
+    from docx import Document
+
+    src = tmp_path / "src.docx"
+    shutil.copy(samples["docx"], src)
+    doc = Document(src)
+    doc.add_paragraph("> 견본의 인용 줄")
+    doc.save(src)
+    out = tmp_path / "out.docx"
+    shutil.copy(src, out)
+    doc = Document(out)
+    doc.add_paragraph("> 결과의 인용 줄")
+    doc.save(out)
+    _, r = verify({**samples, "docx": src}, tmp_path, profile({**samples, "docx": src}), out)
+    assert r["markup"]["status"] == "pass", r["markup"]
 
 
 # --- placeholder -----------------------------------------------------------------
@@ -221,6 +256,16 @@ def test_fields_filled_passes(samples, tmp_path):
 def test_fields_regex_constraint(samples, tmp_path, text, status):
     _, r = verify(samples, tmp_path, form_profile(samples, r"re:^\d+건$"), output(samples, tmp_path, fill(text)))
     assert r["fields"]["status"] == status
+
+
+def test_fields_violation_does_not_echo_value(samples, tmp_path):
+    """칸 값은 개인정보일 수 있어 위반 보고에 값 대신 글자 수만 냅니다 (종단 시험 F16)."""
+    secret = "010-12-345"
+    proc, r = verify(samples, tmp_path, form_profile(samples, r"re:^\d+건$"), output(samples, tmp_path, fill(secret)))
+    assert r["fields"]["status"] == "fail"
+    assert "10자" in r["fields"]["detail"]
+    assert secret not in proc.stdout + proc.stderr
+    assert secret not in json.dumps(r, ensure_ascii=False)
 
 
 def test_fields_placeholder_exempts_constraint(samples, tmp_path):
@@ -377,6 +422,35 @@ def test_length_pages_from_svg(samples, tmp_path):
     assert r["length"]["status"] == "fail"
 
 
+def _svg(path, text="구분"):
+    path.write_text(f'<svg xmlns="http://www.w3.org/2000/svg"><text>{text}</text></svg>', encoding="utf-8")
+
+
+def test_length_pages_from_single_svg(samples, tmp_path):
+    """종단 시험 F14: kordoc은 한 쪽만 렌더하면 _page_NNN 접미 없이 page.svg 하나를 냅니다."""
+    render = tmp_path / "render"
+    render.mkdir()
+    _svg(render / "page.svg")
+    prof = profile(samples)
+    prof["length"] = {"pages": [1, 1]}
+    _, r = verify(samples, tmp_path, prof, output(samples, tmp_path), pages=True)
+    assert r["length"]["status"] == "pass", r["length"]
+    assert "1" in r["length"]["detail"]
+
+
+def test_mixed_single_and_numbered_svg_is_usage_error(samples, tmp_path):
+    render = tmp_path / "render"
+    render.mkdir()
+    _svg(render / "page.svg")
+    _svg(render / "page_page_001.svg")
+    pf = tmp_path / "profile.yaml"
+    pf.write_text(yaml.safe_dump(profile(samples), allow_unicode=True), encoding="utf-8")
+    proc = uv(DOC_VERIFY, "--profile", pf, "--source", samples["docx"], "--expect-sha256", sha256(samples["docx"]),
+              "--output", output(samples, tmp_path), "--pages-dir", render, "--out-dir", tmp_path / "verify")
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "섞여" in proc.stdout + proc.stderr
+
+
 def test_length_section_chars(samples, tmp_path):
     prof = profile(samples)
     prof["structure"]["sections"][0]["length"] = {"chars": [0, 10]}
@@ -384,6 +458,22 @@ def test_length_section_chars(samples, tmp_path):
     assert r["length"]["status"] == "fail"
     assert "s1" in json.dumps(r["length"], ensure_ascii=False)
 
+
+
+def test_length_form_ignores_section_chars_keeps_doc_pages(samples, tmp_path):
+    """종단 시험 F7: form 모드의 섹션은 쓰는 글이 아니라 양식 뼈대입니다.
+    마지막 섹션이 문서 끝까지(표 포함) 이어져 글자 수가 양식 전체가 되므로 섹션 chars는 보지 않고,
+    값이 양식을 다음 쪽으로 밀어내지 않았는지(최상위 pages)만 판정합니다."""
+    prof = form_profile(samples)
+    prof["structure"]["sections"][0]["length"] = {"chars": [0, 10]}
+    out = output(samples, tmp_path, fill("기획팀"))
+    _, r = verify(samples, tmp_path, prof, out)
+    assert r["length"]["status"] == "skip"
+    assert "form" in r["length"]["detail"]
+    prof["length"] = {"pages": [1, 1]}
+    _, r = verify(samples, tmp_path, prof, out, pages=TWO_PAGES)
+    assert r["length"]["status"] == "fail"
+    assert "s1" not in json.dumps(r["length"]["locations"], ensure_ascii=False)
 
 # --- R1 표 -------------------------------------------------------------------------
 

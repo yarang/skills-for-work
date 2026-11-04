@@ -63,7 +63,7 @@ when_to_use: '"이 서식대로 써줘", "이 양식 채워줘", "견본처럼 �
    | 이 문서의 ○○ 부분만 고쳐 줘 | `update` |
 
 2. **형식과 도구를 확인합니다.** HWPX·HWP는 kordoc 도구(`mcp__plugin_moai-officer_kordoc__*`)가 있어야 합니다. 없으면 알리고 멈춥니다. DOCX·PPTX·MD는 `uv`, `soffice`, `pandoc`(MD)를 확인합니다.
-3. **출력 경로를 정합니다.** 견본과 같은 경로는 안 됩니다. 이미 있는 파일이면 다른 이름을 받습니다(스크립트가 덮어쓰지 않음). update 모드의 출력은 `.docu-writer/work/<이름>.updated.<확장자>`이고, 원본 교체는 ⑧에서 따로 승인받습니다.
+3. **출력 경로를 정합니다.** 견본과 같은 경로는 안 됩니다. 이미 있는 파일이면 다른 이름을 받습니다(스크립트가 덮어쓰지 않음). update 모드의 출력은 `.docu-writer/work/<이름>.updated.<확장자>`이고, 원본 교체는 ⑧에서 따로 승인받습니다. kordoc은 숨김 경로에 쓰지 않으므로 HWPX는 `docu-writer-out/`에 낸 뒤 옮깁니다(`format-hwpx` 「kordoc 출력 경로」).
 4. **자료 위치를 받습니다.** 파일·디렉터리 경로와, 웹 검색을 허용하는지(`웹: 허용 | 금지`, 기본 금지).
 5. **기록합니다.**
 
@@ -157,8 +157,11 @@ format_skill: docu-writer:format-hwpx
 사용자가 고치라고 하면 메인 대화가 `profile.yaml`·`evidence.yaml`을 고칩니다. 승인되면 해시를 고정합니다.
 
 ```bash
-shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-writer/approved.sha256
+shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-writer/approved.sha256.tmp \
+  && mv .docu-writer/approved.sha256.tmp .docu-writer/approved.sha256
 ```
+
+두 파일 중 하나라도 없으면 `shasum`이 실패하고 `approved.sha256`은 만들어지지 않습니다(한 줄만 적힌 해시 파일이 남지 않게 임시 파일을 거칩니다).
 
 ## 견본 보호 (②·③·⑤·⑦의 호출마다)
 
@@ -166,7 +169,7 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 
 | 역할 | 허용되는 쓰기 |
 |---|---|
-| analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외) |
+| analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
 | researcher | `.docu-writer/evidence.yaml` |
 | writer | `protected-paths`의 경로, `.docu-writer/protected-paths`·`approved.sha256`·`session.yaml`·`profile.yaml`·`evidence.yaml`을 뺀 곳 |
 | reviewer | 없음 |
@@ -182,7 +185,7 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 writer의 보고를 믿지 않고 메인 대화가 다시 실행합니다. 모두 종료 코드로 판정하며, 모델이 결과를 해석해 통과시키지 않습니다. 스크립트 경로를 얻으려면 먼저 `Skill` 도구로 `docu-writer:doc-verify`를 불러옵니다.
 
 1. `shasum -c .docu-writer/approved.sha256` — 실패하면 writer가 계약 파일을 바꾼 것입니다. ⑤로 되돌리기 전에 사용자에게 diff를 보여 줍니다.
-2. 렌더 — DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`(이전 `page_*`·`pages.json`을 스스로 지우고 냄). HWPX는 먼저 `rm -f .docu-writer/render/page_* .docu-writer/render/pages.json`으로 writer가 남긴 렌더를 지운 뒤, kordoc `render_document`를 svg와 png로 `.docu-writer/render/`에 냅니다(`format-hwpx` 「렌더」). `render/source/`는 지우지 않습니다.
+2. 렌더 — DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`(이전 `page_*`·`pages.json`을 스스로 지우고 냄). HWPX는 먼저 `mkdir -p .docu-writer/render && find .docu-writer/render -maxdepth 1 -type f \( -name 'page*' -o -name pages.json \) -delete`로 writer가 남긴 렌더를 지운 뒤(zsh는 맞는 파일이 없는 `rm -f …/page*`를 오류로 멈추므로 `find`를 씁니다), kordoc `render_document`를 svg와 png로 작업 폴더의 `docu-writer-out/`에 내고 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음 — `format-hwpx` 「렌더」). `render/source/`는 지우지 않습니다.
 3. `doc_verify.py` — `doc-verify` 스킬의 「실행」 명령 그대로. 종료 코드 1이면 `fail` 목록을 붙여 ⑤로 되돌립니다. 2이면 원인(경로·도구)을 고쳐 다시 실행합니다. 2는 통과가 아닙니다.
 4. 통과하면 결과 파일 해시를 남깁니다: `shasum -a 256 <결과 파일> > .docu-writer/verify/output.sha256`. ⑦ 뒤에 대조합니다.
 
@@ -221,7 +224,7 @@ cp "$OUT" "$SRC" && shasum -a 256 "$OUT" "$SRC"
 | 작업 | 생략 가능 |
 |---|---|
 | 양식 채우기이고 값을 사용자가 대화로 모두 줌 | ③ — 메인 대화가 `evidence.yaml`을 적음 |
-| update 모드이고 바꿀 문구를 사용자가 그대로 줌 | ③, ⑦의 fact 관점 |
+| update 모드이고 바꿀 문구를 사용자가 그대로 줌 | ③ — 메인 대화가 사용자가 준 문구를 `evidence.yaml`에 적음, ⑦의 fact 관점 |
 | Markdown이고 표·도표 없음 | ⑦의 design 관점 |
 
-①의 모드 판별, ④ 승인, ⑥ 검증(해시·doc-verify)은 생략하지 않습니다.
+①의 모드 판별, ④ 승인, ⑥ 검증(해시·doc-verify)은 생략하지 않습니다. ③을 건너뛰어도 `evidence.yaml`은 있어야 합니다. 없으면 ④의 `shasum`이 실패하면서 `profile.yaml` 줄만 적어 근거가 잠기지 않습니다.

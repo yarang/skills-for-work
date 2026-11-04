@@ -61,11 +61,13 @@ def get_sections(prof, fails):
     return [s for s in sections if isinstance(s, dict)]
 
 
-def check_section_keys(sections, fails):
+def check_section_keys(sections, fails, mode=None):
+    # form 섹션은 쓰는 글이 아니라 양식 뼈대라 분량이 없습니다(분량은 최상위 length.pages로 봅니다).
+    keys = [k for k in SECTION_KEYS if not (mode == "form" and k == "length")]
     seen = set()
     for i, s in enumerate(sections, 1):
         label = s.get("id") or f"섹션 {i}"
-        absent = [k for k in SECTION_KEYS if k not in s or missing(s[k])]
+        absent = [k for k in keys if k not in s or missing(s[k])]
         if absent:
             fails.append(f"{label}: 칸이 없거나 비어 있음 — {', '.join(absent)}")
         sid = s.get("id")
@@ -222,7 +224,7 @@ def run_check(profile_path: Path, source: Path, tables_path):
     fails = []
     check_header(prof, source, fails)
     sections = get_sections(prof, fails)
-    check_section_keys(sections, fails)
+    check_section_keys(sections, fails, prof.get("mode"))
     check_anchors(sections, source, fmt, fails)
     check_locators(prof, tables, fails)
     check_mode(prof, sections, fails)

@@ -1,4 +1,4 @@
-"""doc_verify.py 내용 검사 — hash·residue·placeholder·fields·scope·length.
+"""doc_verify.py 내용 검사 — hash·residue·markup·placeholder·fields·scope·length.
 
 계약: skills/doc-verify/SKILL.md 「검사 항목」·「검사 세부」.
 각 검사는 Ctx를 받아 {id, status, detail, locations} 하나를 돌려줍니다.
@@ -79,6 +79,37 @@ def check_residue(ctx: Ctx) -> dict:
     return entry("residue", "pass", f"견본 문구 {len(phrases)}개 모두 없음")
 
 
+# --- markup ----------------------------------------------------------------------
+
+# 편집본 마크다운의 표지가 글자로 새어 든 자리 (종단 시험 F12: kordoc patch_document가
+# 요약 상자 글 앞에 「> 」를 그대로 넣음). 견본에 같은 꼴이 있으면 그 종류는 문서의 글로 봅니다.
+MARKUP = {
+    "인용 >": re.compile(r"^\s*>\s"),
+    "제목 #": re.compile(r"^\s*#{1,6}\s"),
+    "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|__[^_\s][^_]*__"),
+    "탈출 \\": re.compile(r"\\[~*_#>|\[\]`-]"),
+    "표 |": re.compile(r"^\s*\|.*\|\s*$"),
+}
+
+
+def _markup_kinds(text: str) -> list:
+    return [kind for kind, pattern in MARKUP.items() if pattern.search(text)]
+
+
+def check_markup(ctx: Ctx) -> dict:
+    known = {kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
+    hits, locs = [], []
+    for text, loc in doc_search_items(ctx.out):
+        kinds = [k for k in _markup_kinds(text) if k not in known]
+        hit = kinds and f'{kinds[0]} "{text.strip()[:30]}"'
+        if hit and hit not in hits:  # 표 칸 글은 칸·행·표 단위로 여러 번 나오므로 한 번만 셉니다
+            hits.append(hit)
+            locs.append(loc)
+    if hits:
+        return entry("markup", "fail", f"{len(hits)}건: {brief(hits)}", _unique(locs))
+    return entry("markup", "pass", "마크다운 표지 없음")
+
+
 # --- placeholder -----------------------------------------------------------------
 
 def check_placeholder(ctx: Ctx) -> dict:
@@ -119,7 +150,8 @@ def _field_problem(ctx: Ctx, field: dict, notes: list) -> str | None:
             ok = re.fullmatch(constraint[3:], text) is not None
         except re.error as exc:
             return f"{fid} constraint 정규식 오류 ({exc})"
-        return None if ok else f'{fid} "{text}"가 {constraint}에 맞지 않음'
+        # 칸 값은 개인정보일 수 있어 보고에 값 대신 글자 수만 냅니다 (kordoc fields_file 마스킹과 같게).
+        return None if ok else f"{fid} 값({len(text)}자)이 {constraint}에 맞지 않음"
     if constraint:
         notes.append(f"{fid} constraint 「{constraint}」는 판정하지 않음 — ⑦ 리뷰어 확인")
     return None
@@ -242,6 +274,10 @@ def _judge(res: dict, name: str, value, limit, unit: str, loc: str | None = None
 def _section_length(ctx: Ctx, res: dict) -> None:
     sections = [s for s in sections_of(ctx.profile) if isinstance(s.get("length"), dict)]
     if not sections:
+        return
+    if ctx.mode == "form":
+        # 양식 섹션은 문서 끝까지(표 포함) 이어져 글자 수가 양식 전체가 됩니다 — 최상위 length만 봅니다.
+        res["notes"].append("form 모드는 섹션 분량을 보지 않음")
         return
     ranges = section_ranges(ctx.out, ctx.src, sections_of(ctx.profile))["ranges"]
     for s in sections:

@@ -15,6 +15,7 @@ PDF는 pymupdf로 쪽별 PNG와 쪽별 글로 바꿉니다. HWPX는 렌더하지
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,13 @@ FALLBACK_DIRS = [Path("/opt/homebrew/bin"), Path("/usr/local/bin"),
                  Path("/Applications/LibreOffice.app/Contents/MacOS")]
 DPI = 150
 TIMEOUT = 300
+# macOS의 LibreOffice는 headless 변환에서 시스템 글꼴을 하나도 찾지 못하고 내장 글꼴로만 그리는 일이
+# 있습니다(종단 시험: 한글이 LinuxLibertineG의 빈 글리프로 찍힘). 전용 프로필의 user/fonts에 글꼴
+# 폴더 링크를 두면 그 글꼴을 읽으므로, 있는 폴더를 모두 링크합니다.
+FONT_ENV = "DOCU_WRITER_FONT_DIRS"
+MAC_FONT_DIRS = [Path("/System/Library/Fonts"), Path("/Library/Fonts"), Path.home() / "Library/Fonts"]
+BUNDLED_FONT_DIRS = ["../Resources/fonts/truetype", "../share/fonts/truetype"]  # soffice 기준
+FONT_FILES = {".ttf", ".otf", ".ttc"}
 
 
 class RenderError(Exception):
@@ -70,6 +78,25 @@ def md_to_docx(src: Path, work: Path, pandoc: str) -> Path:
     return dst
 
 
+def font_dirs() -> list[Path]:
+    """FONT_ENV(경로 구분자로 나눔)와 macOS 표준 글꼴 폴더 중 실제로 있는 디렉터리."""
+    extra = [Path(p).expanduser() for p in os.environ.get(FONT_ENV, "").split(os.pathsep) if p]
+    system = MAC_FONT_DIRS if sys.platform == "darwin" else []
+    return [d for d in dict.fromkeys([*extra, *system]) if d.is_dir()]
+
+
+def link_fonts(profile: Path, dirs: list[Path]) -> list[Path]:
+    """<profile>/user/fonts/ 아래에 글꼴 폴더 링크를 만듭니다. 글꼴 파일은 복사하지 않습니다."""
+    target = profile / "user" / "fonts"
+    target.mkdir(parents=True, exist_ok=True)
+    links = []
+    for i, d in enumerate(dirs):
+        link = target / f"{i:02d}-{d.name or 'fonts'}"
+        link.symlink_to(d.resolve(), target_is_directory=True)
+        links.append(link)
+    return links
+
+
 def to_pdf(src: Path, work: Path, soffice: str) -> Path:
     """입력 복사본을 전용 LibreOffice 프로필로 변환합니다(실행 중인 인스턴스·잠긴 프로필 회피)."""
     staged_dir = work / "in"
@@ -79,6 +106,7 @@ def to_pdf(src: Path, work: Path, soffice: str) -> Path:
     outdir = work / "pdf"
     outdir.mkdir(exist_ok=True)
     profile = (work / "lo-profile").resolve()
+    link_fonts(profile, font_dirs())
     cmd = [soffice, f"-env:UserInstallation={profile.as_uri()}", "--headless", "--norestore",
            "--convert-to", "pdf", "--outdir", str(outdir), str(staged)]
     proc = run_tool(cmd, "soffice")
@@ -118,6 +146,72 @@ def publish(staged: Path, out_dir: Path, keep: Path) -> None:
         os.replace(f, out_dir / f.name)
 
 
+def norm_font(name: str) -> str:
+    """서브셋 접두어(ABCDEF+)를 떼고 소문자 영숫자만 남깁니다. PDF의 PostScript 이름과
+    글꼴 파일의 전체 이름("Linux Libertine G Regular")을 같은 잣대로 맞추기 위해서입니다."""
+    return re.sub(r"[^0-9a-z]", "", name.split("+", 1)[-1].lower())
+
+
+def bundled_fonts(soffice: str) -> list[tuple[str, object]]:
+    """LibreOffice가 함께 싣는 글꼴 (정규화한 이름, pymupdf.Font). 폴더를 못 찾으면 빈 목록."""
+    import pymupdf
+
+    base = Path(soffice).resolve().parent
+    dirs = [(base / rel).resolve() for rel in BUNDLED_FONT_DIRS]
+    dirs += [d.parent / "Resources/fonts/truetype" for d in FALLBACK_DIRS if d.name == "MacOS"]
+    fonts = []
+    for d in dict.fromkeys(dirs):
+        if not d.is_dir():
+            continue
+        for f in sorted(d.iterdir()):
+            if f.suffix.lower() not in FONT_FILES:
+                continue
+            try:
+                font = pymupdf.Font(fontfile=str(f))
+            except Exception:  # noqa: BLE001 - 읽지 못한 글꼴은 판정에서 뺍니다
+                continue
+            fonts.append((norm_font(font.name), font))
+    return fonts
+
+
+def substituted_chars(trace_spans, bundled) -> dict[str, set[str]]:
+    """내장 글꼴로 찍혔는데 그 내장 글꼴에 없는 비ASCII 글자를 {글꼴: 글자들}로 돌려줍니다.
+
+    PDF 안 서브셋 글꼴은 cmap이 없어 직접 물을 수 없으므로, 같은 이름의 원본 글꼴 파일에
+    글리프가 있는지 봅니다. 시스템 글꼴(내장 목록에 없는 이름)은 판정하지 않습니다."""
+    missing: dict[str, set[str]] = {}
+    for span in trace_spans:
+        key = norm_font(span["font"])
+        cands = [f for n, f in bundled if key and (n.startswith(key) or key.startswith(n))]
+        if not cands:
+            continue
+        for ch, *_ in span["chars"]:
+            if ch < 0x80 or chr(ch).isspace():
+                continue
+            if not any(f.has_glyph(ch) for f in cands):
+                missing.setdefault(span["font"].split("+", 1)[-1], set()).add(chr(ch))
+    return missing
+
+
+def check_glyphs(pdf: Path, soffice: str) -> None:
+    """빈 글리프로 찍힌 글자가 있으면 RenderError — PNG가 내용을 보여 주지 못하기 때문입니다."""
+    import pymupdf
+
+    bundled = bundled_fonts(soffice)
+    if not bundled:
+        return
+    missing: dict[str, set[str]] = {}
+    with pymupdf.open(str(pdf)) as doc:
+        for page in doc:
+            for font, chars in substituted_chars(page.get_texttrace(), bundled).items():
+                missing.setdefault(font, set()).update(chars)
+    if missing:
+        detail = "; ".join(f"{f}: {''.join(sorted(c))[:20]}" for f, c in sorted(missing.items()))
+        raise RenderError(
+            f"LibreOffice가 글꼴을 찾지 못해 글자를 빈 글리프로 그렸습니다({detail}). "
+            f"한글 글꼴이 든 폴더를 {FONT_ENV}에 적고(여럿이면 '{os.pathsep}'로 구분) 다시 실행하십시오")
+
+
 def rasterize(pdf: Path, out_dir: Path) -> int:
     import pymupdf
 
@@ -141,6 +235,7 @@ def render(src: Path, out_dir: Path) -> int:
         work = Path(tmp)
         office_src = md_to_docx(src, work, pandoc) if pandoc else src
         pdf = to_pdf(office_src, work, soffice)
+        check_glyphs(pdf, soffice)
         # 변환·래스터화가 끝까지 성공한 뒤에만 기존 렌더 결과를 바꿉니다.
         with tempfile.TemporaryDirectory(prefix=".staging-", dir=out_dir) as stage:
             count = rasterize(pdf, Path(stage))

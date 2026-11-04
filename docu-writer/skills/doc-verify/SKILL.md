@@ -41,7 +41,9 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 
 `<out-dir>`에 `page_001.png …`와 `pages.json`(`[{"page": 1, "text": "…"}]`, 쪽별 글)을 씁니다. 쓰기 전에 `<out-dir>` 바로 아래의 `page_*`와 `pages.json`만 지웁니다. 하위 디렉터리(`source/`)는 건드리지 않습니다. 이전 렌더가 쪽 수가 더 많았을 때 남은 쪽이 `length`·`r1_tables`를 흐리지 않게 하기 위해서입니다. 쪽별 글은 PDF에서 pymupdf `get_text`로 읽습니다.
 
-**HWPX 렌더.** kordoc은 MCP 도구라 스크립트에서 부를 수 없습니다. 메인 대화가 `render_document(format: "svg", pages: "1-N", output_path: .docu-writer/render/page.svg)`와 `format: "png"`를 같은 디렉터리에 냅니다. `doc_verify.py`는 `pages.json`이 없으면 `page_NNN.svg`의 `<text>` 요소에서 쪽별 글을 읽습니다. 조판 캐시가 없는 HWPX(AI가 만든 파일)는 근사 렌더이므로 R1·R3 판정은 ⑧에서 「한컴에서 확인 권장」을 붙입니다.
+**글꼴.** `render.py`는 LibreOffice 전용 프로필의 `user/fonts/`에 글꼴 폴더 링크를 둡니다(macOS: `/System/Library/Fonts`·`/Library/Fonts`·`~/Library/Fonts`, 그리고 `DOCU_WRITER_FONT_DIRS`에 `:`로 나눠 적은 폴더). macOS의 LibreOffice는 headless 변환에서 시스템 글꼴을 못 찾고 내장 Latin 글꼴로만 그리는 일이 있어, 링크가 없으면 한글이 빈 글리프로 찍히고 `pages.json` 글만 멀쩡합니다. 변환한 PDF에서 내장 글꼴에 없는 글자가 그 글꼴로 찍혔으면 PNG를 쓰지 않고 종료 코드 2로 멈춥니다. 한글 글꼴이 든 폴더를 `DOCU_WRITER_FONT_DIRS`에 적고 다시 실행합니다.
+
+**HWPX 렌더.** kordoc은 MCP 도구라 스크립트에서 부를 수 없습니다. 메인 대화가 `render_document(format: "svg", pages: "1-N", output_path: docu-writer-out/page.svg)`와 `format: "png"`를 같은 디렉터리에 낸 뒤 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음 — `format-hwpx` 「렌더」). `doc_verify.py`는 `pages.json`이 없으면 `page_NNN.svg`(한 쪽이면 `page.svg`)의 `<text>` 요소에서 쪽별 글을 읽습니다. 둘이 섞여 있으면 이전 렌더가 남은 것이므로 사용 오류로 멈춥니다. 조판 캐시가 없는 HWPX(AI가 만든 파일)는 근사 렌더이므로 R1·R3 판정은 ⑧에서 「한컴에서 확인 권장」을 붙입니다.
 
 ## 검사 항목
 
@@ -49,8 +51,9 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 |---|---|---|---|
 | `hash` | 견본 sha256이 `--expect-sha256`과 같음 | 모두 | 다르면 `fail` (CRITICAL: 원본이 바뀜) |
 | `residue` | 프로파일 `sample_text`의 문구가 결과에 남았는가 | sample | 남으면 `fail`. `○○`만 있는 토큰은 비교에서 뺍니다 |
+| `markup` | 마크다운 표지(`> ` 인용, `# ` 제목, `**굵게**`, `\` 탈출, `| … |` 표 줄)가 결과 글에 글자로 남았는가 | 모두 | 남으면 `fail`. 견본에 같은 꼴이 있으면 그 종류는 문서의 글로 보고 뺍니다 (kordoc `patch_document`가 요약 상자 앞에 `> `를 남긴 사례) |
 | `placeholder` | 자리표시 목록의 항목마다 `expect` 글이 결과에 있는가. `locator`를 풀 수 있으면 그 위치 안에서 찾음 | 모두 | 없으면 `fail` (kordoc이 `○`를 먹었을 수 있음) |
-| `fields` | 프로파일 `fields`마다 칸이 채워졌거나 자리표시 목록에 있는가, `constraint`를 지키는가 | form | 빈칸·위반이면 `fail` |
+| `fields` | 프로파일 `fields`마다 칸이 채워졌거나 자리표시 목록에 있는가, `constraint`를 지키는가 | form | 빈칸·위반이면 `fail` (보고에는 칸 값 대신 글자 수만 냄) |
 | `scope` | 프로파일 `update.sections` 밖 문단이 견본과 같은가. 섹션 범위는 `anchor`부터 다음 섹션 `anchor` 앞까지 | update | 다르면 `fail` |
 | `r4_headings` | 같은 수준 제목의 (서체, 크기, 굵기)가 하나뿐이고 `design.type.hN`과 같은가 | 모두 | 다르면 `fail` |
 | `r5_tokens` | 결과가 쓴 서체·크기·색·스타일 이름이 프로파일 토큰과 `styles_allowed` 안인가 | 모두 | 밖이면 `fail` |
@@ -62,16 +65,16 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 
 - **R6 정규화.** 비교 전에 `○`(U+25CB)·`ㅇ`(U+3147)·`ᄋ`(U+110B)·`◦`(U+25E6)를 같은 부호로, `•`·`·`를 같은 부호로 봅니다.
 - **형식별 읽는 법.** DOCX는 python-docx(스타일·run 서식·표), PPTX는 python-pptx(레이아웃·플레이스홀더·run 서식), MD는 원문(제목 `#` 수준·목록 부호·표), HWPX는 zip 안 `Contents/section*.xml`의 `hp:t` 글과 `header.xml`의 글자·문단 모양 id입니다. HWPX의 R4·R5는 "견본이 쓰지 않던 글자·문단 모양 id를 결과가 참조하는가"로 판정합니다.
-- 읽을 수 없는 항목(예: MD의 서체)은 `skip`과 이유를 남깁니다. 해당 모드·형식이 아닌 검사도 `skip`이며, `report.json`에는 12개 id가 언제나 모두 들어갑니다.
+- 읽을 수 없는 항목(예: MD의 서체)은 `skip`과 이유를 남깁니다. 해당 모드·형식이 아닌 검사도 `skip`이며, `report.json`에는 13개 id가 언제나 모두 들어갑니다.
 
 ### 검사 세부
 
-- **줄 머리 부호 (R6).** 문단 글의 첫 공백 앞 토큰이 부호 모양이면 줄 머리 부호입니다. 부호 모양은 기호 한 글자(`□ ■ ◇ ◆ ○ ㅇ ᄋ ◦ ● - – • · ※ ▶ ☞`)이거나 번호 모양(`1.` `1)` `(1)` `①` `1.1` `가.` `가)` `(가)` `A.`)입니다. 번호 모양은 숫자·글자가 달라도 같은 부호로 봅니다(`3.` = `1.`). `○○사업`처럼 토큰이 기호 한 글자가 아니면 부호가 아닙니다. `structure.numbering` 항목도 같은 방식으로 모양을 정합니다. 부호가 없는 문단은 세지 않습니다. 수준은 DOCX (스타일, 왼쪽 들여쓰기), PPTX 문단 `lvl`, MD 제목은 `#` 수·그 밖 줄은 줄 앞 공백 수, HWPX 문단 모양 id로 묶고, 한 수준 안에 모양이 둘 이상이면 섞인 것입니다. MD 제목은 `#`와 공백을 뺀 글로 부호를 봅니다.
+- **줄 머리 부호 (R6).** 문단 글의 첫 공백 앞 토큰이 부호 모양이면 줄 머리 부호입니다. 부호 모양은 기호 한 글자(`□ ■ ◇ ◆ ○ ㅇ ᄋ ◦ ● - – • · ※ ▶ ☞`)이거나 번호 모양(`1.` `1)` `(1)` `①` `1.1` `가.` `가)` `(가)` `A.`)입니다. 번호 모양은 숫자·글자가 달라도 같은 부호로 봅니다(`3.` = `1.`). `○○사업`처럼 토큰이 기호 한 글자가 아니면 부호가 아닙니다. 네 자리 숫자로 시작하는 `2026.`·`2026.11.12.`는 날짜의 연도라 부호가 아닙니다(`profile_extract`도 같은 규칙). `structure.numbering` 항목도 같은 방식으로 모양을 정합니다. 부호가 없는 문단은 세지 않습니다. 수준은 DOCX (스타일, 왼쪽 들여쓰기), PPTX 문단 `lvl`, MD 제목은 `#` 수·그 밖 줄은 줄 앞 공백 수, HWPX 문단 모양 id로 묶고, 한 수준 안에 모양이 둘 이상이면 섞인 것입니다. MD 제목은 `#`와 공백을 뺀 글로 부호를 봅니다.
 - **스타일 이름 (R5).** DOCX는 문단 스타일 이름(표 칸 안 문단 포함)만 `styles_allowed`와 비교하고 표 스타일은 보지 않습니다. PPTX는 슬라이드 레이아웃 이름입니다. 서체·크기는 `design.type.*`의 `font`·`pt`, 색은 `design.color` 값과 비교하며, 토큰이 비어 있는 항목은 비교하지 않습니다. run에 직접 적힌 값만 봅니다(스타일에서 물려받은 값은 R4가 봄).
 - **표 머리행.** 2행 이상인 표만 비교합니다(1행짜리 틀 표는 머리행이 없음). 머리행 서식은 첫 행 run들의 굵기와 칸 바탕색입니다.
-- **분량 (`length`).** 문서 전체는 프로파일 최상위 `length`(`pages`·`slides`·`chars` 중 있는 것), 섹션은 `structure.sections[].length.chars`의 상한을 봅니다. `pages`는 렌더 쪽 수(`pages.json` 또는 `page_NNN.svg` 수)이고, 렌더가 없으면 `skip`입니다. `lines`는 조판에 따라 달라 스크립트가 보지 않고 detail에 「⑦ 리뷰어 확인」으로 남깁니다.
+- **분량 (`length`).** 문서 전체는 프로파일 최상위 `length`(`pages`·`slides`·`chars` 중 있는 것), 섹션은 `structure.sections[].length.chars`의 상한을 봅니다(form 모드는 섹션 분량을 보지 않고 최상위 `length`만 봅니다 — 양식 섹션은 문서 끝까지 이어져 글자 수가 양식 전체이기 때문입니다). `pages`는 렌더 쪽 수(`pages.json` 또는 `page_NNN.svg`·`page.svg` 수)이고, 렌더가 없으면 `skip`입니다. `lines`는 조판에 따라 달라 스크립트가 보지 않고 detail에 「⑦ 리뷰어 확인」으로 남깁니다.
 - **빈칸 constraint.** `re:<정규식>`이면 칸 글 전체가 맞아야 합니다(fullmatch). 그 밖의 글로 쓴 constraint는 판정하지 않고 detail에 남겨 ⑦로 넘깁니다.
-- **섹션 범위 (`scope`).** 결과에서 섹션 시작은 견본 anchor 문단과 같은 글의 문단으로 찾습니다. `update.sections` 밖 섹션과 첫 섹션 앞 부분은 문단·표 칸 글의 순서가 견본과 같아야 합니다.
+- **섹션 범위 (`scope`).** 결과에서 섹션 시작은 견본 anchor 문단과 같은 글의 문단으로 찾습니다. PPTX `sl:N`은 견본 N번째 슬라이드의 id(`p:sldId`)로 결과 슬라이드를 찾습니다. 그래서 슬라이드 복제·삭제로 순서가 밀려도 섹션 경계가 따라갑니다. 견본 id가 결과에 하나도 없으면(다른 프로그램이 다시 저장해 id를 새로 매긴 경우) 자리 N으로 찾습니다. `update.sections` 밖 섹션과 첫 섹션 앞 부분은 문단·표 칸 글의 순서가 견본과 같아야 합니다.
 - **자리표시 위치.** `sN`·`fN`·`t:…` 칸 locator는 결과에서 그 범위 안을 찾습니다. `p:`·`sl:` 같은 dump locator는 편집으로 번호가 바뀌므로 문서 전체에서 찾습니다.
 - **R1 표.** 표마다 첫 칸·끝 칸 글(`profile_extract.py tables`와 같은 규칙: 40자 자름, 빈 끝 칸은 그 행의 마지막 빈 아닌 칸)을 쪽별 글에서 공백을 빼고 찾습니다. 못 찾은 표는 detail에 적고 넘어갑니다. `locations`에는 의심 표의 `t:N`을 적습니다.
 
@@ -87,7 +90,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 
 ## 출력
 
-`<out-dir>/report.json`은 검사 항목 표 순서대로 12개 `{id, status, detail, locations}`의 JSON 목록입니다. `status`는 `pass`·`fail`·`warn`·`skip`, `locations`는 locator 글의 목록입니다. 검사할 대상이 없으면 `skip`입니다: `--placeholders`가 없으면 `placeholder`, `length`가 없으면 `length`, `--pages-dir`가 없으면 `r1_tables`. 표준 출력에는 다음 요약을 냅니다.
+`<out-dir>/report.json`은 검사 항목 표 순서대로 13개 `{id, status, detail, locations}`의 JSON 목록입니다. `status`는 `pass`·`fail`·`warn`·`skip`, `locations`는 locator 글의 목록입니다. 검사할 대상이 없으면 `skip`입니다: `--placeholders`가 없으면 `placeholder`, `length`가 없으면 `length`, `--pages-dir`가 없으면 `r1_tables`. 표준 출력에는 다음 요약을 냅니다.
 
 ```
 ### 문서 검증: <결과 파일>
@@ -101,5 +104,6 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 ## 실패했을 때
 
 - **검사를 약하게 만들어 통과시키지 않습니다.** 프로파일의 `sample_text`·`styles_allowed`·`length`를 결과에 맞춰 고치는 것은 고친 것이 아닙니다. 프로파일이 틀렸다고 판단되면 고치지 말고 보고합니다(④ 승인으로 되돌림).
+- **`residue`가 사실인 글을 잡았을 때**(예: 견본과 이번 판 모두에 맞는 끝난 일정): writer는 사실을 바꾸거나 지워서 통과시키지 않습니다. 메인 대화에 해당 지문과 근거를 보고하고, 메인 대화가 analyst에게 `sample_text` 수정을 맡긴 뒤 `profile_extract.py check`와 ④ 재승인(`approved.sha256` 다시 쓰기)을 거쳐 ⑥을 다시 돌립니다.
 - R1·R2를 맞추려고 토큰(글자 크기·여백·줄 간격)을 바꾸지 않습니다. `design-review`를 따릅니다.
 - 같은 실패가 세 번 반복되면 멈추고 원인과 함께 보고합니다.

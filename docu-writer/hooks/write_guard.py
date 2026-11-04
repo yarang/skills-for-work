@@ -19,6 +19,8 @@ KORDOC_TOOLS = (
 )
 CONTRACT_NAMES = ("protected-paths", "approved.sha256", "session.yaml")
 APPROVED_NAMES = ("profile.yaml", "evidence.yaml")
+# kordoc은 숨김 경로에 쓰지 않으므로 kordoc 출력은 cwd의 보이는 이 폴더에 냈다가 옮긴다.
+STAGING_NAME = "docu-writer-out"
 
 
 def target_key(tool_name):
@@ -71,6 +73,12 @@ def forms(path, cwd):
     return {lexical(path, cwd), canonical(path, cwd)}
 
 
+def in_staging(real, cwd):
+    """cwd/docu-writer-out/ 안이면 참. 폴더 자체가 링크면 목적지를 믿을 수 없어 거짓."""
+    staging = lexical(STAGING_NAME, cwd)
+    return not os.path.islink(staging) and is_inside(real, canonical(STAGING_NAME, cwd))
+
+
 def read_protected(workspace, cwd):
     """protected-paths의 빈 줄·주석(#)이 아닌 줄의 경로 형태들. 읽을 수 없으면 None."""
     try:
@@ -101,9 +109,9 @@ def decide(role, target, workspace, protected, cwd):
         return False, "견본(protected-paths)은 읽기 전용입니다"
     contract = workspace_files(workspace, CONTRACT_NAMES, cwd)
     if role == "analyst":
-        if is_inside(real, workspace) and not hits(mine, contract):
+        if (is_inside(real, workspace) or in_staging(real, cwd)) and not hits(mine, contract):
             return True, ""
-        return False, "analyst는 .docu-writer/ 안(계약 파일 제외)에만 쓸 수 있습니다"
+        return False, f"analyst는 .docu-writer/ 안(계약 파일 제외)과 {STAGING_NAME}/ 안에만 쓸 수 있습니다"
     if role == "researcher":
         others = contract | workspace_files(workspace, ("profile.yaml",), cwd)
         if same_file(real, os.path.join(workspace, "evidence.yaml")) and not os.path.islink(lexical(target, cwd)) \

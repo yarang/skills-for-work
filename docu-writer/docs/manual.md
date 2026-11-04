@@ -4,21 +4,22 @@
 
 ## 1. 현재 상태 (v0.2.0, 2026-11-04)
 
-> **스크립트 6개가 들어오고 codex·agy 리뷰의 CRITICAL·HIGH 지적을 반영해, 테스트 205건이 모두 통과합니다.** 다만 실제 업무 문서로 처음부터 끝까지 돌려 보는 종단 시험은 아직 하지 않았습니다. 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오.
+> **HWPX·DOCX·PPTX × sample·form·update 9개 경로의 종단 시험을 마쳤습니다.** 시험에서 찾은 결함 16건(F1~F16)을 모두 고쳤고, 테스트 256건이 통과합니다. 시험 견본은 시험용으로 만든 가상 문서입니다. 실제 업무 문서는 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오. 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에 있습니다.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 규칙 | 에이전트 4개, 스킬 13개(newdoc은 자리만) | 완료 |
-| 테스트 | `tests/` 7개 파일, 205건 (리뷰 회귀 34건 포함) | **205 통과** (10장) |
+| 테스트 | `tests/` 10개 파일, 256건 (리뷰 회귀 34건, 종단 시험 회귀 포함) | **256 통과** (10장) |
 | 스크립트 | `hooks/write_guard.py`·`hooks.json`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py` | 완료 |
-| 시험 | HWPX·DOCX·PPTX × sample·form·update 종단 시험 | 대기 |
+| 시험 | HWPX·DOCX·PPTX × sample·form·update 종단 시험, hook 실동작 확인 | **완료** — 9개 경로 통과, 결함 16건 수정 (13장) |
 | 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | CRITICAL·HIGH 반영 완료, MEDIUM 일부 보류, push 완료 |
 
 알아 둘 한계는 다음과 같습니다.
 
-- **종단 시험 전**: 테스트는 코드로 만든 작은 견본을 씁니다. 병합 셀이 많은 표, 글상자가 많은 HWPX처럼 실제 문서에서만 나오는 경우는 아직 확인하지 못했습니다.
+- **실제 업무 문서**: 종단 시험은 시험용으로 만든 가상 견본(추진계획·주간 보고·신청서 양식)을 썼습니다. 병합 셀이 아주 많은 표, 글상자가 많은 HWPX처럼 실제 문서에서만 나오는 경우는 아직 확인하지 못했습니다.
+- **kordoc 출력은 `docu-writer-out/`을 거칩니다**: kordoc 쓰기 도구는 숨김 경로(`.docu-writer/`)에 쓰지 않습니다. 작업 폴더에 잠깐 `docu-writer-out/`이 생겼다가 옮긴 뒤 지워집니다(6장).
 - **PPTX 슬라이드 복제(`slide_dup`)**: 차트는 원본과 같은 차트 데이터를 가리키고, 애니메이션·전환 효과와 발표자 노트는 복사되지 않습니다.
 - **견본 보호**: hook이 `docu-writer:*` 에이전트의 쓰기를 막지만 `Bash`로 쓴 것은 보지 못합니다. ⑥의 해시 대조가 마지막 그물입니다. `.docu-writer/protected-paths`가 없거나 읽을 수 없으면 hook은 reviewer 외 역할의 쓰기도 모두 막습니다(닫힌 쪽 실패).
 - **writer의 쓰기 범위**: writer는 계약 파일·견본 밖이면 어디든 쓸 수 있습니다(`.git/`·`.claude/` 포함). 결과 경로를 고정하지 않는 설계라서 그대로 두었습니다.
@@ -113,7 +114,7 @@ Ghostscript는 필요 없습니다. PDF → PNG는 pymupdf가 맡습니다.
 | 남은 MEDIUM·LOW 지적 | CRITICAL·HIGH는 ⑤로 되돌려 고친 뒤라 남지 않습니다 |
 | 근사 렌더 안내 | HWPX는 「한컴에서 쪽 나눔 확인 권장」 |
 
-검증 결과의 원본은 `.docu-writer/verify/report.json`입니다. 검사 12개가 언제나 모두 들어가며 `status`는 넷 중 하나입니다.
+검증 결과의 원본은 `.docu-writer/verify/report.json`입니다. 검사 13개가 언제나 모두 들어가며 `status`는 넷 중 하나입니다.
 
 | status | 뜻 |
 |---|---|
@@ -158,6 +159,8 @@ cp -p ".docu-writer/backup/사업계획.20261104-153012.pptx" "/경로/사업계
 | `backup/` | ⑧ | update 모드 원본 백업 |
 
 작업이 끝나면 지워도 됩니다. 단, update 모드의 `backup/`은 되돌릴 일이 없을 때까지 두십시오.
+
+HWPX 작업 중에는 `.docu-writer/` 옆에 `docu-writer-out/`이 잠깐 생깁니다. kordoc 쓰기 도구(`patch_document`·`fill_form`·`render_document` 등)가 `.`으로 시작하는 숨김 경로에 쓰지 않기 때문입니다. 에이전트가 이 폴더에 낸 파일을 `.docu-writer/` 안으로 옮기고 폴더를 지웁니다. 작업이 끝났는데 남아 있으면 옮기다 멈춘 것이니 안을 확인한 뒤 지우십시오. hook은 analyst에게 `.docu-writer/`와 이 폴더만 쓰게 하고, 이 폴더가 심볼릭 링크면 막습니다.
 
 ## 7. 형식별 주의
 
@@ -226,7 +229,9 @@ cd <이 저장소>/docu-writer
 uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf pytest tests
 ```
 
-2026-11-04 실행 결과는 `205 passed`입니다(약 40초, `test_render.py`는 `soffice`·`pandoc`이 있어야 합니다).
+2026-11-04 실행 결과는 `256 passed`입니다(약 80초, `test_render.py`·`test_render_fonts.py`는 `soffice`·`pandoc`이 있어야 합니다). lint는 `uvx ruff check --select F,E9 hooks template/skills/template-analysis/scripts skills/*/scripts tests`로 봅니다.
+
+종단 시험에서 나온 회귀 테스트는 docstring에 「종단 시험 F번호」를 적어 두었습니다. `test_e2e_chain.py`(③→⑥ 연결), `test_render_fonts.py`(F3), `test_workflow_snippets.py`(F2, SKILL.md의 셸 명령을 그대로 실행)가 이때 생겼습니다.
 
 `samples` 픽스처가 DOCX·PPTX·MD 견본을 한꺼번에 만들므로, 한 파일만 돌릴 때도 `--with`에 `python-docx`와 `python-pptx`를 모두 넣어야 합니다. 각 스크립트는 자기 의존성을 PEP 723 블록에 적어 두므로 `--with` 목록은 pytest 쪽에만 필요합니다.
 
@@ -259,3 +264,74 @@ uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf p
 - 렌더는 근사입니다. HWPX는 한컴, DOCX는 Word에서 최종 확인이 필요합니다.
 - hook은 `Bash`로 쓰는 파일을 보지 못합니다. 그래서 ⑥의 해시 대조가 최종 방어선입니다.
 - 견본 서식을 바꾸는 일(서체 변경, 섹션 추가)은 하지 않습니다. 견본과 요청이 충돌하면 견본을 따르고 보고만 합니다.
+- 종단 시험에서 확인했지만 고치지 않은 한계는 13.4에 있습니다.
+
+## 13. 종단 시험 결과 (2026-11-04)
+
+각 `SKILL.md`에 적힌 명령을 그대로 따라 9개 경로를 처음부터 끝까지 돌렸습니다. 견본은 시험용으로 만든 가상 문서이고, 양식에 넣은 개인정보도 가상 값입니다. 시험 중 문서나 도구가 틀린 곳이 나오면 그 자리에서 고치고 회귀 테스트를 붙였습니다.
+
+### 13.1 경로별 결과
+
+| 형식 | 모드 | 견본 | 최종 | 시험 중 나온 일 |
+|---|---|---|---|---|
+| HWPX | sample | 추진계획.hwpx | 통과 | 요약 상자에 `> `가 글자로 새어 든 결과를 새 `markup` 검사가 막음(F12). `> `를 떼고 다시 써서 통과. 숨김 경로 렌더 거부(F13), 한 쪽 렌더 이름(F14), `1.1` 번호(F11) |
+| HWPX | form | 출장 신청서.hwpx | 통과 (`fields` 칸 7개) | 전화번호 형식을 틀린 결과를 `fields`가 막음. 그 보고에 칸 값이 그대로 찍혀 고침(F16) |
+| HWPX | update | 추진계획.hwpx | 통과 | 고칠 섹션 밖(s3) 표 칸을 바꾼 결과를 `scope`가 막음 |
+| DOCX | sample | 주간 보고.docx | 통과 | 사실 문구를 잔여로 잡음(F1), 렌더 글꼴(F3) |
+| DOCX | form | 수강 신청서.docx | 통과 | 칸 이름표가 지문 후보로 샘(F4), `re:` 제약 문서 없음(F5), R1 쪽 글 대조(F6), 양식 섹션에 length 요구(F7) |
+| DOCX | update | 주간 보고.docx | 통과 | ③을 건너뛰면 ④ 명령이 반쪽 승인을 남김(F2, DOCX 시험 중 절차를 따르다 발견) |
+| PPTX | sample | 주간 보고.pptx | 통과 | — |
+| PPTX | form | 회의실 신청 양식.pptx | 통과 | 날짜 칸 `re:` 제약이 정상 값을 떨어뜨림(F9), R6이 날짜 연도를 번호로 봄(F10) |
+| PPTX | update | 주간 보고.pptx | 통과 | 장을 복제하자 섹션 위치가 밀려 정상 결과가 `scope` 실패(F8). 슬라이드 id로 찾게 고친 뒤 통과 |
+
+「막음」은 일부러 틀리게 만든 결과를 검사가 제대로 잡았다는 뜻입니다. HWPX의 세 가지 막는 경로(`markup`·`fields`·`scope`)는 모두 종료 코드 1로 ⑦에 넘어가지 못했습니다.
+
+### 13.2 찾아서 고친 결함
+
+| # | 문제 | 고친 곳 |
+|---|---|---|
+| F1 | residue가 판마다 그대로 이어지는 사실 문구를 견본 잔여로 잡음 | template-analysis: 그런 값은 지문(`sample_text`)에서 뺌. doc-verify: 정당한 글이 잡히면 writer는 사실을 바꾸지 않고 analyst가 지문을 고친 뒤 ④ 재승인 |
+| F2 | update에서 ③을 건너뛰면 `evidence.yaml`이 없는데, ④ 명령이 실패하면서도 profile 한 줄짜리 `approved.sha256`을 남김 | template-workflow ④ 명령, `test_workflow_snippets.py` |
+| F3 | macOS LibreOffice가 시스템 글꼴을 못 찾아 한글을 빈 글리프로 그리는데, 쪽 글은 멀쩡해 검사가 못 알아챔 | `render.py` 글꼴 설정과 글리프 점검, `test_render_fonts.py` |
+| F4 | 양식 칸 이름표가 `sample_text` 후보로 샘 | `profile_extract.py` `drop_field_labels` |
+| F5 | `re:` 제약 쓰는 법이 문서에 없어, 문서를 따른 analyst가 검사할 수 없는 자연어 제약을 씀 | template-analysis SKILL.md |
+| F6 | LibreOffice가 ○를 대체 글꼴로 그리면 쪽 글 순서가 바뀌어 R1이 표 칸을 못 찾음 | `_checks_design.py` R1 낱말 대조 |
+| F7 | form 모드 섹션(양식 뼈대)에도 length를 요구함 | `profile_extract.py check`·doc-verify `length`가 form 섹션을 건너뜀 |
+| F8 | PPTX 장 복제·삭제 뒤 `sl:N` 섹션이 밀림 | `_locate.py` `slide_anchor`가 견본 슬라이드 id로 찾음 |
+| F9 | `re:` 제약이 전체 일치(fullmatch)라는 사실이 문서에 없어 부분 패턴이 정상 값을 떨어뜨림 | template-analysis SKILL.md |
+| F10 | R6이 날짜의 연도(「2026. 11. 12.」)를 번호로 봄 | `_checks_design.py` `YEAR` |
+| F11 | 끝 점 없는 다단 번호 `1.1`을 profile_extract와 doc-verify가 다르게 봄 | `_pe_common.py` `MARKER_RE` |
+| F12 | kordoc `patch_document`가 요약 상자에 `> `를 글자로 넣는데 잡는 검사가 없음 | doc-verify `markup` 검사 추가(검사 13개), format-hwpx 「함정」 |
+| F13 | kordoc `render_document`가 숨김 경로에 쓰지 않음 | 렌더 절차를 `docu-writer-out/` 경유로 바꿈 |
+| F14 | 한 쪽만 렌더하면 접미 없는 `page.svg`가 나와 doc-verify가 못 읽음 | `doc_verify.py`가 둘 다 읽고 섞이면 사용 오류, 옮길 때 `page*` |
+| F15 | 렌더뿐 아니라 kordoc 쓰기 도구 전부가 숨김 경로를 거부함 | 모든 kordoc 출력을 `docu-writer-out/` 경유로, hook이 analyst에게 이 폴더를 허용(심볼릭 링크는 거부) |
+| F16 | `fields` 위반 보고에 칸 값(개인정보일 수 있음)이 그대로 나옴 | 값 대신 글자 수만 냄(kordoc `fields_file` 마스킹과 같게) |
+
+### 13.3 hook 실동작 확인
+
+단위 테스트는 hook 스크립트에 JSON을 넣어 봅니다. 여기서는 `claude -p --plugin-dir docu-writer`로 플러그인을 실제로 띄우고, analyst·writer 서브에이전트가 직접 쓰게 했습니다(HWPX form 작업 폴더 복사본).
+
+| # | 에이전트 | 시도 | 기대 | 결과 |
+|---|---|---|---|---|
+| 1 | analyst | `Write` → `.docu-writer/work/smoke-a.md` | 허용 | 허용, 파일 생김 |
+| 2 | analyst | `Write` → 작업 폴더의 `smoke-root.md` | 거부 | 거부 「analyst는 .docu-writer/ 안(계약 파일 제외)과 docu-writer-out/ 안에만 쓸 수 있습니다」, 파일 없음 |
+| 3 | analyst | kordoc `render_document` → `docu-writer-out/page.svg` | 허용 | 허용, SVG 생김 |
+| 4 | writer | `Write` → `.docu-writer/profile.yaml` | 거부 | 거부 「writer는 계약 파일과 profile.yaml·evidence.yaml을 쓸 수 없습니다」, 내용 그대로 |
+| 5 | writer | `Write` → 견본 `출장 신청서.hwpx` | 거부 | 거부 「견본(protected-paths)은 읽기 전용입니다」, sha256 시험 전후 같음 |
+
+거부는 모두 `PreToolUse:Write` hook에서 나왔고, 에이전트는 거부된 호출을 다시 시도하지 않았습니다.
+
+### 13.4 확인했지만 고치지 않은 한계
+
+| 영역 | 한계 | 대처 |
+|---|---|---|
+| PPTX form | 자리표시(placeholder)만 칸으로 봅니다. 표·글상자 안 칸은 아직 아닙니다 | 그런 양식은 ②에서 보고 |
+| DOCX form | 병합되지 않은 칸의 이름표는 왼쪽 칸 글로 추정합니다 | ④ 승인 화면에서 칸 이름 확인 |
+| residue | LibreOffice 대체 글꼴로 쪽 글 순서가 바뀌면 남은 문구에 쪽 번호를 못 붙일 수 있습니다 | 판정은 문서 글 기준이라 그대로입니다 |
+| 범위 | 패처(`patch_docx`·`patch_pptx`·kordoc)는 섹션 범위를 지키지 않습니다 | doc-verify `scope`가 섹션 밖 변경을 막습니다 |
+| HWPX 렌더 | AI가 만든 HWPX는 근사 렌더입니다(조판 캐시 없음) | 쪽 경계 판정은 한컴에서 확인 |
+| HWPX R6 | 부호가 문단 자동 번호 서식이면 문단 글에 부호가 없어 R6이 보지 못합니다 | ⑦ 리뷰어가 렌더로 확인 |
+| HWPX 프로파일 | `profile_extract.py profile`은 DOCX·PPTX·MD만 초안을 만듭니다 | analyst가 `parse_document`·`extract_profile`로 직접 씀 |
+| kordoc | `> ` 새어 듦(F12), 거짓 「반영 안 된 편집 있음 (수정 1)」, `parse_document`에서 첫 ○가 안 보임, 숨김 경로 쓰기 거부(F13·F15) | 문서 절차와 `markup` 검사로 비켜 감. kordoc 쪽 수정이 필요 |
+| 권한 | reviewer는 `Write` 도구가 없습니다(첫째 방어선). hook은 둘째 방어선입니다 | — |
+| 시험 양식 | 칸이 좁아 전화번호가 줄바꿈됩니다 | 파이프라인 결함이 아니라 양식 설계 문제 |

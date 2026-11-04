@@ -24,7 +24,7 @@ skills:
 
 ## 규칙
 
-- **견본 원본에 쓰지 않습니다.** 결과는 `## 출력 경로` 하나와 `.docu-writer/work/`·`render/`·`verify/`·`placeholders.yaml`에만 씁니다. hook이 보호 경로 쓰기를 막고, ⑥에서 견본 해시를 다시 비교합니다.
+- **견본 원본에 쓰지 않습니다.** 결과는 `## 출력 경로` 하나와 `.docu-writer/work/`·`render/`·`verify/`·`placeholders.yaml`에만 씁니다. kordoc 도구는 숨김 경로에 쓰지 않으므로 `.docu-writer/` 안에 둘 kordoc 출력은 `docu-writer-out/`에 냈다가 옮깁니다(`format-hwpx` 「kordoc 출력 경로」). hook이 보호 경로 쓰기를 막고, ⑥에서 견본 해시를 다시 비교합니다.
 - **계약 파일을 고치지 않습니다.** `.docu-writer/profile.yaml`과 `evidence.yaml`은 ④에서 승인된 것입니다. 검사를 통과시키려고 `sample_text`·`styles_allowed`·`length`를 바꾸는 것은 고친 것이 아닙니다. 프로파일이 틀렸다고 판단되면 보고하고 멈춥니다.
 - **근거표에 없는 사실을 쓰지 않습니다.** 문장을 매끄럽게 하려고 수치·일자·이름을 보태지 않습니다.
 - **서식을 새로 만들지 않습니다.** 프로파일 `styles_allowed`·토큰 밖의 서체·크기·색·스타일을 쓰지 않습니다. R1·R2를 맞추려고 글자 크기·여백·줄 간격을 줄이지 않고 내용을 줄입니다. 줄인 사실은 「줄인 내용」에 남깁니다.

@@ -2,7 +2,7 @@
 # requires-python = ">=3.13"
 # dependencies = ["python-docx", "python-pptx", "pyyaml", "lxml"]
 # ///
-"""결과 문서를 프로파일·견본과 대조해 12개 검사를 돌리고 report.json과 요약을 냅니다.
+"""결과 문서를 프로파일·견본과 대조해 13개 검사를 돌리고 report.json과 요약을 냅니다.
 
 계약: skills/doc-verify/SKILL.md 「검사 항목」·「검사 세부」·「출력」.
 
@@ -25,14 +25,16 @@ sys.dont_write_bytecode = True  # 스킬 디렉터리에 __pycache__를 남기�
 import yaml  # noqa: E402
 
 from _checks_content import (Ctx, check_fields, check_hash, check_length,  # noqa: E402
-                             check_placeholder, check_residue, check_scope, entry)
+                             check_markup, check_placeholder, check_residue, check_scope,
+                             entry)
 from _checks_design import (check_r1, check_r4, check_r5, check_r6,  # noqa: E402
                             check_rewrite, check_table_header)
 from _readers import doc_format, read_doc  # noqa: E402
 
 MODES = {"sample", "form", "update", "new"}
 CHECKS = [
-    ("hash", check_hash), ("residue", check_residue), ("placeholder", check_placeholder),
+    ("hash", check_hash), ("residue", check_residue), ("markup", check_markup),
+    ("placeholder", check_placeholder),
     ("fields", check_fields), ("scope", check_scope), ("r4_headings", check_r4),
     ("r5_tokens", check_r5), ("r6_numbering", check_r6), ("table_header", check_table_header),
     ("length", check_length), ("r1_tables", check_r1), ("rewrite", check_rewrite),
@@ -109,6 +111,11 @@ def load_pages(pages_dir: Path | None) -> list | None:
         return [str(d.get("text") or "") for d in items] or None
     svgs = [p for p in pages_dir.glob("page_*.svg") if re.search(r"\d+", p.stem)]
     svgs.sort(key=lambda p: int(re.search(r"\d+", p.stem).group()))
+    single = pages_dir / "page.svg"  # kordoc은 한 쪽만 렌더하면 _page_NNN 접미 없이 냅니다 (종단 시험 F14)
+    if single.is_file():
+        if svgs:
+            raise UsageError(f"{pages_dir}에 page.svg와 page_NNN.svg가 섞여 있습니다 — 이전 렌더를 지우고 다시 렌더하십시오")
+        svgs = [single]
     return [_svg_text(p) for p in svgs] or None
 
 

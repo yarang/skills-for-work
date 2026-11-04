@@ -23,7 +23,7 @@ description: 견본·양식 파일(HWPX·HWP·DOCX·PPTX·MD)을 읽어 양식 �
    | HWPX | 스크립트 초안 없음. 형식 스킬 「분석」 표의 kordoc 도구로 읽어 직접 씁니다 |
 
 3. **형식 스킬 확인**: 형식 스킬의 「분석」 항목(편집 불가 개체, `styles_allowed`, 노트 등)을 확인합니다.
-4. **견본 렌더**: 1~3쪽을 `.docu-writer/render/source/`에 냅니다. DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`, HWPX는 kordoc `render_document(format: "png", pages: "1-3")`. 이 이미지로 서체 분위기, 강조 방식, 표 모양을 봅니다.
+4. **견본 렌더**: 1~3쪽을 `.docu-writer/render/source/`에 냅니다. DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`, HWPX는 kordoc `render_document(format: "png", pages: "1-3", output_path: docu-writer-out/page.png)`로 낸 뒤 `mkdir -p .docu-writer/render/source && mv docu-writer-out/page* .docu-writer/render/source/ && rmdir docu-writer-out`(kordoc은 숨김 경로에 쓰지 않음). 이 이미지로 서체 분위기, 강조 방식, 표 모양을 봅니다.
 5. **사람이 채우는 칸**: 아래 「analyst가 채우는 칸」.
 6. **점검**: 「프로파일 점검」을 통과시키고 `.docu-writer/profile.yaml`로 씁니다.
 
@@ -111,8 +111,8 @@ locator 문법은 설계서 §5입니다. 섹션 `anchor`는 형식마다 하나
 | `sections[].kind` | 섹션 본문이 주로 무엇인지: 서술·목록·표·도표·칸 |
 | `sections[].required` | sample 모드는 견본에 있는 섹션 모두 `true`. 견본 안 안내문이 「해당 시 작성」이라고 하면 `false` |
 | `sections[].guide` | 견본 글이 **하는 일**을 요약합니다(「사실(일자·건수)로 시작, 문제점 3개」). 견본 글을 옮기지 않습니다 |
-| `sections[].length` | 견본 분량을 기준으로 범위를 둡니다. 줄(`lines`)·글자(`chars`)·장(`slides`)·쪽(`pages`) 가운데 그 형식이 잴 수 있는 것 |
-| `fields[].constraint` | 칸 이름표와 주변 안내문에서 읽습니다(「한글 2~10자」, 「YYYY.MM.DD」). 안내가 없으면 비웁니다 |
+| `sections[].length` | 견본 분량을 기준으로 범위를 둡니다. 줄(`lines`)·글자(`chars`)·장(`slides`)·쪽(`pages`) 가운데 그 형식이 잴 수 있는 것. form 모드에서는 비웁니다: 양식 섹션은 쓰는 글이 아니고, 마지막 섹션이 문서 끝까지(표 포함) 이어져 글자 수가 양식 전체가 되기 때문입니다. 대신 최상위 `length: { pages: [1, 1] }`처럼 견본 쪽 수를 적어, 채운 값이 양식을 다음 쪽으로 밀어내지 않는지 보게 합니다 |
+| `fields[].constraint` | 칸 이름표와 주변 안내문에서 읽습니다. 안내가 글자 꼴을 정해 두면(「010-0000-0000 꼴로」, 「YYYY.MM.DD」) `re:<정규식>`으로 적습니다(`re:010-\d{4}-\d{4}`). 정규식은 **칸 글 전체**와 맞아야 합니다(fullmatch). 날짜 뒤에 시각이 붙는 칸처럼 뒤에 글이 더 올 수 있으면 끝에 `.*`를 붙입니다(`re:\d{4}\.\s?\d{1,2}\.\s?\d{1,2}\..*`). `doc-verify`는 `re:`만 기계로 판정하고, 「한글 2~10자」처럼 글로 쓴 constraint는 ⑦ 리뷰어에게 넘깁니다. 안내가 없으면 비웁니다 |
 | `update.sections·requests` | 갱신 요청을 섹션 id에 대응시킵니다. 요청이 여러 섹션에 걸치면 모두 적고, 대응할 섹션이 없으면 `conflicts`에 적습니다 |
 | `conflicts` | 사용자 요청이 견본과 어긋나는 점. 항상 `handling: report` |
 
@@ -127,6 +127,7 @@ locator 문법은 설계서 §5입니다. 섹션 `anchor`는 형식마다 하나
 - 섹션 제목, 표 머리행 칸, 칸 이름표(「성명」, 「소속」), 쪽 번호·머리글
 - `○○`만으로 된 토큰, 부호만 있는 줄
 - 6자 미만의 짧은 글(「합계」, 「비고」처럼 결과에도 흔히 나오는 말)
+- 다음 판에도 그대로 이어질 값: 이미 끝난 일정 행(「10.27.~11.7.」), 바뀌지 않는 담당 기관·부서명, 고정된 사업명. 주간·월간 보고처럼 지난 판을 견본으로 쓸 때 특히 많습니다. 애매하면 넣지 말고 `conflicts`에 적어 ④에서 사용자에게 묻습니다
 
 DOCX·PPTX·MD는 스크립트의 `sample_text_candidates`(제목 스타일·표 머리행을 뺀 본문 글)에서 고르고, HWPX는 `parse_document` 결과에서 고릅니다. 문장이 길면 앞 20~40자의 구절 하나로 줄입니다. 지문은 찾기용이므로 문장 전체가 필요하지 않습니다.
 
@@ -142,7 +143,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/profile_extract.py" check .docu-writer/profi
 **`check`가 보는 것** (실패하면 종료 코드 1):
 - YAML로 읽히고 `profile_version: 1`, `mode`가 sample·form·update 가운데 하나
 - `source.sha256`이 견본 파일의 실제 값과 같음
-- 섹션마다 `id·title·level·anchor·kind·required·guide·length`가 있고, `id`가 겹치지 않음
+- 섹션마다 `id·title·level·anchor·kind·required·guide·length`가 있고(form 모드는 `length` 제외), `id`가 겹치지 않음
 - anchor가 견본에서 풀리고(문단·슬라이드·제목 글이 있음) 문서 순서대로 늘어섬
 - 모든 `t:N/r:R/c:C`가 표 목록 범위 안(`N ≤ 표 수`, `R ≤ rows`, `C ≤ cols`)
 - form 모드는 `fields`가 하나 이상, update 모드는 `update.sections`의 id가 모두 섹션에 있고 `requests`가 비어 있지 않음

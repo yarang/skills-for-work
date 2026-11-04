@@ -63,4 +63,4 @@ claude --plugin-dir /path/to/skills_for_work/docu-writer
 
 사용법은 [docs/manual.md](docs/manual.md), 설계 배경은 [docs/design.md](docs/design.md)에 있습니다.
 
-> **v0.2.0 상태**: 스크립트 6개(`hooks/`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`)가 들어와 수용 테스트 171건이 통과합니다. 실제 문서로 하는 종단 시험은 아직입니다. [매뉴얼 1장](docs/manual.md#1-현재-상태-v020-2026-11-04)을 보십시오.
+> **v0.2.0 상태**: 스크립트 6개(`hooks/`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`)가 들어와 테스트 256건이 통과하고, HWPX·DOCX·PPTX × sample·form·update 9개 경로의 종단 시험을 마쳤습니다(시험용 가상 견본, 결함 16건 수정). 시험 결과는 [매뉴얼 13장](docs/manual.md#13-종단-시험-결과-2026-11-04)에, 현재 상태는 [매뉴얼 1장](docs/manual.md#1-현재-상태-v020-2026-11-04)에 있습니다.

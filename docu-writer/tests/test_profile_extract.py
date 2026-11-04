@@ -113,6 +113,28 @@ def test_profile_form_mode(samples, tmp_path):
     assert isinstance(prof["fields"], list)
 
 
+def test_profile_form_labels_not_candidates(tmp_path):
+    """종단 시험 F4: 양식의 칸 이름표(6자 이상)가 sample_text 후보로 새면 안 됩니다."""
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph("아래 칸을 빠짐없이 적어 주십시오.")
+    table = doc.add_table(rows=3, cols=2)
+    for r, label in enumerate(["성명", "부서장 확인", "신청 사유 요약"]):
+        table.cell(r, 0).text = label
+    src = tmp_path / "form.docx"
+    doc.save(src)
+    out = tmp_path / "p.yaml"
+    proc = uv(PROFILE_EXTRACT, "profile", src, "--mode", "form", "--out", out)
+    assert proc.returncode == 0, proc.stderr
+    prof = yaml.safe_load(out.read_text(encoding="utf-8"))
+    labels = {f["label"] for f in prof["fields"]}
+    assert {"부서장 확인", "신청 사유 요약"} <= labels
+    cands = prof["sample_text_candidates"]
+    assert "아래 칸을 빠짐없이 적어 주십시오." in cands
+    assert not labels & set(cands)
+
+
 def test_profile_hwpx_unsupported(samples, tmp_path):
     proc = uv(PROFILE_EXTRACT, "profile", samples["hwpx"], "--mode", "sample", "--out", tmp_path / "p.yaml")
     assert proc.returncode == 2
@@ -254,6 +276,18 @@ def test_check_failures_exit_1(samples, valid, tmp_path, mutate):
     proc = check(samples, "docx", valid, tmp_path)
     assert proc.returncode == 1, (mutate.__name__, proc.stdout, proc.stderr)
 
+
+
+def test_check_form_sections_need_no_length(samples, valid, tmp_path):
+    """종단 시험 F7: form 섹션은 쓰는 글이 아니므로 length를 요구하지 않습니다. sample은 계속 요구합니다."""
+    for s in valid["structure"]["sections"]:
+        s.pop("length")
+    proc = check(samples, "docx", valid, tmp_path)
+    assert proc.returncode == 1 and "length" in proc.stdout
+    valid["mode"] = "form"
+    valid["fields"] = [{"id": "f1", "label": "담당", "locator": "t:1/r:3/c:3", "constraint": ""}]
+    proc = check(samples, "docx", valid, tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
 
 def test_check_hwpx_heading_anchor(samples, tmp_path):
     """HWPX 프로파일은 analyst가 직접 쓰고, check는 h:"…"를 공백 무시로 풉니다."""

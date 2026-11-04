@@ -1,41 +1,46 @@
-%% 구현 상태 (2026-11-04, v0.2.0): 스크립트 6개가 들어와 codex·agy 리뷰의 CRITICAL·HIGH를 반영해 테스트 205건이 통과한다. 남은 것은 종단 시험이다
+%% 구현 상태 (2026-11-04, v0.2.0): 스크립트 6개와 리뷰 반영에 이어 9개 경로 종단 시험을 마쳤다. 결함 16건을 고치고 테스트 256건이 통과한다. 남은 것은 MEDIUM 지적과 실제 업무 문서 확인이다
 flowchart LR
-  subgraph DONE["완료"]
+  subgraph DONE["완료 — 규칙·명세"]
     direction TB
     D1["설계·매뉴얼<br/>docs/design.md<br/>docs/manual.md"]
     D2["에이전트 4개<br/>analyst · researcher<br/>writer · reviewer"]
     D3["스킬 13개<br/>절차 2 · 공통 1<br/>디자인 4 · 형식 4<br/>도구 1 · newdoc 1"]
-    D4["수용·회귀 테스트<br/>7개 파일 · 205건"]
     D5["작업 지시서 5개<br/>docs/briefs/"]
   end
   subgraph IMPL["완료 — 스크립트 6개 · 리뷰 반영"]
     direction TB
     S1["hooks/write_guard.py<br/>hooks.json"]
     S2["profile_extract.py"]
-    S3["patch_docx.py"]
-    S4["patch_pptx.py"]
-    S5["render.py<br/>doc_verify.py"]
+    S3["patch_docx.py · patch_pptx.py"]
+    S5["render.py<br/>doc_verify.py (검사 13개)"]
     S6["codex · agy 리뷰 반영<br/>CRITICAL · HIGH 해결"]
   end
-  P{{"205건 통과<br/>Gitea push 완료"}}
+  subgraph E2E["완료 — 종단 시험"]
+    direction TB
+    E1["HWPX · DOCX · PPTX<br/>× sample · form · update<br/>9개 경로 통과"]
+    E2["결함 F1~F16 수정<br/>회귀 테스트 추가"]
+    E3["hook 실동작 5건<br/>claude -p --plugin-dir"]
+  end
+  P{{"테스트 10개 파일 · 256건 통과<br/>Gitea push"}}
   subgraph TODO["남은 일"]
     direction TB
     T1["MEDIUM 지적 정리<br/>(미룬 항목 9개)"]
-    T2["종단 시험<br/>HWPX·DOCX·PPTX<br/>× sample·form·update"]
-    T3["알려진 한계<br/>slide_dup 차트·노트<br/>Bash 쓰기는 hook 밖"]
+    T2["실제 업무 문서로 확인<br/>병합 셀 많은 표 · 글상자"]
+    T3["알려진 한계 (매뉴얼 13.4)<br/>kordoc 숨김 경로 · &gt; 새어 듦<br/>PPTX 양식 칸 · HWPX R6"]
   end
-  D4 -->|명세| IMPL
   D5 -->|지시서| IMPL
-  IMPL --> P --> T2
+  IMPL --> E2E --> P
   P -.-> T1
-  T2 -.-> T3
+  P -.-> T2
+  E2E -.-> T3
 
   classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
   classDef todo fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
   classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
-  class D1,D2,D3,D4,D5,S1,S2,S3,S4,S5,S6 done
+  class D1,D2,D3,D5,S1,S2,S3,S5,S6,E1,E2,E3 done
   class T1,T2,T3 todo
   class P gate
   style DONE fill:#F7FBF6,stroke:#4C8C4A
   style IMPL fill:#F7FBF6,stroke:#4C8C4A
+  style E2E fill:#F7FBF6,stroke:#4C8C4A
   style TODO fill:#F7F8FA,stroke:#6B7B8C

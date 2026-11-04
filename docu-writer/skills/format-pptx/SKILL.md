@@ -72,3 +72,5 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/patch_pptx.py" apply <견본.pptx> \
 ## 갱신 (`update`)
 
 같은 경로입니다. `update.sections`는 프로파일 섹션 id로 적고, 섹션마다 `anchor: "sl:N"`이 범위를 정합니다. 그 밖 편집은 doc-verify `scope`가 잡습니다.
+
+`sl:N` anchor는 견본 N번째 **슬라이드 자체**(`p:sldId`)를 가리킵니다. 고치는 섹션 안에서 `slide_dup`으로 장을 늘리거나 `slide_delete`로 줄여도 뒤 섹션의 시작이 함께 따라가므로, 뒤 섹션이 밀렸다고 `scope`가 실패하지 않습니다. 복제한 장은 `after`가 가리킨 장이 속한 섹션 몫입니다. 고치지 않는 섹션의 장을 지우거나 그 섹션 안에 장을 끼우면 `scope`가 실패합니다. `patch_pptx.py`는 이를 막지 않으니, 장을 늘리고 줄이는 일은 `update.sections` 안에서만 합니다.

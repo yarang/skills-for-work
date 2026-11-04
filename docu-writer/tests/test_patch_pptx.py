@@ -153,6 +153,23 @@ def test_overflow_warning(samples, tmp_path):
     assert any("sl:2/ph:0" in str(w) for w in report["warnings"])
 
 
+def test_no_overflow_warning_for_empty_placeholder(tmp_path):
+    """종단 시험: 양식의 빈 플레이스홀더는 견본 글이 0자라 늘 경고가 났습니다."""
+    from pptx import Presentation
+
+    src = tmp_path / "form.pptx"
+    p = Presentation()
+    p.slides.add_slide(p.slide_layouts[0]).shapes.title.text = "회의실 사용 신청"
+    p.save(src)
+    edits = tmp_path / "e.yaml"
+    edits.write_text('- {op: replace, at: "sl:1/ph:1", text: "2026. 11. 12. 14:00~16:00"}\n', encoding="utf-8")
+    prof = tmp_path / "profile.yaml"
+    prof.write_text("profile_version: 1\ndesign: {styles_allowed: [Title Slide]}\n", encoding="utf-8")
+    proc = uv(PATCH_PPTX, "apply", src, "--edits", edits, "--profile", prof, "--out", tmp_path / "o.pptx")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout)["warnings"] == []
+
+
 def test_apply_does_not_modify_sample(samples, tmp_path):
     before = sha256(samples["pptx"])
     apply(samples, tmp_path, [{"op": "replace", "at": "sl:2/ph:0", "text": "일정"}])

@@ -249,7 +249,7 @@ R1·R2의 "내용을 줄인다"는 근거 있는 사실을 지우라는 뜻이 �
 
   | 역할 | 허용되는 쓰기 |
   |---|---|
-  | analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외) |
+  | analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
   | researcher | `.docu-writer/evidence.yaml` |
   | writer | `protected-paths`의 경로와 `.docu-writer/`의 `protected-paths`·`approved.sha256`·`session.yaml`·`profile.yaml`·`evidence.yaml`을 뺀 곳 |
   | reviewer | 없음 |

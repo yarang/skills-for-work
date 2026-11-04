@@ -91,12 +91,22 @@ def anchor_key(src: Doc, anchor) -> tuple[str, int] | None:
     return key, _occurrence(anchor_items(src), key, idx)
 
 
-def slide_anchor(doc: Doc, anchor) -> int | None:
-    """PPTX `sl:N` → N. 견본 제목 글이 결과에서 바뀌어도 슬라이드 자리로 섹션을 찾습니다."""
+def slide_anchor(doc: Doc, src: Doc, anchor) -> int | None:
+    """PPTX `sl:N` → 결과 슬라이드 번호. 슬라이드 anchor가 아니면 None, 결과에 없으면 0.
+
+    견본 N번 슬라이드의 id(p:sldId)를 결과에서 찾습니다. 그래서 제목 글이 바뀌어도, slide_dup·
+    slide_delete로 앞 슬라이드가 늘거나 줄어도 섹션이 밀리지 않습니다(종단 시험 F8). 견본 id가
+    결과에 하나도 없으면(다른 프로그램이 다시 저장해 id를 새로 매김) 자리 N으로 찾습니다."""
     if doc.fmt != "pptx" or not isinstance(anchor, str):
         return None
     m = re.fullmatch(r"sl:(\d+)", anchor.strip())
-    return int(m.group(1)) if m else None
+    if not m:
+        return None
+    n = int(m.group(1))
+    if not set(src.slide_ids) & set(doc.slide_ids):
+        return n
+    sid = src.slide_ids[n - 1] if n <= len(src.slide_ids) else None
+    return doc.slide_ids.index(sid) + 1 if sid in doc.slide_ids else 0
 
 
 def find_para(doc: Doc, key: str, occ: int, start: int) -> int | None:
@@ -119,7 +129,7 @@ def find_slide(doc: Doc, sn: int, start: int) -> int | None:
 def section_starts(doc: Doc, src: Doc, sections: list) -> list:
     starts, prev = [], 0
     for s in sections:
-        sn = slide_anchor(doc, s.get("anchor"))
+        sn = slide_anchor(doc, src, s.get("anchor"))
         if sn is not None:
             idx = find_slide(doc, sn, prev)
         else:

@@ -10,6 +10,7 @@ from _readers import Para, all_paras, first_last, nows
 
 SYMBOLS = set("□■◇◆○ㅇᄋ◦●-–•·※▶☞")
 SYMBOL_ALIAS = {"ㅇ": "○", "ᄋ": "○", "◦": "○", "·": "•"}
+YEAR = re.compile(r"\d{4}\.")  # 「2026. 11. 12.」·「2026.11.12.」 — 날짜의 연도는 번호가 아님 (종단 시험 F10)
 SHAPES = [
     (re.compile(r"\d+(\.\d+)+\.?"), "1.1"),
     (re.compile(r"\d+\."), "1."),
@@ -161,6 +162,8 @@ def shape_of(token: str) -> str | None:
     """번호·부호 토큰의 모양. 번호가 아니면 None."""
     if len(token) == 1 and token in SYMBOLS:
         return SYMBOL_ALIAS.get(token, token)
+    if YEAR.match(token):
+        return None
     for pattern, shape in SHAPES:
         if pattern.fullmatch(token):
             return shape
@@ -212,13 +215,29 @@ def check_table_header(ctx: Ctx) -> dict:
 
 # --- R1 표 쪽 나뉨 ----------------------------------------------------------------
 
-def _first_page(pages: list, key: str, start: int) -> int | None:
-    return next((i for i in range(start, len(pages)) if key in pages[i]), None)
+def _on_page(page: str, cell: str) -> bool:
+    """칸 글이 쪽 글(공백 없앰)에 있는지. 통째로 없으면 공백으로 나눈 낱말이 모두 있는지 봅니다.
+
+    LibreOffice가 ○·※ 같은 기호를 대체 글꼴로 그리면 pymupdf가 그 조각을 다른 줄로 떼어
+    쪽 글 순서가 바뀝니다(「부서장 ○○○ (서명)」→「○○○부서장(서명)」).
+    """
+    if nows(cell) in page:
+        return True
+    words = [nows(w) for w in cell.split()]
+    return len(words) > 1 and all(w in page for w in words)
+
+
+def _first_page(pages: list, cell: str, start: int) -> int | None:
+    return next((i for i in range(start, len(pages)) if _on_page(pages[i], cell)), None)
 
 
 def _table_pages(pages: list, first: str, last: str, cursor: int) -> tuple[int | None, int | None, int]:
-    """(첫 칸 쪽, 끝 칸 쪽, 다음 커서). 한 쪽에 다 있으면 두 쪽 번호가 같습니다."""
-    both = next((i for i in range(cursor, len(pages)) if first in pages[i] and last in pages[i]), None)
+    """(첫 칸 쪽, 끝 칸 쪽, 다음 커서). 한 쪽에 다 있으면 두 쪽 번호가 같습니다.
+
+    pages는 공백을 없앤 쪽 글, first·last는 칸 글 그대로입니다.
+    """
+    both = next((i for i in range(cursor, len(pages))
+                 if _on_page(pages[i], first) and _on_page(pages[i], last)), None)
     if both is not None:
         return both, both, both
     pf = _first_page(pages, first, cursor)
@@ -238,8 +257,8 @@ def check_r1(ctx: Ctx) -> dict:
     pages = [nows(t) for t in ctx.pages]
     suspects, locs, notes, cursor, seen = [], [], [], 0, 0
     for table in ctx.out.tables:
-        first, last = (nows(x) for x in first_last(table))
-        if not first or not last:
+        first, last = first_last(table)
+        if not nows(first) or not nows(last):
             notes.append(f"{table.at} 첫·끝 칸 비어 건너뜀")
             continue
         pf, pl, cursor = _table_pages(pages, first, last, cursor)

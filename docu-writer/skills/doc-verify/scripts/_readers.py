@@ -83,6 +83,7 @@ class Doc:
     ids: tuple | None = None                    # HWPX (글자 모양 id 집합, 문단 모양 id 집합)
     slides: int | None = None
     anchors: list | None = None                 # h:"…" anchor 대상 [(공백 뺀 글, 블록 번호)]. None = 최상위 문단
+    slide_ids: tuple = ()                       # PPTX 슬라이드 순서대로 p:sldId/@id — sl:N anchor를 정체성으로 찾음
 
     @property
     def tables(self) -> list:
@@ -421,7 +422,8 @@ def read_pptx(path: Path) -> Doc:
                     # h:"…" anchor는 슬라이드 제목 글입니다 (_pe_pptx.heading_texts와 같은 대상).
                     anchors.append((nows(title.text_frame.text), len(blocks)))
                 blocks.extend(_pptx_paras(shape, sn, theme))
-    return Doc("pptx", blocks, [], styles, None, len(prs.slides), anchors)
+    return Doc("pptx", blocks, [], styles, None, len(prs.slides), anchors,
+               tuple(s.slide_id for s in prs.slides))
 
 
 # --- MD --------------------------------------------------------------------------

@@ -90,6 +90,40 @@ def test_analyst_outside_docu_writer(ws):
     assert denied(call(ws, "docu-writer:analyst", "Write", ws["cwd"] / "out.docx"))
 
 
+# kordoc은 숨김 경로(.docu-writer/)에 쓰지 않으므로 analyst의 kordoc 출력은 보이는
+# 임시 폴더 docu-writer-out/에 냈다가 옮깁니다 (종단 시험 F15).
+@pytest.mark.parametrize("tool", ["render_document", "extract_profile", "convert_to_hwpx"])
+def test_analyst_kordoc_staging_allowed(ws, tool):
+    out = ws["cwd"] / "docu-writer-out" / "page.png"
+    assert not denied(call(ws, "docu-writer:analyst", KORDOC + tool, out, key="output_path"))
+
+
+def test_analyst_staging_relative_path_allowed(ws):
+    assert not denied(call(ws, "docu-writer:analyst", KORDOC + "render_document",
+                           "docu-writer-out/page.svg", key="output_path"))
+
+
+@pytest.mark.parametrize("path", ["docu-writer-out", "docu-writer-out/../out.docx", "docu-writer-outx/a.png"])
+def test_analyst_staging_escape_denied(ws, path):
+    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document", path, key="output_path"))
+
+
+def test_analyst_symlinked_staging_denied(ws, tmp_path):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (ws["cwd"] / "docu-writer-out").symlink_to(elsewhere)
+    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document",
+                       ws["cwd"] / "docu-writer-out" / "page.png", key="output_path"))
+
+
+def test_staging_does_not_open_contract_or_sample(ws):
+    link = ws["cwd"] / "docu-writer-out"
+    link.mkdir()
+    (link / "s.hwpx").symlink_to(ws["sample"])
+    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document", link / "s.hwpx",
+                       key="output_path"))
+
+
 @pytest.mark.parametrize("rel,ok", [
     ("evidence.yaml", True),
     ("profile.yaml", False),

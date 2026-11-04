@@ -4,6 +4,7 @@
 검사가 견본과 결과를 같은 잣대로 비교합니다. 여기서는 모듈을 직접 불러 확인합니다.
 """
 import copy
+import dataclasses
 import shutil
 import sys
 import zipfile
@@ -12,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import PROFILE_EXTRACT, ROOT, uv
+from conftest import PATCH_PPTX, PROFILE_EXTRACT, ROOT, uv
 
 sys.path.insert(0, str(ROOT / "skills/doc-verify/scripts"))
 sys.dont_write_bytecode = True
@@ -92,6 +93,39 @@ def test_slide_anchor_survives_title_change(samples, tmp_path):
     assert doc.blocks[starts[0]].slide == 2
 
 
+def _dup_slide2(samples, tmp_path):
+    edits = tmp_path / "dup.yaml"
+    edits.write_text('- {op: slide_dup, like: "sl:2", after: "sl:2"}\n', encoding="utf-8")
+    out = tmp_path / "dup.pptx"
+    prof = tmp_path / "profile.yaml"
+    prof.write_text("profile_version: 1\ndesign: {styles_allowed: [Title Slide, Title and Content, Title Only]}\n",
+                    encoding="utf-8")
+    proc = uv(PATCH_PPTX, "apply", samples["pptx"], "--edits", edits, "--profile", prof, "--out", out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return _readers.read_doc(samples["pptx"]), _readers.read_doc(out)
+
+
+def test_slide_anchor_follows_slide_identity_after_dup(samples, tmp_path):
+    """종단 시험 F8: sl:2 뒤에 장을 복제하면 견본 sl:3(실적)은 결과 4번째 장입니다."""
+    src, doc = _dup_slide2(samples, tmp_path)
+    assert len(doc.slide_ids) == len(src.slide_ids) + 1
+    assert [_locate.slide_anchor(doc, src, f"sl:{n}") for n in (1, 2, 3)] == [1, 2, 4]
+    assert _locate.slide_anchor(doc, src, "t:1") is None
+
+
+def test_slide_anchor_missing_slide_is_zero(samples, tmp_path):
+    src, doc = _dup_slide2(samples, tmp_path)
+    gone = dataclasses.replace(doc, slide_ids=tuple(i for i in doc.slide_ids if i != src.slide_ids[2]))
+    assert _locate.slide_anchor(gone, src, "sl:3") == 0
+
+
+def test_slide_anchor_falls_back_to_position_when_ids_renumbered(samples, tmp_path):
+    """다른 프로그램이 다시 저장해 id가 하나도 겹치지 않으면 자리 N으로 찾습니다."""
+    src, doc = _dup_slide2(samples, tmp_path)
+    renumbered = dataclasses.replace(doc, slide_ids=tuple(i + 1000 for i in doc.slide_ids))
+    assert _locate.slide_anchor(renumbered, src, "sl:3") == 3
+
+
 # --- HWPX --------------------------------------------------------------------------
 
 def test_hwpx_band_table_title_is_anchor(samples):
@@ -158,3 +192,48 @@ def test_para_anchor_items_default_to_top_level_paragraphs(samples):
     doc = _readers.read_doc(samples["docx"])
     items = _locate.anchor_items(doc)
     assert items and all(isinstance(doc.blocks[i], Para) for _, i in items)
+
+
+# --- R1 쪽 글 대조 (종단 시험 F6) ----------------------------------------------------
+
+def test_r1_cell_found_when_fallback_font_reorders_page_text():
+    """LibreOffice가 ○를 대체 글꼴로 그리면 pymupdf 쪽 글 순서가 「○○○ 부서장 (서명)」으로 바뀝니다."""
+    import _checks_design
+
+    pages = [nows("성명 홍길동 부서장 확인 ○○○ 부서장 (서명)")]
+    assert _checks_design._table_pages(pages, "성명", "부서장 ○○○ (서명)", 0)[:2] == (0, 0)
+
+
+def test_r1_cell_token_fallback_needs_every_token_on_page():
+    import _checks_design
+
+    pages = [nows("성명 홍길동 부서장 확인"), nows("○○○ (서명)")]
+    pf, pl, _ = _checks_design._table_pages(pages, "성명", "부서장 ○○○ (서명)", 0)
+    assert (pf, pl) == (0, None)
+
+
+# --- R6 날짜는 번호가 아님 (종단 시험 F10) ------------------------------------------
+
+@pytest.mark.parametrize("text, shape", [
+    ("2026. 11. 12. 14:00~16:00", None),
+    ("2026.11.12. 회의", None),
+    ("1. 추진 배경", "1."),
+    ("1.1 현황", "1.1"),
+    ("12. 기타", "1."),
+])
+def test_r6_year_is_not_marker(text, shape):
+    import _checks_design
+
+    assert _checks_design.shape_of(text.split()[0]) == shape
+
+
+def test_profile_extract_marker_matches_verify_rule():
+    """profile_extract와 doc-verify가 같은 줄 머리 규칙을 써야 numbering이 견본과 결과에서 맞습니다."""
+    sys.path.insert(0, str(ROOT / "template/skills/template-analysis/scripts"))
+    import _checks_design
+    import _pe_common
+
+    # 「1.1 현황」: 끝 점 없는 다단 번호를 추출만 놓치면 손대지 않은 결과가 R6에서 실패했습니다 (F11).
+    for text in ("2026. 11. 12. 14:00", "2026.11.12. 회의", "1. 배경", "1.1 현황", "1.2. 계획", "가. 목적",
+                 "(1) 세부", "3) 셋째"):
+        assert bool(_pe_common.line_marker(text)) == (_checks_design.shape_of(text.split()[0]) is not None), text
