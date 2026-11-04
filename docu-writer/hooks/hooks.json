@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|mcp__.*kordoc__(patch_document|fill_form|generate_document|convert_to_hwpx|extract_profile|render_document)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/write_guard.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
