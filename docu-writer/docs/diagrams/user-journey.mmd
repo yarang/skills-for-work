@@ -1,0 +1,24 @@
+%% 사용자 관점 흐름: 사용자가 답하는 곳은 ① 질문, ④ 승인, ⑧ 원본 교체 승인(update) 세 군데다
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant M as 메인 대화
+  participant A as 에이전트<br/>analyst<br/>researcher<br/>writer<br/>reviewer
+  participant S as 스크립트<br/>doc_verify<br/>render
+
+  U->>M: 견본 파일 + 요청<br/>"이 서식대로 써 줘"
+  M->>U: ① 모드 · 출력 경로 · 자료 위치 질문
+  U->>M: 답변
+  M->>A: ② analyst — 견본 → profile.yaml
+  M->>A: ③ researcher — 근거표 evidence.yaml
+  M->>U: ④ 승인 요청<br/>섹션표 · 근거 없음 · 충돌 · 자리표시
+  U->>M: 승인 (또는 수정 지시)
+  M->>A: ⑤ writer — 견본 복사본에 작성
+  M->>S: ⑥ 해시 · 렌더 · doc_verify
+  S-->>M: 종료 코드 0 / 1 / 2
+  M->>A: ⑦ reviewer × 3 (fact · style · design)
+  M->>U: ⑧ 결과 파일 · 미리보기<br/>남은 자리표시 · 남은 지적
+  opt update 모드
+    U->>M: 원본 교체 승인
+    M->>M: 백업 후 교체
+  end

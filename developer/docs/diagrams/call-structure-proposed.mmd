@@ -1,0 +1,38 @@
+%% 제안 호출구조: 에이전트는 그대로 5개, 방법론은 단계·스킬·스크립트로 붙인다
+flowchart TD
+  U([사용자]) -->|요청| M["메인 대화<br/>dev-workflow"]
+
+  M -->|"① 요구사항 (Spec: REQ-n, DDD: 용어집)"| SPEC[("docs/specs/<br/>docs/domain/glossary.md")]
+  M -->|"② Agent"| R[researcher]
+  M -->|"③ Agent"| A[architect]
+  A -->|"설계서: 행=바운디드 컨텍스트,<br/>AC-n, 계약 버전, ADR"| M
+  M -->|"④ 승인: 설계서 + 설계 스킬"| U
+  M -->|"⑤ Agent (테스트에 AC-n 표기)"| T[tester]
+  M -->|"⑥ Agent"| D[developer]
+
+  M -->|"경계 확인 (⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
+
+  subgraph VER["⑦ 검증 (스크립트, 결정적)"]
+    VS[["ⓐ verify.sh + 커버리지 게이트"]]
+    IT[["ⓑ 통합 테스트"]]
+    TR[["ⓒ trace-check.sh<br/>AC-n ↔ 테스트"]]
+  end
+  M --> VS & IT & TR
+
+  M -->|"⑧ Agent ×2"| V[reviewer]
+  M -->|"⑨ 통합 · PR"| U
+  M -->|"⑩ 배포 (사용자 승인 후)"| CI[["CI: verify.sh와 같은 명령"]]
+
+  subgraph SEL["스킬 선택 경로"]
+    SD["경로 1: stack-detection<br/>매니페스트 의존성<br/>+ Dockerfile·workflows → devops-standards"]
+    DS["경로 2: architect가 근거와 함께 지정<br/>domain-modeling 등 설계 스킬"]
+  end
+  SD & DS --> A
+  A -. "preload" .-> DM["domain-modeling (신규)"]
+  subgraph AX["스킬 두 축 (§5-1 A안)"]
+    POS["위치 축: 프레임워크 > 언어 > 계층 > 공통"]
+    MOD["모델 축: 설계 스킬"]
+  end
+  T & D & V -->|"Skill (## 불러올 스킬)"| POS
+  T & D & V -->|"Skill (## 설계 스킬)"| MOD
+  INV["불변식 (code-principles)"] -. "두 축 모두 위" .-> POS & MOD

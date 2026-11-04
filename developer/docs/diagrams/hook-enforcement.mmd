@@ -1,0 +1,12 @@
+%% hook 개입 지점: 호출 전(PreToolUse) 가드레일 + 사후(경계 확인·⑦ 스크립트) 최종 그물
+flowchart LR
+  M["메인 대화"] -->|"Agent"| SA["서브에이전트<br/>agent_type = work-standards:*"]
+  SA -->|"도구 호출"| PRE{"PreToolUse hook<br/>work-standards:* 아니면 통과"}
+  PRE -- "거부 (exit 2)<br/>H1 developer → 테스트 수정<br/>H2 tester → 테스트 밖 쓰기<br/>H3 저장소 밖·.env·.git<br/>H4 git·배포·네트워크<br/>H5 reviewer·researcher 쓰기" --> SA
+  PRE -- 허용 --> TOOL["도구 실행"]
+  TOOL --> POST["PostToolUse hook<br/>H6 Skill → skill-log.jsonl"]
+  POST --> SA
+  SA -->|"종료"| STOP{"SubagentStop hook<br/>H7 developer: verify.sh"}
+  STOP -- "실패 → block + 이유" --> SA
+  STOP -- 통과 --> M
+  M -->|"최종 그물 (사후)"| VER[["경계 확인: boundary-check<br/>⑦ⓐ verify + 커버리지 · ⑦ⓑ 통합 테스트<br/>⑦ⓒ trace-check (+ skill-log 대조)"]]

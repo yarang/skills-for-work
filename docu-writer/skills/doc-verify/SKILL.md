@@ -1,0 +1,105 @@
+---
+name: doc-verify
+description: 견본·결과 파일·양식 프로파일을 대조하는 결정적 검증 스크립트와 렌더 스크립트의 계약입니다. 견본 해시, 견본 문구 잔존, 자리표시 위치, 빈칸, 갱신 범위 밖 변경, R4·R5·R6 디자인 규칙, R1 표 쪽 경계 의심, 쪽 수를 검사하고, 쪽별 PNG를 만듭니다. 메인 대화가 ⑥ 검증에서 실행하고, writer가 작성을 마쳤다고 보고하기 전에 실행합니다.
+---
+
+# 문서 검증
+
+검증은 판단이 아니라 **스크립트**입니다. 같은 파일에는 언제나 같은 결과가 나와야 하므로 모델이 결과를 해석해 통과시키지 않습니다. 이 문서가 스크립트의 명세입니다. 스크립트를 고칠 때는 이 문서를 먼저 고칩니다.
+
+## 실행
+
+```bash
+# 1. 렌더 — DOCX·PPTX·MD. HWPX는 아래 「HWPX 렌더」로 대신합니다.
+uv run "${CLAUDE_SKILL_DIR}/scripts/render.py" <결과 파일> .docu-writer/render/
+
+# 2. 검증
+uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
+  --profile .docu-writer/profile.yaml \
+  --source <견본> --expect-sha256 <①에서 기록한 값> \
+  --output <결과 파일> \
+  --placeholders .docu-writer/placeholders.yaml \
+  --pages-dir .docu-writer/render/ \
+  --out-dir .docu-writer/verify/
+```
+
+두 스크립트 모두 PEP 723 인라인 의존성을 적고 `uv run`으로 Python 3.13에서 돕니다. 모드는 프로파일 `mode`에서 읽습니다. `--placeholders`는 자리표시가 없으면 생략합니다.
+
+| 종료 코드 | 뜻 | 할 일 |
+|---|---|---|
+| 0 | 통과 (`warn`·`skip`만 있음) | 요약을 ⑦ 리뷰어에게 넘깁니다 |
+| 1 | 차단 (`fail`이 하나 이상) | 실패한 검사를 ⑤에서 고치고 다시 실행합니다 |
+| 2 | 사용법·환경 오류 | 파일·프로파일이 없거나, 지원하지 않는 형식이거나, 렌더 도구(soffice·pandoc)가 없습니다 |
+
+## 렌더 (`render.py`)
+
+| 형식 | 경로 |
+|---|---|
+| DOCX·PPTX | `soffice --headless --convert-to pdf` → pymupdf로 쪽별 PNG(150dpi) |
+| MD | `pandoc` → DOCX → 위와 같음 |
+| HWPX | 스크립트가 렌더하지 않습니다. 아래 「HWPX 렌더」 |
+
+`<out-dir>`에 `page_001.png …`와 `pages.json`(`[{"page": 1, "text": "…"}]`, 쪽별 글)을 씁니다. 쓰기 전에 `<out-dir>` 바로 아래의 `page_*`와 `pages.json`만 지웁니다. 하위 디렉터리(`source/`)는 건드리지 않습니다. 이전 렌더가 쪽 수가 더 많았을 때 남은 쪽이 `length`·`r1_tables`를 흐리지 않게 하기 위해서입니다. 쪽별 글은 PDF에서 pymupdf `get_text`로 읽습니다.
+
+**HWPX 렌더.** kordoc은 MCP 도구라 스크립트에서 부를 수 없습니다. 메인 대화가 `render_document(format: "svg", pages: "1-N", output_path: .docu-writer/render/page.svg)`와 `format: "png"`를 같은 디렉터리에 냅니다. `doc_verify.py`는 `pages.json`이 없으면 `page_NNN.svg`의 `<text>` 요소에서 쪽별 글을 읽습니다. 조판 캐시가 없는 HWPX(AI가 만든 파일)는 근사 렌더이므로 R1·R3 판정은 ⑧에서 「한컴에서 확인 권장」을 붙입니다.
+
+## 검사 항목
+
+| id | 검사 | 모드 | 판정 |
+|---|---|---|---|
+| `hash` | 견본 sha256이 `--expect-sha256`과 같음 | 모두 | 다르면 `fail` (CRITICAL: 원본이 바뀜) |
+| `residue` | 프로파일 `sample_text`의 문구가 결과에 남았는가 | sample | 남으면 `fail`. `○○`만 있는 토큰은 비교에서 뺍니다 |
+| `placeholder` | 자리표시 목록의 항목마다 `expect` 글이 결과에 있는가. `locator`를 풀 수 있으면 그 위치 안에서 찾음 | 모두 | 없으면 `fail` (kordoc이 `○`를 먹었을 수 있음) |
+| `fields` | 프로파일 `fields`마다 칸이 채워졌거나 자리표시 목록에 있는가, `constraint`를 지키는가 | form | 빈칸·위반이면 `fail` |
+| `scope` | 프로파일 `update.sections` 밖 문단이 견본과 같은가. 섹션 범위는 `anchor`부터 다음 섹션 `anchor` 앞까지 | update | 다르면 `fail` |
+| `r4_headings` | 같은 수준 제목의 (서체, 크기, 굵기)가 하나뿐이고 `design.type.hN`과 같은가 | 모두 | 다르면 `fail` |
+| `r5_tokens` | 결과가 쓴 서체·크기·색·스타일 이름이 프로파일 토큰과 `styles_allowed` 안인가 | 모두 | 밖이면 `fail` |
+| `r6_numbering` | 줄 머리 번호 부호가 `structure.numbering` 안인가, 같은 수준에 부호가 섞이지 않았는가 | 모두 | 어기면 `fail` |
+| `table_header` | 모든 표의 머리행 서식(굵기·바탕색)이 같은가 | 모두 | 다르면 `fail` |
+| `length` | 쪽·장·글자 수가 `length` 상한 안인가 | 모두 | 넘으면 `fail`. MD는 글자 수만 보고 쪽 기준은 `skip` |
+| `r1_tables` | 표마다 첫 칸 글과 마지막 칸 글이 같은 쪽에 나오는가 | 모두 | 다르면 `warn` (의심 — 판정은 ⑦ 시각 검수). MD는 `skip` |
+| `rewrite` | 결과 옆에 `<결과>.rewrite.hwpx`(`out.hwpx.rewrite.hwpx`) 또는 `<결과 이름>.rewrite.hwpx`(`out.rewrite.hwpx`)가 있는가 | HWPX | 있으면 `fail`: patch가 제자리 반영을 못 함. writer가 어느 파일이 결과인지 정해 보고 |
+
+- **R6 정규화.** 비교 전에 `○`(U+25CB)·`ㅇ`(U+3147)·`ᄋ`(U+110B)·`◦`(U+25E6)를 같은 부호로, `•`·`·`를 같은 부호로 봅니다.
+- **형식별 읽는 법.** DOCX는 python-docx(스타일·run 서식·표), PPTX는 python-pptx(레이아웃·플레이스홀더·run 서식), MD는 원문(제목 `#` 수준·목록 부호·표), HWPX는 zip 안 `Contents/section*.xml`의 `hp:t` 글과 `header.xml`의 글자·문단 모양 id입니다. HWPX의 R4·R5는 "견본이 쓰지 않던 글자·문단 모양 id를 결과가 참조하는가"로 판정합니다.
+- 읽을 수 없는 항목(예: MD의 서체)은 `skip`과 이유를 남깁니다. 해당 모드·형식이 아닌 검사도 `skip`이며, `report.json`에는 12개 id가 언제나 모두 들어갑니다.
+
+### 검사 세부
+
+- **줄 머리 부호 (R6).** 문단 글의 첫 공백 앞 토큰이 부호 모양이면 줄 머리 부호입니다. 부호 모양은 기호 한 글자(`□ ■ ◇ ◆ ○ ㅇ ᄋ ◦ ● - – • · ※ ▶ ☞`)이거나 번호 모양(`1.` `1)` `(1)` `①` `1.1` `가.` `가)` `(가)` `A.`)입니다. 번호 모양은 숫자·글자가 달라도 같은 부호로 봅니다(`3.` = `1.`). `○○사업`처럼 토큰이 기호 한 글자가 아니면 부호가 아닙니다. `structure.numbering` 항목도 같은 방식으로 모양을 정합니다. 부호가 없는 문단은 세지 않습니다. 수준은 DOCX (스타일, 왼쪽 들여쓰기), PPTX 문단 `lvl`, MD 제목은 `#` 수·그 밖 줄은 줄 앞 공백 수, HWPX 문단 모양 id로 묶고, 한 수준 안에 모양이 둘 이상이면 섞인 것입니다. MD 제목은 `#`와 공백을 뺀 글로 부호를 봅니다.
+- **스타일 이름 (R5).** DOCX는 문단 스타일 이름(표 칸 안 문단 포함)만 `styles_allowed`와 비교하고 표 스타일은 보지 않습니다. PPTX는 슬라이드 레이아웃 이름입니다. 서체·크기는 `design.type.*`의 `font`·`pt`, 색은 `design.color` 값과 비교하며, 토큰이 비어 있는 항목은 비교하지 않습니다. run에 직접 적힌 값만 봅니다(스타일에서 물려받은 값은 R4가 봄).
+- **표 머리행.** 2행 이상인 표만 비교합니다(1행짜리 틀 표는 머리행이 없음). 머리행 서식은 첫 행 run들의 굵기와 칸 바탕색입니다.
+- **분량 (`length`).** 문서 전체는 프로파일 최상위 `length`(`pages`·`slides`·`chars` 중 있는 것), 섹션은 `structure.sections[].length.chars`의 상한을 봅니다. `pages`는 렌더 쪽 수(`pages.json` 또는 `page_NNN.svg` 수)이고, 렌더가 없으면 `skip`입니다. `lines`는 조판에 따라 달라 스크립트가 보지 않고 detail에 「⑦ 리뷰어 확인」으로 남깁니다.
+- **빈칸 constraint.** `re:<정규식>`이면 칸 글 전체가 맞아야 합니다(fullmatch). 그 밖의 글로 쓴 constraint는 판정하지 않고 detail에 남겨 ⑦로 넘깁니다.
+- **섹션 범위 (`scope`).** 결과에서 섹션 시작은 견본 anchor 문단과 같은 글의 문단으로 찾습니다. `update.sections` 밖 섹션과 첫 섹션 앞 부분은 문단·표 칸 글의 순서가 견본과 같아야 합니다.
+- **자리표시 위치.** `sN`·`fN`·`t:…` 칸 locator는 결과에서 그 범위 안을 찾습니다. `p:`·`sl:` 같은 dump locator는 편집으로 번호가 바뀌므로 문서 전체에서 찾습니다.
+- **R1 표.** 표마다 첫 칸·끝 칸 글(`profile_extract.py tables`와 같은 규칙: 40자 자름, 빈 끝 칸은 그 행의 마지막 빈 아닌 칸)을 쪽별 글에서 공백을 빼고 찾습니다. 못 찾은 표는 detail에 적고 넘어갑니다. `locations`에는 의심 표의 `t:N`을 적습니다.
+
+## 입력 파일
+
+`.docu-writer/placeholders.yaml` (writer가 ⑤에서 씀):
+
+```yaml
+- locator: s2            # 설계서 §5 locator 문법: s2 · f1 · t:1/r:2/c:3 · p:12 · sl:3/ph:1/p:2
+  expect: "총 ○○건"
+  reason: 근거 없음      # 근거 없음 | 개인정보 | 비밀값
+```
+
+## 출력
+
+`<out-dir>/report.json`은 검사 항목 표 순서대로 12개 `{id, status, detail, locations}`의 JSON 목록입니다. `status`는 `pass`·`fail`·`warn`·`skip`, `locations`는 locator 글의 목록입니다. 검사할 대상이 없으면 `skip`입니다: `--placeholders`가 없으면 `placeholder`, `length`가 없으면 `length`, `--pages-dir`가 없으면 `r1_tables`. 표준 출력에는 다음 요약을 냅니다.
+
+```
+### 문서 검증: <결과 파일>
+- 결과: 통과 | 차단 (종료 코드 N)
+  pass  hash          견본 sha256 일치
+  fail  residue       3건: "2025년 상반기 실적" (2쪽) …
+  warn  r1_tables     표 2 「추진 일정」 첫 칸 3쪽, 끝 칸 4쪽
+  skip  r5_tokens     MD는 서체 정보 없음
+```
+
+## 실패했을 때
+
+- **검사를 약하게 만들어 통과시키지 않습니다.** 프로파일의 `sample_text`·`styles_allowed`·`length`를 결과에 맞춰 고치는 것은 고친 것이 아닙니다. 프로파일이 틀렸다고 판단되면 고치지 말고 보고합니다(④ 승인으로 되돌림).
+- R1·R2를 맞추려고 토큰(글자 크기·여백·줄 간격)을 바꾸지 않습니다. `design-review`를 따릅니다.
+- 같은 실패가 세 번 반복되면 멈추고 원인과 함께 보고합니다.

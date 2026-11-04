@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "skills-for-work",
+  "description": "업무용 Claude Code 플러그인 모음: 개발 표준(work-standards)과 문서 작업(docu-writer)",
+  "owner": { "name": "yarang", "email": "yarang@gmail.com" },
+  "plugins": [
+    {
+      "name": "work-standards",
+      "description": "역할 에이전트, 개발 절차, 코드 원칙, 검증 스크립트로 이루어진 개발 표준",
+      "author": { "name": "yarang" },
+      "category": "development",
+      "source": "./developer"
+    },
+    {
+      "name": "docu-writer",
+      "description": "견본·양식을 우선하는 문서 작성 절차, 형식별(HWPX·DOCX·PPTX·MD) 처리, 문서 디자인 규칙과 검수",
+      "author": { "name": "yarang" },
+      "category": "productivity",
+      "source": "./docu-writer"
+    }
+  ]
+}

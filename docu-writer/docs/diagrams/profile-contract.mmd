@@ -1,0 +1,23 @@
+%% 양식 프로파일은 만드는 쪽(analyst·planner)과 쓰는 쪽(writer·doc-verify·reviewer)의 계약이다
+flowchart LR
+  subgraph MAKE["만드는 쪽"]
+    A["analyst<br/>1단계:<br/>견본에서 읽음"]
+    PL["planner<br/>2단계:<br/>종류 + 테마"]
+  end
+  subgraph PROF["profile.yaml"]
+    direction TB
+    P1["source · mode"]
+    P2["voice · structure · fields"]
+    P3["design 토큰<br/>page · type · color · table · styles_allowed"]
+    P4["sample_text · conflicts"]
+  end
+  subgraph USE["쓰는 쪽"]
+    W["writer<br/>structure·fields·voice<br/>대로 작성"]
+    V["doc-verify<br/>구조·토큰·잔존 대조"]
+    R["reviewer(design)<br/>PNG를 토큰과 대조"]
+  end
+  A --> PROF
+  PL --> PROF
+  PROF --> W
+  PROF --> V
+  PROF --> R

@@ -1,0 +1,14 @@
+%% 형식별 분석·작성·렌더 경로: HWPX는 kordoc, DOCX·PPTX·MD는 python 스크립트, 렌더는 쪽별 PNG로 모은다
+flowchart LR
+  IN{"견본 형식"} -->|HWPX·HWP| K1["kordoc<br/>parse_document<br/>parse_form"]
+  IN -->|DOCX| D1["profile_extract.py<br/>(python-docx)"]
+  IN -->|PPTX| P1["profile_extract.py<br/>(python-pptx)"]
+  IN -->|MD| M1["profile_extract.py"]
+  IN -->|PDF| X["편집 불가<br/>→ 2단계 신규 작성"]
+  K1 --> K2["kordoc<br/>patch_document<br/>fill_form"] --> K3["kordoc<br/>render_document<br/>(PNG·SVG)"]
+  D1 --> D2["patch_docx.py"] --> R["soffice → PDF<br/>→ pymupdf"]
+  P1 --> P2["patch_pptx.py"] --> R
+  M1 --> M2["직접 편집<br/>도표는<br/>mermaid-cli → SVG"] --> MP["pandoc → DOCX"] --> R
+  K3 --> PNG[["쪽별 PNG"]]
+  R --> PNG
+  PNG --> REV["⑥ doc-verify<br/>⑦ reviewer(design)"]

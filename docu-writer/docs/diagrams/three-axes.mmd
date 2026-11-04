@@ -1,0 +1,29 @@
+%% 세 축(입력 모드·문서 종류·출력 형식)과 디자인이 양식 프로파일 하나로 모인다
+flowchart LR
+  SAMPLE[("주어진 견본<br/>(최우선)")]
+  subgraph MODE["입력 모드 → 절차"]
+    subgraph P1["1단계"]
+      M1["견본 따라 쓰기"]
+      M2["양식 채우기"]
+      M3["문서 갱신"]
+    end
+    M4["신규 작성 (2단계)"]
+  end
+  subgraph KIND["문서 종류 → 내용"]
+    K1["기술 문서 · 업무 보고<br/>회의록 · 매뉴얼"]
+  end
+  subgraph DES["디자인 (가로지름)"]
+    D1["정보 · 시각 · 도표 · 검수"]
+  end
+  subgraph FMT["출력 형식 → 담는 방법"]
+    F1["HWPX · DOCX · PPTX · MD"]
+  end
+  SAMPLE --> P1
+  P1 -->|"analyst가<br/>견본에서 추출"| P["양식 프로파일<br/>profile.yaml"]
+  M4 -->|"planner가<br/>종류·테마로 생성"| P
+  K1 -.->|"견본 모드:<br/>충돌은 보고만"| P
+  D1 --> P
+  P --> W["writer"] --> OUT[["결과 파일"]]
+  F1 --> W
+  P --> V["doc-verify · reviewer"]
+  OUT --> V

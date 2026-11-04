@@ -1,0 +1,19 @@
+%% 작업 디렉터리 .docu-writer/: 단계마다 누가 어떤 파일을 쓰는가 (hook이 역할별로 막음)
+flowchart LR
+  S1["① 메인"] --> F1["session.yaml<br/>protected-paths"]
+  S2["② analyst"] --> F2["profile.yaml<br/>work/tables.yaml<br/>render/source/"]
+  S3["③ researcher"] --> F3["evidence.yaml"]
+  S4["④ 메인<br/>(승인 시)"] --> F4["approved.sha256"]
+  S5["⑤ writer"] --> F5["결과 파일<br/>placeholders.yaml<br/>work/skeleton · edits.yaml"]
+  S6["⑥ 메인"] --> F6["render/page_*.png<br/>render/pages.json<br/>verify/report.json<br/>verify/output.sha256"]
+  S8["⑧ 메인<br/>(update 승인 시)"] --> F8["backup/<br/>이름.시각.확장자"]
+
+  F1 -.->|hook이 읽음| G["write_guard<br/>견본·계약 파일 쓰기 거부"]
+  F4 -.->|⑥·⑦ 대조| V["shasum -c"]
+
+  classDef main fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
+  classDef agent fill:#E1ECF7,stroke:#003366,color:#0A2540
+  classDef file fill:#FFFFFF,stroke:#9AA5B1,color:#28253D
+  class S1,S4,S6,S8 main
+  class S2,S3,S5 agent
+  class F1,F2,F3,F4,F5,F6,F8 file

@@ -1,0 +1,17 @@
+%% 방법론을 어디에 둘지: design.md §2 기준 + 시점 축(호출 전 hook / 사후 스크립트)
+flowchart TD
+  IN["방법론의 한 규칙"] --> Q1{"사용자와 대화·승인이<br/>필요한가?"}
+  Q1 -- 예 --> MAIN["메인 대화 (dev-workflow 단계·관문)"]
+  Q1 -- 아니오 --> Q2{"결과가 결정적인가?<br/>(같은 입력 → 같은 판정)"}
+  Q2 -- 예 --> Q4{"도구 호출 하나만 보고<br/>실행 전에 막을 수 있는가?"}
+  Q4 -- 예 --> HK["플러그인 hook (PreToolUse 등)<br/>+ 사후 스크립트를 최종 그물로"]
+  Q4 -- 아니오 --> SCR["스크립트 (경계 확인·⑦ 검증, 사후)"]
+  Q2 -- 아니오 --> Q3{"권한·모델·독립성이<br/>기존 역할과 다른가?"}
+  Q3 -- 예 --> AG["새 에이전트 (드묾)"]
+  Q3 -- 아니오 --> SKL["스킬 (지식)"]
+
+  MAIN --- M1["Spec: ① 요구사항 형식, ④ 스펙 승인<br/>DDD: 용어집 확정<br/>DevOps: ⑩ 배포 승인"]
+  HK --- H1["TDD: developer의 테스트 수정 거부<br/>불변식: 저장소 밖·.env 쓰기 거부<br/>DevOps: 서브에이전트 git·배포 명령 거부<br/>Spec: Skill 호출 기록"]
+  SCR --- S1["TDD: 커버리지 게이트<br/>Spec: 인수 조건 ↔ 테스트 추적<br/>CBD: 행 경계 (boundary-check)<br/>DevOps: CI = verify.sh"]
+  AG --- A1["해당 없음<br/>(방법론별 에이전트 = v1 폭증 재현)"]
+  SKL --- K1["DDD: domain-modeling<br/>OOP: code-principles 보강<br/>CBD: 계약 버전 규칙<br/>DevOps: devops-standards"]
