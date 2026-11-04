@@ -13,8 +13,10 @@
 """
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -84,7 +86,7 @@ def load_placeholders(path: Path | None) -> list | None:
 def _svg_text(path: Path) -> str:
     from lxml import etree
 
-    parser = etree.XMLParser(recover=True)
+    parser = etree.XMLParser(recover=True, resolve_entities=False, no_network=True, load_dtd=False)
     root = etree.fromstring(path.read_bytes(), parser)
     if root is None:
         return ""
@@ -153,14 +155,26 @@ def parse_args(argv):
     return ap.parse_args(argv)
 
 
+def write_report(out_dir: Path, report: list) -> None:
+    """임시 파일에 다 쓴 뒤 os.replace로 바꿉니다. report.json이 견본을 가리키는
+    심볼릭 링크나 하드 링크여도 링크 자체만 바뀌고 견본은 그대로입니다."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".report-", suffix=".json", dir=out_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=2)
+        os.replace(tmp, out_dir / "report.json")
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         ctx = build_ctx(args)
         report = run_checks(ctx)
-        args.out_dir.mkdir(parents=True, exist_ok=True)
-        (args.out_dir / "report.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_report(args.out_dir, report)
     except (UsageError, OSError) as exc:
         print(f"doc_verify.py: {exc}", file=sys.stderr)
         return 2

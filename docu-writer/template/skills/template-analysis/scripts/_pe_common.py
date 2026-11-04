@@ -2,6 +2,7 @@
 import hashlib
 import importlib
 import re
+import zipfile
 from pathlib import Path
 
 import yaml
@@ -29,7 +30,35 @@ def detect_format(path: Path) -> str:
     fmt = FORMATS.get(path.suffix.lower())
     if fmt is None:
         raise UsageError(f"지원하지 않는 형식: {path.suffix or path.name}")
+    problem = zip_problem(path) if fmt in ("docx", "pptx", "hwpx") else None
+    if problem:
+        raise UsageError(f"{fmt.upper()}를 열지 않음: {problem}")
     return fmt
+
+
+# 압축 폭탄 방지: 선언된 압축 해제 크기를 먼저 봅니다. zipfile은 항목을 읽을 때
+# 선언 크기를 넘겨 풀지 않으므로(ZipExtFile), 선언 크기 검사로 상한이 지켜집니다.
+ZIP_MAX_ENTRIES = 20_000
+ZIP_MAX_TOTAL = 1 << 30          # 압축을 푼 전체 크기 1 GiB
+ZIP_MAX_RATIO = 200              # 10 MiB를 넘는 항목의 압축률 상한
+
+
+def zip_problem(path) -> str | None:
+    """OOXML·HWPX 패키지가 지나치게 크거나 압축률이 비정상이면 그 이유를 돌려줍니다."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            infos = zf.infolist()
+    except (zipfile.BadZipFile, OSError):
+        return None              # 열 수 없는 파일은 형식별 로더가 원래 오류로 보고합니다
+    if len(infos) > ZIP_MAX_ENTRIES:
+        return f"zip 항목이 너무 많습니다 ({len(infos)}개 > {ZIP_MAX_ENTRIES})"
+    total = sum(i.file_size for i in infos)
+    if total > ZIP_MAX_TOTAL:
+        return f"압축을 푼 크기가 너무 큽니다 ({total} 바이트 > {ZIP_MAX_TOTAL})"
+    for i in infos:
+        if i.file_size > 10 << 20 and i.file_size > ZIP_MAX_RATIO * max(i.compress_size, 1):
+            return f"압축률이 비정상입니다: {i.filename}"
+    return None
 
 
 def format_module(fmt: str):

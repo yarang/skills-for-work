@@ -27,7 +27,7 @@ def section_roots(path: Path):
         raise UsageError(f"HWPX를 열 수 없음: {exc}") from exc
     if not blobs:
         raise UsageError("HWPX에 Contents/section*.xml이 없음")
-    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=True)
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
     try:
         return [etree.fromstring(b, parser) for b in blobs]
     except etree.XMLSyntaxError as exc:

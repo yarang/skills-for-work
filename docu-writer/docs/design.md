@@ -245,7 +245,7 @@ R1·R2의 "내용을 줄인다"는 근거 있는 사실을 지우라는 뜻이 �
 - **시각 검수(`reviewer`, `관점: design`)**: 쪽별 PNG를 직접 봅니다. R1~R3과 겹침, 대비 부족, 견본 대비 분위기 차이를 점검합니다. 분위기 차이처럼 잴 수 없는 지적은 MEDIUM 이하로 둡니다.
 
 **견본 원본 보호.**
-- 사전: `hooks/` PreToolUse 가드가 `docu-writer:*` 에이전트의 Write·Edit·MultiEdit와 kordoc 쓰기 도구(`output_path`) 호출을 검사합니다. 입력의 `agent_type`(예: `docu-writer:writer`)으로 역할을 알아내 아래 범위 밖이면 거부합니다. 메인 대화(`agent_type` 없음)는 검사하지 않습니다.
+- 사전: `hooks/` PreToolUse 가드가 `docu-writer:*` 에이전트의 Write·Edit·MultiEdit·NotebookEdit와 kordoc 쓰기 도구(`output_path`) 호출을 검사합니다. 경로는 심볼릭 링크를 따라간 실제 위치와 링크 자체 둘 다로, 대소문자를 무시하고 비교합니다. `protected-paths`가 없거나 읽을 수 없으면 모든 쓰기를 막습니다. 입력의 `agent_type`(예: `docu-writer:writer`)으로 역할을 알아내 아래 범위 밖이면 거부합니다. 메인 대화(`agent_type` 없음)는 검사하지 않습니다.
 
   | 역할 | 허용되는 쓰기 |
   |---|---|

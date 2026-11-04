@@ -94,8 +94,10 @@ class Planner:
         self.warnings: list[str] = []
         self.counts: dict = {}
         self.gone: set = set()
-        self.slides_gone: set = set()
+        self.slides_gone: set = set()     # slide keys ("sl"|"new", N) queued for slide_delete
+        self.slides_touched: set = set()  # slide keys that text/row/notes edits point into
         self.tails: dict = {}
+        self.slide_tails: dict = {}       # p:sldId -> last p:sldId inserted after it
 
     # --- validation ------------------------------------------------------------
 
@@ -115,11 +117,17 @@ class Planner:
         self.jobs.append((2 if op == "slide_delete" else 0 if op == "slide_dup" else 1,
                           job, op, edit_at(edit)))
 
-    def _ref(self, loc) -> Ref:
+    def _ref(self, loc, guard=True) -> Ref:
+        """Resolve loc. guard=False is for slide_dup/slide_delete, which may name a slide
+        that is (or will be) deleted — dup then delete is how a slide is moved."""
         try:
             target = self.check.resolve(loc)
         except LocError as exc:
             raise EditError(str(exc)) from exc
+        if guard:
+            if target.slide_key in self.slides_gone:
+                raise EditError(f"{loc} is on a slide deleted by an earlier edit")
+            self.slides_touched.add(target.slide_key)
         ref = Ref(loc, target, loc.startswith("new:"))
         if ref.deferred:
             self.refs.append(ref)
@@ -169,15 +177,15 @@ class Planner:
         self.gone.add((t.slide_key, t.el))
         return lambda: _detach(ref.target.el)
 
-    def _slide_ref(self, loc, allow_new=True) -> Ref:
+    def _slide_ref(self, loc, allow_new=True, guard=True) -> Ref:
         if not isinstance(loc, str) or not (_SLIDE_RE.match(loc) if allow_new else _SL_RE.match(loc)):
             raise EditError(f"{loc!r} must be {'sl:N or new:K' if allow_new else 'sl:N'}")
-        return self._ref(loc)
+        return self._ref(loc, guard)
 
     def _v_slide_dup(self, edit):
         seq = self.dup_seq
-        like = self._slide_ref(edit["like"], allow_new=False)
-        after = self._slide_ref(edit["after"])
+        like = self._slide_ref(edit["like"], allow_new=False, guard=False)
+        after = self._slide_ref(edit["after"], guard=False)
         layout = like.target.el.slide_layout.name
         if self.allowed and layout not in self.allowed:
             raise EditError(f"layout {layout!r} of {like.loc} is not in design.styles_allowed")
@@ -187,14 +195,28 @@ class Planner:
         def run():
             anchor = after_id if after_id is not None else sld_id_of(self.prs, self.live.slide(
                 "new", int(after.loc.split(":")[1])))
-            self.live.new_slides[seq] = duplicate_slide(self.prs, like.target.el, anchor)
+            new = duplicate_slide(self.prs, like.target.el, self._slide_tail(anchor))
+            self.slide_tails[anchor] = sld_id_of(self.prs, new)
+            self.live.new_slides[seq] = new
         return run
 
+    def _slide_tail(self, sld_id):
+        """Last slide already chained after sld_id (following chains), so several dups
+        after the same slide keep their listed order instead of reversing it."""
+        while sld_id in self.slide_tails:
+            sld_id = self.slide_tails[sld_id]
+        return sld_id
+
     def _v_slide_delete(self, edit):
-        ref = self._slide_ref(edit["at"])
-        if ref.loc in self.slides_gone:
+        ref = self._slide_ref(edit["at"], guard=False)
+        key = ref.target.slide_key
+        if key in self.slides_gone:
             raise EditError(f"{ref.loc} is already deleted by an earlier edit")
-        self.slides_gone.add(ref.loc)
+        if key in self.slides_touched:
+            raise EditError(f"{ref.loc} has other edits; deleting it would discard them")
+        if len(self.check.slides) + self.dup_seq - len(self.slides_gone) <= 1:
+            raise EditError(f"{ref.loc} is the only slide left in the deck")
+        self.slides_gone.add(key)
         return lambda: delete_slide(self.prs, ref.target.el)
 
     def _v_notes(self, edit):

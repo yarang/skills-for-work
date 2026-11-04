@@ -7,7 +7,8 @@
 locator는 dump 시점 기준이며, 적용 전에 모두 요소 참조로 풀어 둡니다.
   p:N        w:body 직계 w:p의 N번째 (빈 문단 포함, 1부터)
   t:N        w:body 직계 w:tbl의 N번째 (머리글·바닥글 표, 칸 안쪽 표는 세지 않음)
-  t:N/r:R/c:C  w:tr / w:tc 순서대로 R행 C칸 (병합 확장 없음)
+  t:N/r:R/c:C  R번째 w:tr의 그리드 열 C (gridBefore·gridSpan 반영, 프로파일·doc_verify와 같은 좌표).
+               가로 병합 칸은 차지한 열 어디로든 찾고, 세로 병합의 이어짐 칸은 거부합니다.
 종료 코드: 0 성공, 1 적용하지 못한 편집이 있음(파일 안 씀), 2 사용법·환경 오류.
 """
 import argparse
@@ -70,6 +71,44 @@ def cell_text(tc):
     return " ".join(t for t in texts if t).strip()
 
 
+def _int_val(el, default):
+    try:
+        return max(int(el.get(qn("w:val"))), 0) if el is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def row_grid(tr):
+    """[(시작 그리드 열 1부터, 차지한 열 수, tc), …] — gridBefore·gridSpan 반영."""
+    col = _int_val(tr.find(f"{qn('w:trPr')}/{qn('w:gridBefore')}"), 0) + 1
+    out = []
+    for tc in tr.findall(W_TC):
+        width = max(_int_val(tc.find(f"{qn('w:tcPr')}/{qn('w:gridSpan')}"), 1), 1)
+        out.append((col, width, tc))
+        col += width
+    return out
+
+
+def is_vmerge_continue(tc):
+    vm = tc.find(f"{qn('w:tcPr')}/{qn('w:vMerge')}")
+    return vm is not None and vm.get(qn("w:val"), "continue") == "continue"
+
+
+def is_vmerge_restart(tc):
+    vm = tc.find(f"{qn('w:tcPr')}/{qn('w:vMerge')}")
+    return vm is not None and vm.get(qn("w:val")) == "restart"
+
+
+def continues_merge(tr):
+    """이 행에 세로 병합 이어짐 칸이 있으면 참 — 위 행과 병합으로 묶여 있음."""
+    return tr is not None and any(is_vmerge_continue(tc) for tc in tr.findall(W_TC))
+
+
+def strip_vmerge(tr):
+    for vm in list(tr.iter(qn("w:vMerge"))):
+        vm.getparent().remove(vm)
+
+
 def cell_kind(tc):
     return next((k for k in map(para_kind, cell_paras(tc)) if k), None)
 
@@ -95,7 +134,9 @@ def block(at, style, text, kind):
 def dump_table(doc, n, tbl):
     blocks = []
     for r, tr in enumerate(tbl.findall(W_TR), 1):
-        for c, tc in enumerate(tr.findall(W_TC), 1):
+        for c, _, tc in row_grid(tr):
+            if is_vmerge_continue(tc):
+                continue
             paras = cell_paras(tc)
             style = style_name(doc, paras[0]) if paras else ""
             blocks.append(block(f"t:{n}/r:{r}/c:{c}", style, cell_text(tc), cell_kind(tc)))
@@ -179,6 +220,7 @@ class Ctx:
         self.warnings = []
         self.chain = {}
         self.row_deletes = {}
+        self.gone = set()            # 지우기로 계획된 문단·행 — 겹친 지우기를 거부
 
     def para(self, loc):
         m = RE_P.match(loc) if isinstance(loc, str) else None
@@ -200,10 +242,14 @@ class Ctx:
         rows = tbl.findall(W_TR) if tbl is not None else []
         if not 1 <= int(m[2]) <= len(rows):
             raise EditError(f"locator를 찾을 수 없음: {loc!r}")
-        tcs = rows[int(m[2]) - 1].findall(W_TC)
-        if not 1 <= int(m[3]) <= len(tcs):
+        col = int(m[3])
+        tc = next((tc for start, width, tc in row_grid(rows[int(m[2]) - 1])
+                   if start <= col < start + width), None)
+        if tc is None:
             raise EditError(f"locator를 찾을 수 없음: {loc!r}")
-        return tcs[int(m[3]) - 1]
+        if is_vmerge_continue(tc):
+            raise EditError(f"세로 병합의 이어짐 칸: {loc!r} — 병합이 시작되는 행의 locator를 쓰십시오")
+        return tc
 
     def row(self, tbl, n, field):
         rows = tbl.findall(W_TR)
@@ -262,6 +308,9 @@ def plan_delete(ctx, e):
     p = ctx.para(e.get("at"))
     if next(p.iter(qn("w:sectPr")), None) is not None:
         raise EditError("구역 나눔이 든 문단은 지울 수 없음")
+    if p in ctx.gone:
+        raise EditError(f"이미 지우기로 한 문단: {e.get('at')}")
+    ctx.gone.add(p)
     return (lambda: p.getparent().remove(p)), True
 
 
@@ -274,8 +323,12 @@ def plan_row_add(ctx, e):
         raise EditError("cells가 문자열 목록이 아님")
     if any("\n" in c or "\r" in c for c in cells):
         raise EditError("cells에 줄바꿈이 있음")
+    if continues_merge(anchor.getnext()):
+        raise EditError(f"행 {e.get('after')} 뒤는 세로 병합 중간이라 행을 넣을 수 없음")
     clone = copy.deepcopy(like)
     strip_bookmarks(clone)
+    # 견본 행의 세로 병합 표시를 그대로 두면 새 칸 글이 위 칸에 묻히거나 아래 행을 끌어들입니다.
+    strip_vmerge(clone)
     fill_row(ctx, clone, cells)
     return (lambda: ctx.insert_after(anchor, clone)), False
 
@@ -290,13 +343,21 @@ def fill_row(ctx, tr, cells):
         for nested in tc.findall(W_TBL):
             tc.remove(nested)
         set_cell_text(tc, cells[i] if i < len(cells) else "", ctx.warnings)
+        # 새 행은 한 칸 한 문단으로 둡니다. 견본 행(병합 시작 칸 등)의 빈 문단이 남으면 행이 높아집니다.
+        for extra in cell_paras(tc)[1:]:
+            tc.remove(extra)
 
 
 def plan_row_delete(ctx, e):
     tbl = ctx.table(e.get("table"))
     tr = ctx.row(tbl, e.get("row"), "row")
+    if tr in ctx.gone:
+        raise EditError(f"이미 지우기로 한 행: {e.get('row')}")
+    if any(is_vmerge_restart(tc) for tc in tr.findall(W_TC)) and continues_merge(tr.getnext()):
+        raise EditError(f"행 {e.get('row')}은 세로 병합이 시작되는 행이라 지울 수 없음 (이어진 행이 고아가 됨)")
     done = ctx.row_deletes.setdefault(tbl, set())
     done.add(tr)
+    ctx.gone.add(tr)
     if len(done) >= len(tbl.findall(W_TR)):
         raise EditError("표의 모든 행을 지울 수 없음")
     return (lambda: tr.getparent().remove(tr)), True
@@ -375,11 +436,27 @@ def cmd_apply(args):
     if not failed:
         for step in steps:
             step()
-        with open(args.out, "xb") as fh:
-            doc.save(fh)
+        save(doc, args.out)
     report = {"applied": 0 if failed else len(steps), "failed": failed, "warnings": ctx.warnings}
     print(json.dumps(report, ensure_ascii=False))
     return 1 if failed else 0
+
+
+def save(doc, out):
+    """배타적으로 만든 출력에만 쓰고, 실패하면 그 파일을 지웁니다 (종료 코드 2)."""
+    try:
+        fh = open(out, "xb")
+    except OSError as exc:
+        raise UsageError(f"출력 파일을 만들 수 없음: {out} ({exc})") from exc
+    try:
+        with fh:
+            doc.save(fh)
+    except Exception as exc:  # noqa: BLE001 - 부분 파일을 남기지 않음
+        Path(out).unlink(missing_ok=True)
+        raise UsageError(f"출력 파일을 쓰지 못함: {out} ({exc})") from exc
+    except BaseException:  # Ctrl-C 등에서도 부분 파일을 남기지 않음
+        Path(out).unlink(missing_ok=True)
+        raise
 
 
 def make_parser():
@@ -402,7 +479,7 @@ def main(argv=None):
     args = make_parser().parse_args(argv)
     try:
         return args.func(args)
-    except UsageError as exc:
+    except (UsageError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 

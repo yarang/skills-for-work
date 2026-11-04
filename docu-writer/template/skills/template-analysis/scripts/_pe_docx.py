@@ -43,10 +43,13 @@ def tc_text(tc) -> str:
 
 
 def grid_rows(tbl):
-    """[[(그리드 열 1부터, tc), …], …] — 세로 병합 이어짐 칸은 뺌."""
+    """[[(그리드 열 1부터, tc), …], …] — gridBefore 반영, 세로 병합 이어짐 칸은 뺌.
+
+    patch_docx·doc_verify(python-docx row.cells)와 같은 그리드 좌표다."""
     rows = []
     for tr in tbl.iterchildren(w("tr")):
-        col, cells = 1, []
+        before = tr.find(f"{w('trPr')}/{w('gridBefore')}")
+        col, cells = 1 + (int(before.get(w("val"))) if before is not None else 0), []
         for tc in tr.iterchildren(w("tc")):
             span = tc.find(f"{w('tcPr')}/{w('gridSpan')}")
             vmerge = tc.find(f"{w('tcPr')}/{w('vMerge')}")

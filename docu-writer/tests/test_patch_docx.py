@@ -203,3 +203,62 @@ def test_out_exists_exit_2(samples, tmp_path):
     proc, _ = apply(samples, tmp_path, [{"op": "replace", "at": "t:1/r:1/c:1", "text": "항목"}])
     assert proc.returncode == 2
     assert out.read_bytes() == b"keep"
+
+
+# --- 리뷰 회귀: 이중 삭제·세로 병합 ----------------------------------------------------
+
+def test_double_delete_same_paragraph_rejected(samples, tmp_path):
+    proc, out = apply(samples, tmp_path, [{"op": "delete", "at": "p:3"}, {"op": "delete", "at": "p:3"}])
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert not out.exists()
+
+
+def test_double_row_delete_rejected(samples, tmp_path):
+    proc, out = apply(samples, tmp_path, [{"op": "row_delete", "table": "t:1", "row": 2},
+                                          {"op": "row_delete", "table": "t:1", "row": 2}])
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert not out.exists()
+
+
+@pytest.fixture
+def merged(tmp_path):
+    """표 t:1 4행 2열, 1열의 2~3행이 세로 병합(2행 restart, 3행 continue)."""
+    from docx import Document
+    doc = Document()
+    t = doc.add_table(rows=4, cols=2)
+    for r, row in enumerate([["구분", "값"], ["준비", "1"], ["", "2"], ["합계", "3"]]):
+        for c, text in enumerate(row):
+            t.cell(r, c).text = text
+    t.cell(1, 0).merge(t.cell(2, 0))
+    path = tmp_path / "merged.docx"
+    doc.save(path)
+    return path
+
+
+def apply_to(src, tmp_path, edits):
+    e = tmp_path / "edits.yaml"
+    e.write_text(yaml.safe_dump(edits, allow_unicode=True), encoding="utf-8")
+    out = tmp_path / "merged_out.docx"
+    proc = uv(PATCH_DOCX, "apply", src, "--edits", e, "--profile", write_profile(tmp_path), "--out", out)
+    return proc, out
+
+
+@pytest.mark.parametrize("edit", [
+    {"op": "row_delete", "table": "t:1", "row": 2},
+    {"op": "row_add", "table": "t:1", "like_row": 4, "after": 2, "cells": ["a", "b"]},
+])
+def test_vmerge_breaking_edits_rejected(merged, tmp_path, edit):
+    proc, out = apply_to(merged, tmp_path, [edit])
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert not out.exists()
+
+
+def test_row_add_cloned_from_merged_row_drops_vmerge(merged, tmp_path):
+    from docx import Document
+    from docx.oxml.ns import qn
+    proc, out = apply_to(merged, tmp_path, [
+        {"op": "row_add", "table": "t:1", "like_row": 2, "after": 3, "cells": ["시행", "4"]}])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    tr = Document(out).tables[0]._tbl.tr_lst[3]
+    assert not list(tr.iter(qn("w:vMerge")))
+    assert [c.text for c in Document(out).tables[0].rows[3].cells] == ["시행", "4"]

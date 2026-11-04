@@ -132,11 +132,21 @@ def cmd_apply(args) -> int:
 
 
 def save(prs, out: Path) -> None:
+    """Create the output exclusively, so a file or link that appeared after
+    check_out() is never overwritten; on failure remove only our own file."""
     try:
-        prs.save(str(out))
+        fh = open(out, "xb")
+    except OSError as exc:
+        raise UsageError(f"cannot create {out}: {exc}") from exc
+    try:
+        with fh:
+            prs.save(fh)
     except Exception as exc:  # noqa: BLE001 - leave no partial output behind
         out.unlink(missing_ok=True)
         raise UsageError(f"cannot write {out}: {exc}") from exc
+    except BaseException:  # Ctrl-C etc.: still leave no partial output behind
+        out.unlink(missing_ok=True)
+        raise
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,7 +169,7 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except UsageError as exc:
+    except (UsageError, OSError) as exc:
         print(f"patch_pptx: {exc}", file=sys.stderr)
         return 2
 

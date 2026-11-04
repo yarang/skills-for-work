@@ -199,3 +199,57 @@ def test_malformed_input_denied():
 
 def test_write_without_file_path_denied(ws):
     assert denied(call(ws, "docu-writer:writer", "Write", None))
+
+
+# --- 리뷰 회귀 (codex·antigravity) ------------------------------------------------
+
+def test_symlink_then_dotdot_follows_link_target(ws):
+    """`link/../x`의 `..`는 링크 목적지 기준 — 정규화를 먼저 하면 cwd/x로 잘못 풀린다."""
+    (ws["cwd"] / "lnk").symlink_to(ws["dw"] / "work")
+    assert denied(call(ws, "docu-writer:writer", "Write", ws["cwd"] / "lnk" / ".." / "profile.yaml"))
+
+
+@pytest.mark.parametrize("name", ["Profile.YAML", "SESSION.yaml", "Protected-Paths"])
+def test_case_variant_contract_file(ws, name):
+    assert denied(call(ws, "docu-writer:writer", "Write", ws["dw"] / name))
+
+
+def test_dangling_symlink_to_contract(ws):
+    (ws["dw"] / "approved.sha256").unlink()
+    (ws["cwd"] / "dangling").symlink_to(ws["dw"] / "approved.sha256")
+    assert denied(call(ws, "docu-writer:writer", "Write", ws["cwd"] / "dangling"))
+
+
+@pytest.mark.parametrize("role", ["writer", "analyst", "researcher"])
+def test_missing_protected_paths_fails_closed(ws, role):
+    (ws["dw"] / "protected-paths").unlink()
+    assert denied(call(ws, f"docu-writer:{role}", "Write", ws["dw"] / "work" / "a.yaml"))
+
+
+def test_researcher_evidence_symlink_denied(ws):
+    ev = ws["dw"] / "evidence.yaml"
+    ev.unlink()
+    ev.symlink_to(ws["cwd"] / "elsewhere.txt")
+    assert denied(call(ws, "docu-writer:researcher", "Write", ev))
+
+
+def test_researcher_link_pointing_at_evidence_denied(ws):
+    (ws["cwd"] / "ev").symlink_to(ws["dw"] / "evidence.yaml")
+    assert denied(call(ws, "docu-writer:researcher", "Write", ws["cwd"] / "ev"))
+
+
+def test_notebook_edit_checked(ws):
+    assert denied(call(ws, "docu-writer:writer", "NotebookEdit", ws["dw"] / "profile.yaml",
+                       key="notebook_path"))
+    assert denied(call(ws, "docu-writer:reviewer", "NotebookEdit", ws["cwd"] / "n.ipynb",
+                       key="notebook_path"))
+
+
+def test_whitespace_path_denied(ws):
+    assert denied(call(ws, "docu-writer:writer", "Write", "   "))
+
+
+def test_guard_never_exits_1(ws):
+    """종료 코드 1은 Claude Code가 막지 않으므로 가드는 0 또는 2만 낸다."""
+    for payload in ("[]", "null", '{"agent_type": "docu-writer:writer", "tool_name": "Write", "tool_input": 3}'):
+        assert run_guard(payload).returncode in (0, 2)

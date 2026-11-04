@@ -4,23 +4,24 @@
 
 ## 1. 현재 상태 (v0.2.0, 2026-11-04)
 
-> **스크립트 6개가 들어와 수용 테스트 171건이 모두 통과합니다.** 다만 실제 업무 문서로 처음부터 끝까지 돌려 보는 종단 시험은 아직 하지 않았습니다. 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오.
+> **스크립트 6개가 들어오고 codex·agy 리뷰의 CRITICAL·HIGH 지적을 반영해, 테스트 205건이 모두 통과합니다.** 다만 실제 업무 문서로 처음부터 끝까지 돌려 보는 종단 시험은 아직 하지 않았습니다. 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 규칙 | 에이전트 4개, 스킬 13개(newdoc은 자리만) | 완료 |
-| 테스트 | `tests/` 6개 파일, 171건 | **171 통과** (10장) |
+| 테스트 | `tests/` 7개 파일, 205건 (리뷰 회귀 34건 포함) | **205 통과** (10장) |
 | 스크립트 | `hooks/write_guard.py`·`hooks.json`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py` | 완료 |
 | 시험 | HWPX·DOCX·PPTX × sample·form·update 종단 시험 | 대기 |
-| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 리뷰 진행, push 완료 |
+| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | CRITICAL·HIGH 반영 완료, MEDIUM 일부 보류, push 완료 |
 
 알아 둘 한계는 다음과 같습니다.
 
 - **종단 시험 전**: 테스트는 코드로 만든 작은 견본을 씁니다. 병합 셀이 많은 표, 글상자가 많은 HWPX처럼 실제 문서에서만 나오는 경우는 아직 확인하지 못했습니다.
 - **PPTX 슬라이드 복제(`slide_dup`)**: 차트는 원본과 같은 차트 데이터를 가리키고, 애니메이션·전환 효과와 발표자 노트는 복사되지 않습니다.
-- **견본 보호**: hook이 `docu-writer:*` 에이전트의 쓰기를 막지만 `Bash`로 쓴 것은 보지 못합니다. ⑥의 해시 대조가 마지막 그물입니다.
+- **견본 보호**: hook이 `docu-writer:*` 에이전트의 쓰기를 막지만 `Bash`로 쓴 것은 보지 못합니다. ⑥의 해시 대조가 마지막 그물입니다. `.docu-writer/protected-paths`가 없거나 읽을 수 없으면 hook은 reviewer 외 역할의 쓰기도 모두 막습니다(닫힌 쪽 실패).
+- **writer의 쓰기 범위**: writer는 계약 파일·견본 밖이면 어디든 쓸 수 있습니다(`.git/`·`.claude/` 포함). 결과 경로를 고정하지 않는 설계라서 그대로 두었습니다.
 
 ## 2. 설치
 
@@ -225,7 +226,7 @@ cd <이 저장소>/docu-writer
 uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf pytest tests
 ```
 
-2026-11-04 실행 결과는 `171 passed`입니다(약 40초, `test_render.py`는 `soffice`·`pandoc`이 있어야 합니다).
+2026-11-04 실행 결과는 `205 passed`입니다(약 40초, `test_render.py`는 `soffice`·`pandoc`이 있어야 합니다).
 
 `samples` 픽스처가 DOCX·PPTX·MD 견본을 한꺼번에 만들므로, 한 파일만 돌릴 때도 `--with`에 `python-docx`와 `python-pptx`를 모두 넣어야 합니다. 각 스크립트는 자기 의존성을 PEP 723 블록에 적어 두므로 `--with` 목록은 pytest 쪽에만 필요합니다.
 

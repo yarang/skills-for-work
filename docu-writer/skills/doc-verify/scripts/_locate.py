@@ -54,51 +54,77 @@ def field_text(doc: Doc, loc: str | None) -> str | None:
 
 # --- 섹션 ------------------------------------------------------------------------
 
-def _occurrence(paras: list, target: Para) -> int:
-    key = nows(target.text)
+def anchor_items(doc: Doc) -> list:
+    """h:"…" anchor 대상 [(공백 뺀 글, 블록 번호)] — 프로파일 추출의 heading_texts와 같은 대상.
+
+    Doc.anchors가 없으면(DOCX) 최상위 문단입니다."""
+    if doc.anchors is not None:
+        return doc.anchors
+    return [(nows(b.text), i) for i, b in enumerate(doc.blocks) if isinstance(b, Para)]
+
+
+def _occurrence(items: list, key: str, idx: int) -> int:
     n = 0
-    for p in paras:
-        if nows(p.text) == key:
+    for text, i in items:
+        if text == key:
             n += 1
-        if p is target:
-            return n
+            if i == idx:
+                return n
     return 0
 
 
 def anchor_key(src: Doc, anchor) -> tuple[str, int] | None:
-    """anchor를 (공백 뺀 문단 글, 몇 번째)로 바꿉니다. 풀 수 없으면 None."""
+    """글 anchor(`h:"…"#N`·DOCX `p:N`)를 (공백 뺀 글, 몇 번째)로 바꿉니다. 풀 수 없으면 None.
+
+    PPTX `sl:N`은 글이 아니라 슬라이드 번호로 찾으므로 여기서 다루지 않습니다(slide_anchor)."""
     if not isinstance(anchor, str):
         return None
     m = HEADING.fullmatch(anchor.strip())
     if m:
         return nows(m.group(1)), int(m.group(2) or 1)
-    paras = src.paras
-    target = None
-    if re.fullmatch(r"p:\d+", anchor):
-        target = next((p for p in paras if p.loc == anchor), None)
-    elif m := re.fullmatch(r"sl:(\d+)", anchor):
-        target = next((p for p in paras if p.slide == int(m.group(1)) and p.text.strip()), None)
-    if target is None or not nows(target.text):
+    if src.fmt != "docx" or not re.fullmatch(r"p:\d+", anchor):
         return None
-    return nows(target.text), _occurrence(paras, target)
+    idx = next((i for i, b in enumerate(src.blocks) if isinstance(b, Para) and b.loc == anchor), None)
+    if idx is None or not nows(src.blocks[idx].text):
+        return None
+    key = nows(src.blocks[idx].text)
+    return key, _occurrence(anchor_items(src), key, idx)
+
+
+def slide_anchor(doc: Doc, anchor) -> int | None:
+    """PPTX `sl:N` → N. 견본 제목 글이 결과에서 바뀌어도 슬라이드 자리로 섹션을 찾습니다."""
+    if doc.fmt != "pptx" or not isinstance(anchor, str):
+        return None
+    m = re.fullmatch(r"sl:(\d+)", anchor.strip())
+    return int(m.group(1)) if m else None
 
 
 def find_para(doc: Doc, key: str, occ: int, start: int) -> int | None:
-    """key 글의 occ번째 문단의 블록 번호. start 앞이면 None."""
+    """key 글의 occ번째 anchor 대상을 담은 블록 번호. start 앞이면 None."""
     n = 0
-    for i, b in enumerate(doc.blocks):
-        if isinstance(b, Para) and nows(b.text) == key:
+    for text, i in anchor_items(doc):
+        if text == key:
             n += 1
             if n == occ:
                 return i if i >= start else None
     return None
 
 
+def find_slide(doc: Doc, sn: int, start: int) -> int | None:
+    """슬라이드 sn의 첫 블록 번호. 블록이 없거나 start 앞이면 None."""
+    idx = next((i for i, b in enumerate(doc.blocks) if getattr(b, "slide", None) == sn), None)
+    return idx if idx is not None and idx >= start else None
+
+
 def section_starts(doc: Doc, src: Doc, sections: list) -> list:
     starts, prev = [], 0
     for s in sections:
-        key = anchor_key(src, s.get("anchor"))
-        idx = find_para(doc, key[0], key[1], prev) if key else None
+        sn = slide_anchor(doc, s.get("anchor"))
+        if sn is not None:
+            idx = find_slide(doc, sn, prev)
+        else:
+            key = anchor_key(src, s.get("anchor"))
+            idx = find_para(doc, key[0], key[1], prev) if key else None
         starts.append(idx)
         if idx is not None:
             prev = idx

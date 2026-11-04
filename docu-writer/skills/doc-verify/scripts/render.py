@@ -14,6 +14,7 @@ PDF는 pymupdf로 쪽별 PNG와 쪽별 글로 바꿉니다. HWPX는 렌더하지
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -88,14 +89,33 @@ def to_pdf(src: Path, work: Path, soffice: str) -> Path:
     return pdf
 
 
-def clean_out_dir(out_dir: Path) -> None:
-    """바로 아래의 page_* 파일과 pages.json만 지웁니다. 하위 디렉터리는 건드리지 않습니다."""
+def prepare_out_dir(out_dir: Path) -> None:
     if out_dir.exists() and not out_dir.is_dir():
         raise RenderError(f"출력 경로가 디렉터리가 아닙니다: {out_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
+
+
+def is_same(a: Path, b: Path) -> bool:
+    try:
+        return a.samefile(b)
+    except OSError:
+        return False
+
+
+def clean_out_dir(out_dir: Path, keep: Path) -> None:
+    """바로 아래의 page_* 파일과 pages.json만 지웁니다. 입력 파일(keep)과 하위 디렉터리는 건드리지 않습니다."""
     for f in out_dir.iterdir():
-        if (f.name.startswith("page_") or f.name == "pages.json") and (f.is_file() or f.is_symlink()):
+        if not (f.name.startswith("page_") or f.name == "pages.json"):
+            continue
+        if (f.is_file() or f.is_symlink()) and not is_same(f, keep):
             f.unlink()
+
+
+def publish(staged: Path, out_dir: Path, keep: Path) -> None:
+    """다 만든 결과만 게시합니다. 같은 볼륨 안의 os.replace라 링크를 따라 쓰지 않습니다."""
+    clean_out_dir(out_dir, keep)
+    for f in sorted(staged.iterdir()):
+        os.replace(f, out_dir / f.name)
 
 
 def rasterize(pdf: Path, out_dir: Path) -> int:
@@ -116,12 +136,16 @@ def render(src: Path, out_dir: Path) -> int:
     check_input(src)
     soffice = find_tool("soffice")
     pandoc = find_tool("pandoc") if src.suffix.lower() == ".md" else None
-    clean_out_dir(out_dir)
+    prepare_out_dir(out_dir)
     with tempfile.TemporaryDirectory(prefix="docu-render-") as tmp:
         work = Path(tmp)
         office_src = md_to_docx(src, work, pandoc) if pandoc else src
         pdf = to_pdf(office_src, work, soffice)
-        return rasterize(pdf, out_dir)
+        # 변환·래스터화가 끝까지 성공한 뒤에만 기존 렌더 결과를 바꿉니다.
+        with tempfile.TemporaryDirectory(prefix=".staging-", dir=out_dir) as stage:
+            count = rasterize(pdf, Path(stage))
+            publish(Path(stage), out_dir, src)
+        return count
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -131,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     try:
         count = render(args.input.resolve(), args.out_dir.resolve())
-    except RenderError as exc:
+    except (RenderError, OSError) as exc:
         print(f"render.py: {exc}", file=sys.stderr)
         return 2
     print(f"{count}쪽 → {args.out_dir}")

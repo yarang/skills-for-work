@@ -202,3 +202,42 @@ def test_out_exists_exit_2(samples, tmp_path):
     proc, _ = apply(samples, tmp_path, [{"op": "replace", "at": "sl:2/ph:0", "text": "일정"}])
     assert proc.returncode == 2
     assert out.read_bytes() == b"keep"
+
+
+# --- 리뷰 회귀: 슬라이드 복제·삭제 ----------------------------------------------------
+
+def titles(path):
+    return [s.shapes.title.text_frame.text for s in prs(path).slides]
+
+
+def test_repeated_dup_after_same_slide_keeps_order(samples, tmp_path):
+    ok(apply(samples, tmp_path, [
+        {"op": "slide_dup", "like": "sl:2", "after": "sl:2"},
+        {"op": "slide_dup", "like": "sl:2", "after": "sl:2"},
+        {"op": "replace", "at": "new:1/ph:0", "text": "가"},
+        {"op": "replace", "at": "new:2/ph:0", "text": "나"},
+    ])[0])
+    assert titles(tmp_path / "out.pptx") == ["○○사업 추진계획(안)", "추진 일정", "가", "나", "실적"]
+
+
+def test_move_slide_by_dup_then_delete(samples, tmp_path):
+    ok(apply(samples, tmp_path, [
+        {"op": "slide_dup", "like": "sl:3", "after": "sl:1"},
+        {"op": "slide_delete", "at": "sl:3"},
+    ])[0])
+    assert titles(tmp_path / "out.pptx") == ["○○사업 추진계획(안)", "실적", "추진 일정"]
+
+
+@pytest.mark.parametrize("edits", [
+    [{"op": "slide_delete", "at": "sl:1"}, {"op": "slide_delete", "at": "sl:2"},
+     {"op": "slide_delete", "at": "sl:3"}],
+    [{"op": "slide_delete", "at": "sl:3"}, {"op": "replace", "at": "sl:3/ph:0", "text": "x"}],
+    [{"op": "replace", "at": "sl:3/ph:0", "text": "x"}, {"op": "slide_delete", "at": "sl:3"}],
+    [{"op": "slide_delete", "at": "sl:2"}, {"op": "row_add", "table": "t:1", "like_row": 2,
+                                            "after": 2, "cells": ["a", "b", "c"]}],
+    [{"op": "slide_delete", "at": "sl:2"}, {"op": "notes", "at": "sl:2", "text": "x"}],
+])
+def test_slide_delete_conflicts_rejected(samples, tmp_path, edits):
+    proc, out = apply(samples, tmp_path, edits)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert not out.exists()
