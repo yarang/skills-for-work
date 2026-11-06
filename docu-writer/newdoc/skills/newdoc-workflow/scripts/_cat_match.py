@@ -9,7 +9,7 @@ from _cat_load import CatalogError, Catalog, Item, normalize, resolve
 
 ROUTE_KEYS = (
     "route", "format", "doc_type", "theme", "catalog_id", "file", "profile", "reference_doc",
-    "tokens", "preset", "template_path", "pack_path", "catalog_source",
+    "tokens", "preset", "template_path", "pack_path", "catalog_source", "mode",
 )
 
 
@@ -35,7 +35,7 @@ def _fixed_route(route: dict, item: Item) -> tuple[dict, list[str]]:
     file = _path(item.catalog, label, item.entry, "file")
     profile = _path(item.catalog, label, item.entry, "profile")
     route.update(route="fixed", catalog_id=item.key, file=file, profile=profile,
-                 catalog_source=item.catalog.source)
+                 catalog_source=item.catalog.source, mode=item.entry.get("mode", "sample"))
     return route, [p for p in (file, profile) if p]
 
 

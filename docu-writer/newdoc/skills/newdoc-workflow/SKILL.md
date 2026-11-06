@@ -66,7 +66,7 @@ fi
 
 | `route` | 다음 |
 |---|---|
-| `fixed` | **신규 절차를 끝내고 template-workflow `sample`로 넘깁니다.** `route.json`의 `file`을 견본으로 삼아 template-workflow ①부터 다시 기록합니다(견본 파일이 `protected-paths`에 들어감). ②는 아래 「경로 B — 동봉 프로파일」을 먼저 봅니다. |
+| `fixed` | **신규 절차를 끝내고 template-workflow로 넘깁니다. 모드는 `route.json`의 `mode`(`sample` 견본 · `form` 빈칸 양식)이며 다시 묻지 않습니다.** `route.json`의 `file`을 견본으로 삼아 template-workflow ①부터 다시 기록합니다(견본 파일이 `protected-paths`에 들어감). ②는 아래 「경로 B — 동봉 프로파일」을 먼저 봅니다. |
 | `theme` | 이 절차를 계속합니다. 테마 파일(`reference_doc`·`tokens`·`template_path`)은 위 명령으로 이미 보호됐습니다. |
 | `none` | 이 절차를 계속합니다. 변환 도구의 기본 서식을 쓰며 ④에서 「기본 서식」이라고 알립니다. |
 
@@ -82,7 +82,7 @@ materials: [ /abs/자료/, "웹: 금지" ]
 format_skill: docu-writer:format-hwpx
 route: theme                  # route.json의 route (fixed | theme | none)
 theme: hwpx/default           # theme일 때 — 형식/이름
-# catalog_id: 우리과-기안문    # fixed일 때 — 고정 견본 id
+# catalog_id: 우리과-기안문    # fixed일 때 — 고정 견본 id (mode는 route.json의 mode)
 ```
 
 ### 경로 B — 동봉 프로파일
@@ -186,7 +186,7 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 
 ## ⑤ 변환 경로
 
-writer는 먼저 `.docu-writer/work/draft.md`에 씁니다. 섹션 제목은 프로파일 `title` 그대로, 수준은 `level`대로(`level: 1` → `##`). 본문에는 `####` 이하 제목과 펜스 코드 블록을 쓰지 않습니다. pandoc이 `Heading 4`·`Source Code`를 만들어 `styles_allowed` 밖이 되므로 `r5_tokens`가 `fail`합니다. 더 나눌 내용은 목록 2단으로 씁니다. 그다음 출력 형식으로 바꿉니다.
+writer는 먼저 `.docu-writer/work/draft.md`에 씁니다. 섹션 제목은 프로파일 `title` 그대로, 수준은 `level`대로(`level: 1` → `##`). 본문에는 `####` 이하 제목과 펜스 코드 블록을 쓰지 않습니다. pandoc이 `Heading 4`·`Source Code`를 만들어 `styles_allowed` 밖이 되므로 `r5_tokens`가 `fail`합니다. 더 나눌 내용은 목록 2단으로 씁니다. `pandoc` 경로에서는 `>` 인용도 쓰지 않습니다(`Block Text`가 되어 같은 이유로 `fail`). 요약 상자 `> …하고자 함`은 HWPX 프리셋 전용입니다. DOCX에서 문서 제목 `#`은 `Heading 1`(16pt), `level: 1` 섹션은 `Heading 2`, `level: 2`는 `Heading 3`이 됩니다. 그다음 출력 형식으로 바꿉니다.
 
 | `design.route.tool` | 경로 |
 |---|---|
@@ -194,7 +194,7 @@ writer는 먼저 `.docu-writer/work/draft.md`에 씁니다. 섹션 제목은 프
 | `pandoc` | `pandoc .docu-writer/work/draft.md --reference-doc=<route.reference_doc> -o <출력 경로>`. `reference_doc`이 없으면(`none`) 옵션 없이. `format-docx` 「신규 작성」 |
 | `generate_document` | kordoc `generate_document`(`markdown`: draft.md 내용, `output_path`: 작업 폴더의 `docu-writer-out/<이름>.hwpx`) → 출력 경로로 옮김. 옵션은 route에 적힌 것만 넘깁니다: `preset`(+`gate`) **또는** `template_path` **또는** `pack_path`. 셋을 섞지 않고, route에 아무것도 없으면 preset 없이 부릅니다 |
 
-HWPX 프리셋의 Markdown 대응: `#` 제목, `##` 장, `###` □ 항목, 목록 1단 ㅇ·2단 -, `> …하고자 함` 요약 상자, `※` 참고. 보고서·계획서 프리셋은 `##` 장 제목을 번호 칸(Ⅰ·Ⅱ)과 제목 칸으로 나눕니다. writer는 번호를 쓰지 않고 `title`만 씁니다. 신규 모드에서는 writer가 `generate_document`를 쓰기 전에 멈추지 않습니다(④에서 경로를 승인받았으므로).
+HWPX 프리셋의 Markdown 대응: `#` 제목, `##` 장, `###` □ 항목, 그 아래 목록 1단 ㅇ·2단 - (`###` 없이 `##` 바로 아래 둔 목록은 한 단씩 올라가 1단 □·2단 ㅇ이 되므로, ㅇ 항목을 쓰려면 `###`를 둡니다), `> …하고자 함` 요약 상자, `※` 참고. 보고서·계획서 프리셋은 `##` 장 제목을 번호 칸(Ⅰ·Ⅱ)과 제목 칸으로 나눕니다. writer는 번호를 쓰지 않고 `title`만 씁니다. 신규 모드에서는 writer가 `generate_document`를 쓰기 전에 멈추지 않습니다(④에서 경로를 승인받았으므로).
 
 **테마 파일은 고치지 않습니다.** `reference_doc`·`template_path`는 `protected-paths`에 있어 hook이 막습니다. 결과가 테마와 다르게 보이면 writer는 보고하고 멈춥니다.
 
@@ -204,8 +204,8 @@ template-workflow ⑥의 순서를 따르되 다음이 다릅니다.
 
 1. `shasum -c .docu-writer/approved.sha256` — 같음.
 2. `materials.sha256`이 있으면 `shasum -c .docu-writer/materials.sha256` — 견본 해시 대신 이것으로 참고 자료와 테마 파일에 대해 「원본에 쓰지 않음」을 확인합니다.
-3. 렌더 — 같음(`render/source/`는 없음).
-4. `doc_verify.py` — `--source`·`--expect-sha256` 없이 실행합니다. **신규 모드 지원 전에는 종료 코드 2가 나옵니다.** 이때는 통과로 치지 않고, R1~R6을 렌더 PNG로 직접 확인한 결과를 ⑧에 「자동 검증 미완」으로 적습니다.
+3. 렌더 — 같음(`render/source/`는 없음). HWPX는 `render.py`가 거절하므로 `docu-writer:doc-verify` 「HWPX 렌더」대로 kordoc `render_document`를 `format: "svg"`로 불러 `page.svg`·`page_NNN.svg`를 `.docu-writer/render/`에 둡니다 — 이 파일이 없으면 `length`(쪽수)·`r1_tables`가 `skip`됩니다.
+4. `doc_verify.py` — `--source`·`--expect-sha256` 없이 실행합니다. 프로파일의 `mode: new`를 보고 신규 모드 규칙으로 검사합니다(`docu-writer:doc-verify` 「신규 모드」). 견본이 없어 `skip`되는 항목(r4, 토큰이 빈 r5, MD의 markup)은 렌더 PNG로 직접 확인하고 ⑧에 적습니다.
 
    명령은 `docu-writer:doc-verify` 스킬 「실행」의 2번에서 `--source …` `--expect-sha256 …` 줄만 뺀 것입니다(스크립트 경로는 그 스킬을 불러 얻습니다).
 5. 결과 파일 해시 `verify/output.sha256` — 같음.

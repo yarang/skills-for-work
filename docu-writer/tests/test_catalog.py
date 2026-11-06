@@ -20,7 +20,7 @@ from conftest import ROOT, uv
 CATALOG = ROOT / "newdoc/skills/newdoc-workflow/scripts/catalog.py"
 ROUTE_KEYS = {
     "route", "format", "doc_type", "theme", "catalog_id", "file", "profile", "reference_doc",
-    "tokens", "preset", "template_path", "pack_path", "catalog_source",
+    "tokens", "preset", "template_path", "pack_path", "catalog_source", "mode",
 }
 PRESETS = {"보고서": "보고서", "계획서": "계획서", "기안문": "기안문", "회의록": "회의록", "보도자료": "보도자료"}
 
@@ -109,7 +109,7 @@ def test_docx_theme_match(env):
     assert route(env) == {
         "route": "theme", "format": "docx", "doc_type": "보고서", "theme": "docx/default",
         "catalog_id": None, "file": None, "profile": None, "reference_doc": ref, "tokens": tokens,
-        "preset": None, "template_path": None, "pack_path": None, "catalog_source": "plugin",
+        "preset": None, "template_path": None, "pack_path": None, "catalog_source": "plugin", "mode": None,
     }
     assert "보고서" in env["out"].read_text(encoding="utf-8")  # ensure_ascii=False
 
@@ -193,6 +193,7 @@ BAD = {
     "fixed_bad_format": lambda d: d.update(fixed=_bad_fixed(format="pptx")),
     "fixed_no_file": lambda d: d.update(fixed=_bad_fixed(file=None)),
     "fixed_dup_id": lambda d: d.update(fixed=_bad_fixed() + _bad_fixed()),
+    "fixed_bad_mode": lambda d: d.update(fixed=_bad_fixed(mode="update")),
     "theme_bad_format": lambda d: d["themes"].update(pptx={"default": {"reference_doc": "x.pptx"}}),
     "docx_no_reference": lambda d: d["themes"]["docx"].update(default={"tokens": "themes/docx/default.tokens.yaml"}),
     "file_missing": lambda d: d.update(fixed=_bad_fixed(file="fixed/없음.docx")),
@@ -259,6 +260,7 @@ def test_fixed_beats_theme(env):
     got = route(env)
     assert (got["route"], got["catalog_id"], got["file"], got["profile"]) == ("fixed", "우리과-기안문", f, p)
     assert got["catalog_source"] == "plugin" and got["theme"] is None and got["preset"] is None
+    assert got["mode"] == "sample"  # mode를 적지 않으면 견본
 
 
 def test_fixed_needs_same_format(env):
@@ -466,3 +468,14 @@ def test_list_shows_sources(env):
     assert "plugin" in out and "user" in out
     only = cat(env, "list", "--format", "hwpx").stdout
     assert "hwpx/default" in only and "docx/default" not in only
+
+
+def test_fixed_mode_form_passes_through(env):
+    touch(env["plugin"] / "fixed/기안문.hwpx")
+    entry = _fixed("기안문-양식")
+    entry["mode"] = "form"
+    env["plugin_cat"] = write_catalog(env["plugin"], plugin_data(fixed=[entry]))
+    proc = match(env, "기안문", "hwpx")
+    assert proc.returncode == 0, proc.stderr
+    got = route(env)
+    assert (got["route"], got["mode"]) == ("fixed", "form")

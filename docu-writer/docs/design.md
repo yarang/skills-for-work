@@ -320,6 +320,7 @@ fixed: []
 #     format: hwpx
 #     file: fixed/우리과-기안문.hwpx
 #     profile: fixed/우리과-기안문.profile.yaml   # 선택 — 미리 분석해 둔 프로파일
+#     mode: sample                     # 선택 — sample(본문 있는 견본, 기본) | form(빈칸 양식)
 #     note: 2026년 개정 서식
 ```
 
@@ -333,7 +334,7 @@ fixed: []
 ```
 ① catalog.py match → route: fixed
    → 견본 파일을 protected-paths에 넣음 (번들 파일도 견본과 똑같이 보호)
-   → session.yaml: mode: sample, source: <견본 실제 경로>, catalog_id: <id>
+   → session.yaml: mode: <route.json의 mode — sample | form>, source: <견본 실제 경로>, catalog_id: <id>
 ② profile 있음: 복사 → source.path를 실제 경로로 바꿈 → profile_extract.py check --source <견본>
      통과 → analyst 생략  /  실패 → analyst가 다시 분석
    profile 없음: analyst가 분석 (1단계 그대로)
@@ -341,6 +342,8 @@ fixed: []
 ```
 
 `newdoc-workflow`는 ①에서 경로만 정하고 `template-workflow`로 넘깁니다. 1단계 절차를 복사해 두지 않습니다.
+
+**모드는 카탈로그가 정합니다.** template-workflow ①은 「같은 파일이라도 견본인지 채울 양식인지 사용자만 안다」며 파일만 보고 모드를 정하지 않습니다. 고정 견본은 사용자가 미리 등록한 것이므로, 그 판단을 항목의 `mode`(`sample` 기본 | `form`)로 적어 둡니다. 법정 서식(예: 행정업무규정 시행규칙 별지 제1호서식 기안문)처럼 칸만 있는 파일은 `form`입니다.
 
 ### 9.5 테마 규칙
 

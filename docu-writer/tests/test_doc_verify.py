@@ -708,3 +708,21 @@ def test_new_mode_md_output_skips_markup(tmp_path):
     _, r = verify_new(tmp_path, prof, out)
     assert r["markup"]["status"] == "skip", r["markup"]
     assert "신규 모드" in r["markup"]["detail"]
+
+
+def test_r6_skips_when_numbering_declared_but_text_has_no_markers(tmp_path):
+    """자동 번호(DOCX numPr)·HWPX 프리셋 부호는 글에 없으므로 「부호 없음」을 통과로 보지 않고 skip합니다."""
+    prof = new_profile()
+    prof["structure"]["numbering"] = ["□", "ㅇ", "-"]
+    out = new_output(tmp_path, [("추진 배경", "Heading 1"), ("지역 수요가 늘어 사업을 시작한다", None)])
+    proc, r = verify_new(tmp_path, prof, out)
+    assert r["r6_numbering"]["status"] == "skip", r["r6_numbering"]
+    assert "렌더로 확인" in r["r6_numbering"]["detail"]
+
+
+def test_r6_passes_without_markers_when_no_numbering_declared(tmp_path):
+    prof = new_profile()
+    prof["structure"]["numbering"] = []
+    out = new_output(tmp_path, [("추진 배경", "Heading 1"), ("지역 수요가 늘어 사업을 시작한다", None)])
+    _, r = verify_new(tmp_path, prof, out)
+    assert r["r6_numbering"]["status"] == "pass", r["r6_numbering"]

@@ -42,11 +42,11 @@ Matching (`match`):
   - hwpx: exactly one of `preset_map` / `template_path` / `pack_path`. With `preset_map`: type found (normalized key) → route theme with `preset`; not found → route none. With `template_path`/`pack_path` → route theme.
 - `md` → always none (unless a fixed entry matched).
 - No theme → none.
-- route.json (UTF-8, `ensure_ascii=False`): `{"route": "fixed|theme|none", "format": ..., "doc_type": <as given>, "theme": "<format>/<name>" | null, "catalog_id": <id> | null, "file": ..., "profile": ..., "reference_doc": ..., "tokens": ..., "preset": ..., "template_path": ..., "pack_path": ..., "catalog_source": "plugin|user" | null}` — keys not applicable are null.
+- route.json (UTF-8, `ensure_ascii=False`): `{"route": "fixed|theme|none", "format": ..., "doc_type": <as given>, "theme": "<format>/<name>" | null, "catalog_id": <id> | null, "file": ..., "profile": ..., "reference_doc": ..., "tokens": ..., "preset": ..., "template_path": ..., "pack_path": ..., "catalog_source": "plugin|user" | null, "mode": "sample|form" | null}` — keys not applicable are null. `mode` is set only for fixed: the entry's `mode`, default `sample`.
 - stdout: the realpaths that must be protected, one per line, nothing else: fixed → `file` and `profile` (if any); docx theme → `reference_doc` and `tokens`; hwpx theme → `template_path` or `pack_path` (preset prints nothing); none → nothing.
 - Every referenced file of the chosen entry must exist; a missing file → exit 2 (message names entry and path).
 
-`check` rejects (exit 1): hwpx theme with zero or more than one of preset_map/template_path/pack_path; fixed entry without id/doc_type(list of non-empty strings)/format/file; format not in md|docx|hwpx; duplicate id within one catalog; docx theme without reference_doc; referenced file missing.
+`check` rejects (exit 1): hwpx theme with zero or more than one of preset_map/template_path/pack_path; fixed entry without id/doc_type(list of non-empty strings)/format/file; fixed `mode` other than sample|form; format not in md|docx|hwpx; duplicate id within one catalog; docx theme without reference_doc; referenced file missing.
 
 Acceptance tests — create tests/test_catalog.py (use tmp_path catalogs; add a global option `--plugin-catalog <path>` that replaces the `__file__`-derived plugin catalog — tests use it, the workflow never passes it; say so in --help):
 1. docx theme match → route theme, stdout = realpaths of reference_doc and tokens, route.json fields correct.

@@ -199,6 +199,10 @@ def check_r6(ctx: Ctx) -> dict:
             problems.append(f"같은 단계에 부호 섞임 ({', '.join(counts)})")
     if problems:
         return entry("r6_numbering", "fail", brief(_unique(problems), 5), _unique(locs))
+    if allowed and not by_level:
+        # 자동 번호(DOCX numPr)·HWPX 프리셋 부호는 문단 속성이라 글에 나타나지 않습니다 — 통과로 볼 근거가 없음
+        return entry("r6_numbering", "skip",
+                     "글에 줄 머리 부호 없음 — 자동 번호·문단 번호 속성이면 글에 나타나지 않으므로 렌더로 확인 (⑦ 리뷰어 확인)")
     used = sorted({s for c in by_level.values() for s in c})
     return entry("r6_numbering", "pass", f"부호 {', '.join(used) or '없음'}")
 

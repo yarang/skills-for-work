@@ -7,6 +7,8 @@ from pathlib import Path
 
 from _cat_load import FORMATS, Catalog, normalize, resolve
 
+FIXED_MODES = ("sample", "form")  # template-workflow 모드 — update는 기존 문서 고치기라 고정 견본에 없음
+
 HWPX_KINDS = ("preset_map", "template_path", "pack_path")
 
 
@@ -98,6 +100,8 @@ def _fixed_entry(index: int, entry) -> list[str]:
         out.append(f"{label}: format은 {'|'.join(FORMATS)} 중 하나여야 합니다({entry.get('format')!r})")
     if not _text(entry.get("file")):
         out.append(f"{label}: file이 없습니다")
+    if "mode" in entry and entry["mode"] not in FIXED_MODES:
+        out.append(f"{label}: mode는 {'|'.join(FIXED_MODES)} 중 하나여야 합니다({entry['mode']!r})")
     out.extend(_paths_are_text(label, entry, ("profile",)))
     return out
 

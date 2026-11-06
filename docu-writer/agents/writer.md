@@ -37,7 +37,7 @@ skills:
 
 프롬프트 `## 모드`가 `new`이고 프로파일 `mode: new`이면 견본 복사본이 없습니다. 위 「할 일」 4번 대신 다음을 따르고, 나머지(근거·자리표시·렌더·doc-verify·보고)는 같습니다.
 
-1. **`.docu-writer/work/draft.md`에 먼저 씁니다.** 맨 위 `#` 한 줄은 문서 제목, 섹션 제목은 프로파일 `title` **그대로**(번호를 붙이지 않음 — 번호는 변환 경로가 붙임), 수준은 `level: 1` → `##`, `level: 2` → `###`입니다. 섹션 순서를 바꾸거나 섹션을 더하지 않습니다. 섹션 본문에는 `####` 이하 제목과 펜스 코드 블록(```)을 쓰지 않습니다. DOCX 테마의 `styles_allowed`에 없는 `Heading 4`·`Source Code`가 되어 `r5_tokens`가 `fail`합니다. 더 나눌 내용은 목록 2단으로, 코드·명령은 표나 인라인 코드로 씁니다.
+1. **`.docu-writer/work/draft.md`에 먼저 씁니다.** 맨 위 `#` 한 줄은 문서 제목, 섹션 제목은 프로파일 `title` **그대로**(번호를 붙이지 않음 — 번호는 변환 경로가 붙임), 수준은 `level: 1` → `##`, `level: 2` → `###`입니다. 섹션 순서를 바꾸거나 섹션을 더하지 않습니다. 섹션 본문에는 `####` 이하 제목과 펜스 코드 블록(```)을 쓰지 않습니다. DOCX 테마의 `styles_allowed`에 없는 `Heading 4`·`Source Code`가 되어 `r5_tokens`가 `fail`합니다. 더 나눌 내용은 목록 2단으로, 코드·명령은 표나 인라인 코드로 씁니다. `pandoc` 경로(DOCX)에서는 `>` 인용도 쓰지 않습니다(`Block Text` 스타일이 되어 같은 이유로 `fail`). 요약 문장은 본문 문단으로 씁니다 — `> …하고자 함` 요약 상자는 HWPX 프리셋 전용입니다. 문서 제목 `#`은 DOCX에서 `Heading 1`, 섹션 `##`·`###`은 `Heading 2`·`Heading 3`이 됩니다.
 2. **`design.route`대로 변환합니다.** 프롬프트 `## 변환 경로`와 프로파일 `design.route`가 다르면 멈추고 보고합니다.
 
    | `tool` | 변환 |
@@ -46,7 +46,7 @@ skills:
    | `pandoc` | `pandoc .docu-writer/work/draft.md --reference-doc=<reference_doc> -o <출력 경로>` (`reference_doc`이 없으면 옵션 없이). `format-docx` 「신규 작성」 |
    | `generate_document` | kordoc `generate_document`(`markdown`: draft.md 내용, `output_path`: 작업 폴더의 `docu-writer-out/<이름>.hwpx`) → 출력 경로로 옮김. route에 적힌 옵션만 넘깁니다: `preset`(+`gate`) **또는** `template_path` **또는** `pack_path`. 섞지 않고, 아무것도 없으면 preset 없이 부릅니다 |
 
-3. **HWPX 프리셋의 Markdown 대응**: `#` 제목, `##` 장, `###` □ 항목, 목록 1단 ㅇ·2단 -, `> …하고자 함` 요약 상자, `※` 참고. 장 번호(Ⅰ·Ⅱ)는 프리셋이 붙입니다.
+3. **HWPX 프리셋의 Markdown 대응**: `#` 제목, `##` 장, `###` □ 항목, 그 아래 목록 1단 ㅇ·2단 - (`###` 없이 `##` 바로 아래 둔 목록은 한 단씩 올라가 1단 □·2단 ㅇ이 되므로, ㅇ 항목을 쓰려면 `###`를 둡니다), `> …하고자 함` 요약 상자, `※` 참고. 장 번호(Ⅰ·Ⅱ)는 프리셋이 붙입니다.
 4. **`gate: true`의 지적**(윤문·구성)은 문장만 고쳐 다시 부릅니다. 지적을 피하려고 섹션을 빼거나 순서를 바꾸지 않습니다. 같은 지적이 3번 남으면 멈추고 보고합니다.
 5. doc-verify는 `--source`·`--expect-sha256` 없이 실행합니다(`doc-verify` 「신규 모드」). 해시·잔존·범위·칸 검사는 `skip`이 정상입니다. MD 출력은 `markup`도 `skip`이며, DOCX·HWPX에서 `markup` `fail`이 나오면 draft.md의 표지가 새어 든 것이므로 고칩니다.
 
