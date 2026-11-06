@@ -1,0 +1,9 @@
+# default.docx에서 다시 뽑은 값과 같아야 합니다 (tests/test_theme_default.py).
+page: {size: A4, orientation: portrait, margins_mm: [20, 20, 20, 20]}
+type:
+  body: {font: 맑은 고딕, pt: 10.5}
+  h1: {font: 맑은 고딕, pt: 16, bold: true}
+  h2: {font: 맑은 고딕, pt: 13, bold: true}
+  h3: {font: 맑은 고딕, pt: 11, bold: true}
+color: {}
+styles_allowed: [Title, Heading 1, Heading 2, Heading 3, Body Text, First Paragraph, Compact, Table]

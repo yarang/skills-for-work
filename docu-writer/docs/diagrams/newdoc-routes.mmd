@@ -1,0 +1,17 @@
+%% 2단계 신규 작성의 세 경로: catalog.py match가 고정 견본(B)·테마(C, 기본)·기본값(A)을 정한다
+flowchart TD
+  U(["① 문서 종류·출력 형식"]) --> M["catalog.py match<br/>플러그인 + 사용자 카탈로그<br/>(같은 키는 사용자 우선)"]
+  M --> Q1{"fixed 항목의<br/>doc_type·format이<br/>정확히 같은가"}
+  Q1 -->|예| B["B 고정 견본 (fixed)<br/>견본·동봉 프로파일 보호"]
+  Q1 -->|아니오| Q2{"그 형식에<br/>테마가 있는가"}
+  Q2 -->|"docx · reference_doc<br/>hwpx · preset_map 적중<br/>hwpx · template_path·pack_path"| C["C 테마 (theme, 기본)<br/>테마 파일 보호"]
+  Q2 -->|"md · 테마 없음<br/>preset_map 미적중"| A["A 기본값 (none)<br/>④에서 「기본 서식」 알림"]
+  B --> TW["template-workflow<br/>sample 모드 ②~⑧<br/>(analyst 또는 동봉 프로파일)"]
+  C --> PL["② planner<br/>목차 + design + design.route"]
+  A --> PL
+  PL --> R3["③ researcher → ④ 승인"]
+  R3 --> W["⑤ writer<br/>draft.md → design.route"]
+  W -->|pandoc| O1["DOCX<br/>--reference-doc 테마"]
+  W -->|generate_document| O2["HWPX<br/>preset · template_path · pack_path"]
+  W -->|copy| O3["MD"]
+  O1 & O2 & O3 --> V["⑥ doc-verify (mode: new)<br/>⑦ reviewer → ⑧ 전달"]

@@ -1,6 +1,6 @@
 ---
 name: newdoc-workflow
-description: 견본 없이 새 문서(보고서·계획서·기안문·회의록·기술 문서 등)를 요구사항 → 목차 설계 → 근거 조사 → 승인 → 작성 → 검증 → 리뷰 → 전달 파이프라인으로 만들 때 쓰는 절차입니다. 견본 우선 워크플로(template-workflow)와 같은 공유층(writer·doc-verify·reviewer)을 쓰고, ②의 analyst 자리에 planner가 들어가 문서 종류와 목적에서 같은 형식의 프로파일(mode: new)을 만듭니다. doc-verify의 신규 모드 지원이 끝나기 전까지는 사용자가 직접 부를 때만 씁니다.
+description: 견본 없이 새 문서(보고서·계획서·기안문·회의록·기술 문서 등)를 요구사항 → 목차 설계 → 근거 조사 → 승인 → 작성 → 검증 → 리뷰 → 전달 파이프라인으로 만들 때 쓰는 절차입니다. 견본 우선 워크플로(template-workflow)와 같은 공유층(writer·doc-verify·reviewer)을 쓰고, ②의 analyst 자리에 planner가 들어가 문서 종류와 목적에서 같은 형식의 프로파일(mode: new)을 만듭니다. 사용자가 「견본 없이 새로」 문서를 만들 때 부릅니다.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 메인 대화가 이 절차를 따릅니다. **견본 우선 워크플로(`docu-writer:template-workflow`)를 먼저 불러옵니다.** 이 문서는 그 절차에서 **달라지는 점만** 적습니다. 적지 않은 것(작업 디렉터리, 승인 명령, hook, ⑥ 순서, ⑦ 되돌리기, ⑧ 보고)은 template-workflow를 그대로 따릅니다.
 
-> **현재 상태 — 단계적 도입.** 절차는 준비됐습니다. 카탈로그 스크립트(`catalog.py`), 기본 DOCX 테마, `doc_verify.py`·프로파일 점검(`profile_extract.py check`)의 `mode: new` 지원, `planner` 에이전트는 작업 중입니다(`docs/design.md` §9.7, `docs/briefs/brief_newdoc.md`). `catalog.py`가 없으면 ①의 경로는 `none`(기본 서식)으로 칩니다. 그 전까지 ⑥의 `doc_verify.py`는 종료 코드 2로 끝나므로 **⑥을 통과로 칠 수 없고**, ⑧에서 「자동 검증 미완」을 사용자에게 알립니다. 그래서 이 스킬은 자동으로 불리지 않습니다(`disable-model-invocation`).
+> **자동으로 불리지 않습니다.** 워크플로 스킬은 설명(description) 비용을 아끼려고 `disable-model-invocation: true`로 둡니다(`docs/design.md` §9.2). 사용자가 「견본 없이 새 문서」를 요청하면 메인 대화가 이 스킬을 직접 불러옵니다. 경로가 셋으로 갈리는 모습은 `docs/diagrams/newdoc-routes.svg`에 있습니다.
 
 ## 파이프라인
 
@@ -62,7 +62,7 @@ fi
 
 `protected-paths` 파일이 **없으면** hook이 모든 서브에이전트 쓰기를 막습니다. 빈 파일은 「보호할 것 없음」입니다.
 
-`catalog.py`의 종료 코드가 2(카탈로그 문법 오류·파일 없음)면 그 메시지를 사용자에게 보이고, 기본 서식(`none`)으로 갈지 묻습니다. 스크립트가 아직 없으면 묻지 않고 `none`으로 칩니다. `route.json`의 `route`로 갈라집니다.
+`catalog.py`의 종료 코드가 2(카탈로그 문법 오류·파일 없음·`route.json`이 이미 있음)면 그 메시지를 사용자에게 보이고, 기본 서식(`none`)으로 갈지 묻습니다. `route.json`이 이미 있다는 오류는 위 `rm -f`를 빠뜨린 것이므로 지우고 다시 부릅니다. `route.json`의 `route`로 갈라집니다.
 
 | `route` | 다음 |
 |---|---|
@@ -186,7 +186,7 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 
 ## ⑤ 변환 경로
 
-writer는 먼저 `.docu-writer/work/draft.md`에 씁니다. 섹션 제목은 프로파일 `title` 그대로, 수준은 `level`대로(`level: 1` → `##`). 그다음 출력 형식으로 바꿉니다.
+writer는 먼저 `.docu-writer/work/draft.md`에 씁니다. 섹션 제목은 프로파일 `title` 그대로, 수준은 `level`대로(`level: 1` → `##`). 본문에는 `####` 이하 제목과 펜스 코드 블록을 쓰지 않습니다. pandoc이 `Heading 4`·`Source Code`를 만들어 `styles_allowed` 밖이 되므로 `r5_tokens`가 `fail`합니다. 더 나눌 내용은 목록 2단으로 씁니다. 그다음 출력 형식으로 바꿉니다.
 
 | `design.route.tool` | 경로 |
 |---|---|

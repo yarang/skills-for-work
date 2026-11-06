@@ -1,0 +1,15 @@
+# doc_verify.py 신규 모드(mode: new) 시험용 프로파일 — 견본(source) 없음.
+# 계약: skills/doc-verify/SKILL.md 「신규 모드 (`mode: new`)」.
+profile_version: 1
+mode: new
+structure:
+  numbering: ["Ⅰ.", "1)", "○"]
+  sections:
+    - {id: s1, title: 추진 배경, level: 1, anchor: 'h:"추진배경"'}
+    - {id: s2, title: 현황, level: 2, anchor: 'h:"현황"'}
+design:
+  route: {tool: pandoc}
+  styles_allowed: [Normal, Heading 1, Heading 2]
+  type: {}
+  color: {}
+sample_text: []

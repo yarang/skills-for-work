@@ -33,6 +33,9 @@ def _hwpx_new_ids(ctx: Ctx) -> list:
 
 
 def _hwpx_ids_check(ctx: Ctx, cid: str) -> dict:
+    if ctx.mode == "new":
+        # 견본 모양 id가 없으면 모든 id가 「새 id」가 되어 늘 fail입니다 — 읽을 수 없는 항목으로 skip.
+        return entry(cid, "skip", "신규 모드 — 견본이 없어 HWPX 글자·문단 모양 id를 비교할 수 없음")
     new = _hwpx_new_ids(ctx)
     if new:
         return entry(cid, "fail", f"견본에 없는 모양 id {len(new)}개: {brief(new)}", new)
@@ -141,13 +144,16 @@ def check_r5(ctx: Ctx) -> dict:
         return _hwpx_ids_check(ctx, "r5_tokens")
     design = ctx.profile.get("design") or {}
     allowed = [str(s) for s in design.get("styles_allowed") or []]
+    tokens = _token_sets(design)
+    if not allowed and not any(tokens):
+        return entry("r5_tokens", "skip", "비교할 토큰 없음 (styles_allowed·design.type·design.color 비어 있음)")
     problems, locs = [], []
     if allowed:
         for name, loc in ctx.out.styles:
             if name not in allowed:
                 problems.append(f"스타일 「{name}」")
                 locs.append(loc)
-    run_problems, run_locs = _run_problems(ctx, *_token_sets(design))
+    run_problems, run_locs = _run_problems(ctx, *tokens)
     problems += run_problems
     locs += run_locs
     if problems:

@@ -12,7 +12,7 @@ import shutil
 import pytest
 import yaml
 
-from conftest import BODY_SENTENCE, DOC_VERIFY, uv
+from conftest import BODY_SENTENCE, DOC_VERIFY, FIXTURES, uv
 
 IDS = ["hash", "residue", "markup", "placeholder", "fields", "scope", "r4_headings", "r5_tokens",
        "r6_numbering", "table_header", "length", "r1_tables", "rewrite"]
@@ -550,3 +550,161 @@ def test_usage_errors_exit_2(samples, tmp_path, case):
     proc = uv(DOC_VERIFY, "--profile", pf, "--source", src, "--expect-sha256", "0" * 64,
               "--output", out, "--out-dir", tmp_path / "verify")
     assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
+# --- 신규 모드 (mode: new) ------------------------------------------------------------
+# 계약: SKILL.md 「신규 모드 (`mode: new`)」. 견본이 없으므로 결과 DOCX는 python-docx로 새로 만듭니다.
+
+NEW_PROFILE = FIXTURES / "new" / "doc_verify" / "profile_new_docx.yaml"
+NEW_BODY = [
+    ("Ⅰ. 추진 배경", "Heading 1"),
+    ("○ 지역 수요가 늘어 사업을 시작한다", None),
+    ("1) 현황", "Heading 2"),
+    ("○ 이용 건수는 지난해보다 늘었다", None),
+]
+
+
+def new_profile():
+    return yaml.safe_load(NEW_PROFILE.read_text(encoding="utf-8"))
+
+
+def new_output(tmp_path, paras=NEW_BODY):
+    from docx import Document
+    doc = Document()
+    for text, style in paras:
+        doc.add_paragraph(text, style=style)
+    out = tmp_path / "new.docx"
+    doc.save(out)
+    return out
+
+
+def run_new(tmp_path, prof, out, *extra, placeholders=None):
+    pf = tmp_path / "profile.yaml"
+    pf.write_text(yaml.safe_dump(prof, allow_unicode=True), encoding="utf-8")
+    args = ["--profile", pf, "--output", out, "--out-dir", tmp_path / "verify", *extra]
+    if placeholders is not None:
+        ph = tmp_path / "placeholders.yaml"
+        ph.write_text(yaml.safe_dump(placeholders, allow_unicode=True), encoding="utf-8")
+        args += ["--placeholders", ph]
+    return uv(DOC_VERIFY, *args)
+
+
+def verify_new(tmp_path, prof, out, *extra, placeholders=None):
+    proc = run_new(tmp_path, prof, out, *extra, placeholders=placeholders)
+    assert proc.returncode in (0, 1), proc.stdout + proc.stderr
+    report = json.loads((tmp_path / "verify" / "report.json").read_text(encoding="utf-8"))
+    assert [e["id"] for e in report] == IDS
+    return proc, {e["id"]: e for e in report}
+
+
+def test_new_mode_without_source_passes(tmp_path):
+    proc, r = verify_new(tmp_path, new_profile(), new_output(tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    for cid in ("hash", "residue", "scope", "fields"):
+        assert r[cid]["status"] == "skip", r[cid]
+        assert "신규 모드" in r[cid]["detail"], r[cid]
+
+
+def test_new_mode_with_both_source_args_still_skips_hash(samples, tmp_path):
+    src = samples["docx"]
+    proc, r = verify_new(tmp_path, new_profile(), new_output(tmp_path),
+                         "--source", src, "--expect-sha256", "0" * 64)
+    assert proc.returncode == 0, proc.stdout
+    assert r["hash"]["status"] == "skip"
+    assert "신규 모드" in r["hash"]["detail"]
+
+
+@pytest.mark.parametrize("case", ["new-only-source", "new-only-sha", "sample-no-source", "sample-only-sha"])
+def test_new_mode_source_arg_usage_errors(samples, tmp_path, case):
+    src = samples["docx"]
+    if case.startswith("new"):
+        prof, out = new_profile(), new_output(tmp_path)
+    else:
+        prof, out = profile(samples), output(samples, tmp_path)
+    extra = {
+        "new-only-source": ["--source", src],
+        "new-only-sha": ["--expect-sha256", sha256(src)],
+        "sample-no-source": [],
+        "sample-only-sha": ["--expect-sha256", sha256(src)],
+    }[case]
+    proc = run_new(tmp_path, prof, out, *extra)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stderr.strip()
+    assert not (tmp_path / "verify" / "report.json").exists()
+
+
+def _section_limits(prof, limits):
+    for s, limit in zip(prof["structure"]["sections"], limits):
+        s["length"] = {"chars": [0, limit]}
+    return prof
+
+
+def test_new_mode_heading_anchor_ignores_chapter_number(tmp_path):
+    """「Ⅰ. 추진 배경」은 h:"추진배경"과, 「1) 현황」은 h:"현황"과 맞아야 섹션 분량을 잴 수 있습니다."""
+    prof = _section_limits(new_profile(), [5, 5])
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert proc.returncode == 1
+    assert r["length"]["status"] == "fail", r["length"]
+    assert {"s1", "s2"} <= set(r["length"]["locations"])
+    prof = _section_limits(new_profile(), [500, 500])
+    _, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert r["length"]["status"] == "pass", r["length"]
+
+
+def test_new_mode_missing_section_length_skips(tmp_path):
+    prof = _section_limits(new_profile(), [500, 500])
+    prof["structure"]["sections"].append(
+        {"id": "s3", "title": "기대 효과", "level": 1, "anchor": 'h:"기대효과"', "length": {"chars": [0, 1]}})
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    assert r["length"]["status"] != "fail"
+    assert "s3" in r["length"]["detail"]
+
+
+@pytest.mark.parametrize("locator,status", [("s2", "pass"), ("s1", "fail")])
+def test_new_mode_placeholder_uses_loose_anchor(tmp_path, locator, status):
+    phs = [{"locator": locator, "expect": "이용 건수"}]
+    _, r = verify_new(tmp_path, new_profile(), new_output(tmp_path), placeholders=phs)
+    assert r["placeholder"]["status"] == status, r["placeholder"]
+
+
+def test_new_mode_markup_has_no_sample_exception(tmp_path):
+    """견본 대조 예외 없이 모든 마크다운 표지를 봅니다.
+    (작업 지시서 시험 5의 「○○」는 SKILL 계약상 markup 대상이 아니어서 이 시험으로 바꿈 — 조정자 승인.)"""
+    out = new_output(tmp_path, NEW_BODY + [("○ 신청은 **135건**이다", None)])
+    proc, r = verify_new(tmp_path, new_profile(), out)
+    assert proc.returncode == 1
+    assert r["markup"]["status"] == "fail", r["markup"]
+
+
+def test_new_mode_empty_tokens_skip_r5(tmp_path):
+    prof = new_profile()
+    prof["design"].update({"type": {}, "color": {}, "styles_allowed": []})
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    assert r["r5_tokens"]["status"] == "skip", r["r5_tokens"]
+
+
+def test_new_mode_hwpx_shape_ids_skip(samples, tmp_path):
+    prof = new_profile()
+    prof["structure"]["numbering"] = []
+    out = tmp_path / "new.hwpx"
+    shutil.copy(samples["hwpx"], out)
+    _, r = verify_new(tmp_path, prof, out)
+    for cid in ("r4_headings", "r5_tokens"):
+        assert r[cid]["status"] == "skip", r[cid]
+        assert "신규 모드" in r[cid]["detail"]
+    errors = [k for k, v in r.items() if str(v.get("detail", "")).startswith("검사 오류")]
+    assert not errors, errors
+
+
+def test_new_mode_md_output_skips_markup(tmp_path):
+    """MD 출력은 마크다운이 곧 형식이므로 표·제목·굵게가 있어도 markup은 skip입니다."""
+    out = tmp_path / "new.md"
+    out.write_text("# 추진 배경\n\n- 신청은 **135건**이다\n\n## 현황\n\n| 구분 | 건수 |\n|---|---|\n| 신청 | 135 |\n",
+                   encoding="utf-8")
+    prof = new_profile()
+    prof["design"] = {"route": {"tool": "copy"}}
+    _, r = verify_new(tmp_path, prof, out)
+    assert r["markup"]["status"] == "skip", r["markup"]
+    assert "신규 모드" in r["markup"]["detail"]

@@ -4,11 +4,12 @@
 「locator와 anchor」·「견본 문구 지문」·「프로파일 점검」.
 """
 import hashlib
+from pathlib import Path
 
 import pytest
 import yaml
 
-from conftest import BODY_SENTENCE, EXPECTED_TABLES, PROFILE_EXTRACT, uv
+from conftest import BODY_SENTENCE, EXPECTED_TABLES, FIXTURES, PROFILE_EXTRACT, uv
 
 
 def tables(path):
@@ -261,7 +262,7 @@ def mutate_version(p):
 
 
 def mutate_mode(p):
-    p["mode"] = "new"
+    p["mode"] = "bogus"
 
 
 @pytest.mark.parametrize("mutate", [
@@ -307,3 +308,160 @@ def test_check_hwpx_heading_anchor(samples, tmp_path):
     assert check(samples, "hwpx", prof, tmp_path).returncode == 0
     prof["structure"]["sections"][1]["anchor"] = 'h:"없는 제목"'
     assert check(samples, "hwpx", prof, tmp_path).returncode == 1
+
+
+# --- check: 신규 모드 (mode: new) -------------------------------------------------
+# 계약: template-analysis SKILL 「프로파일 점검」 「신규 모드」, 설계서 §9.6.
+
+NEW_PROFILE = FIXTURES / "new" / "profile_extract" / "new_profile.yaml"
+
+
+@pytest.fixture
+def new_prof():
+    return yaml.safe_load(NEW_PROFILE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def theme(tmp_path):
+    """route 경로 값으로 쓸 실제 파일 (절대 경로)."""
+    d = tmp_path / "theme"
+    d.mkdir()
+    files = {"docx": d / "default.docx", "hwpx": d / "서식.hwpx", "pack": d / "pack.json"}
+    for f in files.values():
+        f.write_bytes(b"x")
+    return {k: str(v.resolve()) for k, v in files.items()}
+
+
+def check_new(prof, tmp_path, *extra):
+    p = tmp_path / "new-profile.yaml"
+    p.write_text(yaml.safe_dump(prof, allow_unicode=True), encoding="utf-8")
+    return uv(PROFILE_EXTRACT, "check", p, *extra)
+
+
+VALID_ROUTES = {
+    "pandoc_reference_doc": lambda t: {"tool": "pandoc", "reference_doc": t["docx"]},
+    "pandoc_bare": lambda t: {"tool": "pandoc"},
+    "gd_preset_gate": lambda t: {"tool": "generate_document", "preset": "보고서", "gate": True},
+    "gd_preset": lambda t: {"tool": "generate_document", "preset": "계획서"},
+    "gd_template_path": lambda t: {"tool": "generate_document", "template_path": t["hwpx"]},
+    "gd_pack_path": lambda t: {"tool": "generate_document", "pack_path": t["pack"]},
+    "gd_bare": lambda t: {"tool": "generate_document"},
+    "copy": lambda t: {"tool": "copy"},
+}
+
+
+@pytest.mark.parametrize("name", list(VALID_ROUTES))
+def test_check_new_valid_routes(new_prof, theme, tmp_path, name):
+    new_prof["design"]["route"] = VALID_ROUTES[name](theme)
+    proc = check_new(new_prof, tmp_path)
+    assert proc.returncode == 0, (name, proc.stdout, proc.stderr)
+
+
+def set_route(route):
+    def mutate(p, t):
+        p["design"]["route"] = route(t) if callable(route) else route
+    return mutate
+
+
+def set_anchor(i, anchor):
+    def mutate(p, t):
+        p["structure"]["sections"][i]["anchor"] = anchor
+    return mutate
+
+
+def set_key(key, value):
+    def mutate(p, t):
+        p[key] = value
+    return mutate
+
+
+def del_section_key(key):
+    def mutate(p, t):
+        del p["structure"]["sections"][0][key]
+    return mutate
+
+
+def add_table_locator(p, t):
+    p["structure"]["sections"][0]["locator"] = "t:1/r:1/c:1"
+
+
+def del_design(p, t):
+    del p["design"]
+
+
+def del_route(p, t):
+    del p["design"]["route"]
+
+
+NEW_VIOLATIONS = {
+    "version": (set_key("profile_version", 2), "profile_version"),
+    "source_key": (set_key("source", {"path": "/x.docx", "format": "docx", "sha256": "0" * 64}), "source"),
+    "missing_guide": (del_section_key("guide"), "guide"),
+    "missing_length": (del_section_key("length"), "length"),
+    "anchor_p_form": (set_anchor(0, "p:3"), "anchor"),
+    "anchor_empty": (set_anchor(0, 'h:""'), "anchor"),
+    "anchor_blank": (set_anchor(0, 'h:"   "'), "anchor"),
+    "anchor_nth": (set_anchor(1, 'h:"추진 배경"#2'), "anchor"),
+    "anchor_duplicate": (set_anchor(1, 'h:"추진배경"'), "anchor"),
+    "table_locator": (add_table_locator, "t:1"),
+    "sample_text": (set_key("sample_text", ["2026년 상반기 신청 건수 120건"]), "sample_text"),
+    "fields": (set_key("fields", [{"id": "f1", "label": "담당"}]), "fields"),
+    "fields_empty": (set_key("fields", []), "fields"),
+    "update": (set_key("update", {"sections": ["s1"], "requests": ["일정"]}), "update"),
+    "conflict_handling": (set_key("conflicts", [{"item": "x", "handling": "add"}]), "conflicts"),
+    "no_design": (del_design, "design.route"),
+    "no_route": (del_route, "design.route"),
+    "tool_unknown": (set_route({"tool": "soffice"}), "tool"),
+    "tool_missing": (set_route({"reference_doc": "/x.docx"}), "tool"),
+    "pandoc_preset": (set_route({"tool": "pandoc", "preset": "보고서"}), "preset"),
+    "pandoc_template": (set_route(lambda t: {"tool": "pandoc", "template_path": t["hwpx"]}), "template_path"),
+    "gd_preset_and_template": (set_route(lambda t: {"tool": "generate_document", "preset": "보고서",
+                                                    "template_path": t["hwpx"]}), "template_path"),
+    "gd_template_and_pack": (set_route(lambda t: {"tool": "generate_document", "template_path": t["hwpx"],
+                                                  "pack_path": t["pack"]}), "pack_path"),
+    "gd_gate_without_preset": (set_route({"tool": "generate_document", "gate": True}), "gate"),
+    "gd_gate_with_template": (set_route(lambda t: {"tool": "generate_document", "gate": True,
+                                                   "template_path": t["hwpx"]}), "gate"),
+    "gd_gate_not_bool": (set_route({"tool": "generate_document", "preset": "보고서", "gate": "yes"}), "gate"),
+    "gd_preset_empty": (set_route({"tool": "generate_document", "preset": ""}), "preset"),
+    "gd_unknown_key": (set_route({"tool": "generate_document", "reference_doc": "/x.docx"}), "reference_doc"),
+    "copy_extra_key": (set_route(lambda t: {"tool": "copy", "reference_doc": t["docx"]}), "reference_doc"),
+    "path_relative": (set_route({"tool": "pandoc", "reference_doc": "themes/docx/default.docx"}), "절대"),
+    "path_missing": (set_route(lambda t: {"tool": "pandoc", "reference_doc": t["docx"] + ".none"}), "없"),
+    "path_dir": (set_route(lambda t: {"tool": "generate_document",
+                                      "pack_path": str(Path(t["pack"]).parent)}), "pack_path"),
+}
+
+
+@pytest.mark.parametrize("name", list(NEW_VIOLATIONS))
+def test_check_new_violations_exit_1(new_prof, theme, tmp_path, name):
+    mutate, reason = NEW_VIOLATIONS[name]
+    mutate(new_prof, theme)
+    proc = check_new(new_prof, tmp_path)
+    assert proc.returncode == 1, (name, proc.stdout, proc.stderr)
+    assert reason in proc.stdout, (name, proc.stdout)
+
+
+def test_check_new_with_source_is_usage_error(new_prof, samples, tmp_path):
+    proc = check_new(new_prof, tmp_path, "--source", samples["docx"])
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stdout == ""
+
+
+def test_check_new_with_tables_is_usage_error(new_prof, tmp_path):
+    t = tmp_path / "tables.yaml"
+    t.write_text("tables: []\n", encoding="utf-8")
+    proc = check_new(new_prof, tmp_path, "--tables", t)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
+@pytest.mark.parametrize("mode", ["sample", "form", "update"])
+def test_check_other_modes_need_source(valid, tmp_path, mode):
+    valid["mode"] = mode
+    proc = check_new(valid, tmp_path)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stdout == ""
+
+
+def test_check_missing_profile_without_source(tmp_path):
+    assert uv(PROFILE_EXTRACT, "check", tmp_path / "none.yaml").returncode == 2

@@ -6,8 +6,10 @@
 
 계약: skills/doc-verify/SKILL.md 「검사 항목」·「검사 세부」·「출력」.
 
-    uv run doc_verify.py --profile P --source S --expect-sha256 H --output O \\
+    uv run doc_verify.py --profile P [--source S --expect-sha256 H] --output O \\
         [--placeholders F] [--pages-dir D] --out-dir R
+
+--source·--expect-sha256은 mode: new에서만 뺄 수 있습니다(SKILL.md 「신규 모드」).
 
 종료 코드: 0 = pass·warn·skip만, 1 = fail 하나 이상, 2 = 사용법·환경 오류.
 """
@@ -29,7 +31,7 @@ from _checks_content import (Ctx, check_fields, check_hash, check_length,  # noq
                              entry)
 from _checks_design import (check_r1, check_r4, check_r5, check_r6,  # noqa: E402
                             check_rewrite, check_table_header)
-from _readers import doc_format, read_doc  # noqa: E402
+from _readers import Doc, doc_format, read_doc  # noqa: E402
 
 MODES = {"sample", "form", "update", "new"}
 CHECKS = [
@@ -119,17 +121,38 @@ def load_pages(pages_dir: Path | None) -> list | None:
     return [_svg_text(p) for p in svgs] or None
 
 
+def _source_args(args, mode: str) -> Path | None:
+    """--source·--expect-sha256 조합을 모드에 맞게 확인합니다. 견본을 쓸 때만 경로를 돌려줍니다.
+
+    mode: new는 둘 다 없거나 둘 다 있어야 하고(있어도 견본 대조는 하지 않음), 다른 모드는 둘 다 필수입니다."""
+    given = [name for name, value in (("--source", args.source), ("--expect-sha256", args.expect_sha256))
+             if value is not None]
+    if mode == "new":
+        if len(given) == 1:
+            raise UsageError(f"mode: new에서는 --source와 --expect-sha256을 함께 주거나 둘 다 빼야 합니다 "
+                             f"(받은 인자: {given[0]})")
+        return _need_doc(args.source, "견본") if given else None
+    missing = [n for n in ("--source", "--expect-sha256") if n not in given]
+    if missing:
+        raise UsageError(f"mode: {mode}에서는 다음 인자가 필요합니다: {', '.join(missing)}")
+    return _need_doc(args.source, "견본")
+
+
 def build_ctx(args) -> Ctx:
     prof = load_profile(args.profile)
-    source = _need_doc(args.source, "견본")
+    mode = prof["mode"]
+    source = _source_args(args, mode)
     output = _need_doc(args.output, "결과")
     placeholders = load_placeholders(args.placeholders)
     pages = load_pages(args.pages_dir)
     try:
-        src, out = read_doc(source), read_doc(output)
+        out = read_doc(output)
+        # 신규 모드는 견본이 없습니다. 견본 자리에는 빈 문서를 두고 검사는 mode로 가릅니다.
+        src = Doc(out.fmt, []) if mode == "new" else read_doc(source)
     except Exception as exc:  # 형식 라이브러리 오류는 종류가 많아 한데 받습니다.
         raise UsageError(f"문서를 읽을 수 없습니다: {exc}") from exc
-    return Ctx(prof, prof["mode"], source, args.expect_sha256, output, src, out,
+    expect = args.expect_sha256 if mode != "new" else None
+    return Ctx(prof, mode, source if mode != "new" else None, expect, output, src, out,
                placeholders, pages, args.pages_dir)
 
 
@@ -153,8 +176,8 @@ def summary(output: Path, report: list, code: int) -> str:
 def parse_args(argv):
     ap = argparse.ArgumentParser(description="결과 문서를 프로파일·견본과 대조해 검증")
     ap.add_argument("--profile", type=Path, required=True, help="profile.yaml")
-    ap.add_argument("--source", type=Path, required=True, help="견본 파일")
-    ap.add_argument("--expect-sha256", required=True, help="견본의 기대 sha256")
+    ap.add_argument("--source", type=Path, help="견본 파일 (mode: new는 선택)")
+    ap.add_argument("--expect-sha256", help="견본의 기대 sha256 (mode: new는 선택)")
     ap.add_argument("--output", type=Path, required=True, help="결과 파일")
     ap.add_argument("--placeholders", type=Path, help="자리표시 목록 YAML")
     ap.add_argument("--pages-dir", type=Path, help="렌더 디렉터리 (pages.json 또는 page_NNN.svg)")

@@ -7,7 +7,7 @@ import yaml
 from _pe_common import (MIN_SAMPLE_LEN, UsageError, detect_format, format_module, no_space,
                         placeholder_only, sha256_of)
 
-MODES = ("sample", "form", "update")
+MODES = ("sample", "form", "update", "new")
 SECTION_KEYS = ("id", "title", "level", "anchor", "kind", "required", "guide", "length")
 H_ANCHOR_RE = re.compile(r'^h:"(.*)"(?:#(\d+))?$')
 P_ANCHOR_RE = re.compile(r"^(p|sl):(\d+)$")
@@ -43,7 +43,7 @@ def check_header(prof, source: Path, fails):
     if prof.get("profile_version") != 1:
         fails.append(f"profile_version이 1이 아님: {prof.get('profile_version')!r}")
     if prof.get("mode") not in MODES:
-        fails.append(f"mode가 sample·form·update 가운데 하나가 아님: {prof.get('mode')!r}")
+        fails.append(f"mode가 sample·form·update·new 가운데 하나가 아님: {prof.get('mode')!r}")
     src = prof.get("source") if isinstance(prof.get("source"), dict) else {}
     if src.get("sha256") != sha256_of(source):
         fails.append("source.sha256이 견본 파일의 실제 값과 다름")

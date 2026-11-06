@@ -14,6 +14,9 @@ SHAPE_CELL = re.compile(r"(sl:\d+/sh:\d+)/t/r:(\d+)/c:(\d+)")
 HEADING = re.compile(r'h:"(.*)"(?:#(\d+))?')
 SECTION_ID = re.compile(r"s\d+")
 FIELD_ID = re.compile(r"f\d+")
+# 신규 모드 제목 앞 장 번호 — 「Ⅰ.」「1.」「1)」「가.」「가)」와 점 없는 꼴(SKILL.md 「신규 모드」).
+# 점·괄호가 없는 숫자·한글 번호는 뒤에 공백이 있을 때만 번호로 봅니다(「12개월」·「가나다」를 자르지 않음).
+CHAPTER = re.compile(r"\s*(?:[Ⅰ-Ⅹ][.)]?|(?:\d{1,2}|[가나다라마바사아자차카타파하])(?:[.)]|(?=\s)))\s*")
 
 
 def _cell(table, r: int, c: int) -> str | None:
@@ -63,6 +66,23 @@ def anchor_items(doc: Doc) -> list:
     return [(nows(b.text), i) for i, b in enumerate(doc.blocks) if isinstance(b, Para)]
 
 
+def chapter_stripped(text: str) -> str:
+    """앞 장 번호를 뺀 공백 없는 글. 번호가 없거나 빼면 아무 글도 남지 않으면 그대로."""
+    m = CHAPTER.match(text or "")
+    rest = nows(text[m.end():]) if m and m.end() else ""
+    return rest or nows(text)
+
+
+def _loose_items(doc: Doc) -> list:
+    """[(공백 뺀 글, 장 번호 뺀 글, 블록 번호)]. 번호는 공백을 빼기 전 원래 글에서 찾습니다."""
+    items = []
+    for text, i in anchor_items(doc):
+        block = doc.blocks[i] if 0 <= i < len(doc.blocks) else None
+        raw = block.text if isinstance(block, Para) and nows(block.text) == text else text
+        items.append((text, chapter_stripped(raw), i))
+    return items
+
+
 def _occurrence(items: list, key: str, idx: int) -> int:
     n = 0
     for text, i in items:
@@ -109,11 +129,14 @@ def slide_anchor(doc: Doc, src: Doc, anchor) -> int | None:
     return doc.slide_ids.index(sid) + 1 if sid in doc.slide_ids else 0
 
 
-def find_para(doc: Doc, key: str, occ: int, start: int) -> int | None:
-    """key 글의 occ번째 anchor 대상을 담은 블록 번호. start 앞이면 None."""
+def find_para(doc: Doc, key: str, occ: int, start: int, loose: bool = False) -> int | None:
+    """key 글의 occ번째 anchor 대상을 담은 블록 번호. start 앞이면 None.
+
+    loose(신규 모드)면 글이 같거나, 앞 장 번호를 뺀 글이 같은 문단도 맞는 것으로 셉니다."""
+    items = _loose_items(doc) if loose else [(t, t, i) for t, i in anchor_items(doc)]
     n = 0
-    for text, i in anchor_items(doc):
-        if text == key:
+    for text, bare, i in items:
+        if text == key or bare == key:
             n += 1
             if n == occ:
                 return i if i >= start else None
@@ -126,7 +149,7 @@ def find_slide(doc: Doc, sn: int, start: int) -> int | None:
     return idx if idx is not None and idx >= start else None
 
 
-def section_starts(doc: Doc, src: Doc, sections: list) -> list:
+def section_starts(doc: Doc, src: Doc, sections: list, loose: bool = False) -> list:
     starts, prev = [], 0
     for s in sections:
         sn = slide_anchor(doc, src, s.get("anchor"))
@@ -134,16 +157,16 @@ def section_starts(doc: Doc, src: Doc, sections: list) -> list:
             idx = find_slide(doc, sn, prev)
         else:
             key = anchor_key(src, s.get("anchor"))
-            idx = find_para(doc, key[0], key[1], prev) if key else None
+            idx = find_para(doc, key[0], key[1], prev, loose) if key else None
         starts.append(idx)
         if idx is not None:
             prev = idx
     return starts
 
 
-def section_ranges(doc: Doc, src: Doc, sections: list) -> dict:
-    """{섹션 id: (시작 블록, 끝 블록) | None}과 첫 섹션 시작 블록."""
-    starts = section_starts(doc, src, sections)
+def section_ranges(doc: Doc, src: Doc, sections: list, loose: bool = False) -> dict:
+    """{섹션 id: (시작 블록, 끝 블록) | None}과 첫 섹션 시작 블록. loose는 find_para 참고."""
+    starts = section_starts(doc, src, sections, loose)
     resolved = sorted(i for i in starts if i is not None)
     ranges = {}
     for s, idx in zip(sections, starts):
@@ -170,7 +193,8 @@ def scope_texts(out: Doc, src: Doc, profile: dict, loc) -> tuple[list, str | Non
     whole = [t for t, _ in search_items(out.blocks)] + list(out.extra)
     loc = str(loc or "").strip()
     if SECTION_ID.fullmatch(loc):
-        rng = section_ranges(out, src, sections_of(profile))["ranges"].get(loc)
+        loose = profile.get("mode") == "new"
+        rng = section_ranges(out, src, sections_of(profile), loose)["ranges"].get(loc)
         if rng:
             return [t for t, _ in search_items(out.blocks[rng[0]:rng[1]])], loc
         return whole, None

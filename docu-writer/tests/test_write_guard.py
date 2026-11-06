@@ -74,6 +74,9 @@ def test_other_plugin_agent_not_checked(ws):
 
 # --- 역할별 허용 범위 -------------------------------------------------------------
 
+# planner(2단계 newdoc-workflow ②)는 analyst와 같은 범위 (template-workflow 「견본 보호」).
+ANALYST_LIKE = ["analyst", "planner"]
+
 @pytest.mark.parametrize("rel,ok", [
     ("profile.yaml", True),
     ("work/tables.yaml", True),
@@ -82,45 +85,52 @@ def test_other_plugin_agent_not_checked(ws):
     ("approved.sha256", False),
     ("session.yaml", False),
 ])
-def test_analyst_scope(ws, rel, ok):
-    assert denied(call(ws, "docu-writer:analyst", "Write", ws["dw"] / rel)) is not ok
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_scope(ws, rel, ok, role):
+    assert denied(call(ws, f"docu-writer:{role}", "Write", ws["dw"] / rel)) is not ok
 
 
-def test_analyst_outside_docu_writer(ws):
-    assert denied(call(ws, "docu-writer:analyst", "Write", ws["cwd"] / "out.docx"))
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_outside_docu_writer(ws, role):
+    assert denied(call(ws, f"docu-writer:{role}", "Write", ws["cwd"] / "out.docx"))
 
 
 # kordoc은 숨김 경로(.docu-writer/)에 쓰지 않으므로 analyst의 kordoc 출력은 보이는
 # 임시 폴더 docu-writer-out/에 냈다가 옮깁니다 (종단 시험 F15).
 @pytest.mark.parametrize("tool", ["render_document", "extract_profile", "convert_to_hwpx"])
-def test_analyst_kordoc_staging_allowed(ws, tool):
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_kordoc_staging_allowed(ws, tool, role):
     out = ws["cwd"] / "docu-writer-out" / "page.png"
-    assert not denied(call(ws, "docu-writer:analyst", KORDOC + tool, out, key="output_path"))
+    assert not denied(call(ws, f"docu-writer:{role}", KORDOC + tool, out, key="output_path"))
 
 
-def test_analyst_staging_relative_path_allowed(ws):
-    assert not denied(call(ws, "docu-writer:analyst", KORDOC + "render_document",
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_staging_relative_path_allowed(ws, role):
+    assert not denied(call(ws, f"docu-writer:{role}", KORDOC + "render_document",
                            "docu-writer-out/page.svg", key="output_path"))
 
 
 @pytest.mark.parametrize("path", ["docu-writer-out", "docu-writer-out/../out.docx", "docu-writer-outx/a.png"])
-def test_analyst_staging_escape_denied(ws, path):
-    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document", path, key="output_path"))
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_staging_escape_denied(ws, path, role):
+    assert denied(call(ws, f"docu-writer:{role}", KORDOC + "render_document", path, key="output_path"))
 
 
-def test_analyst_symlinked_staging_denied(ws, tmp_path):
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_analyst_symlinked_staging_denied(ws, tmp_path, role):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     (ws["cwd"] / "docu-writer-out").symlink_to(elsewhere)
-    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document",
+    assert denied(call(ws, f"docu-writer:{role}", KORDOC + "render_document",
                        ws["cwd"] / "docu-writer-out" / "page.png", key="output_path"))
 
 
-def test_staging_does_not_open_contract_or_sample(ws):
+@pytest.mark.parametrize("role", ANALYST_LIKE)
+def test_staging_does_not_open_contract_or_sample(ws, role):
     link = ws["cwd"] / "docu-writer-out"
     link.mkdir()
     (link / "s.hwpx").symlink_to(ws["sample"])
-    assert denied(call(ws, "docu-writer:analyst", KORDOC + "render_document", link / "s.hwpx",
+    assert denied(call(ws, f"docu-writer:{role}", KORDOC + "render_document", link / "s.hwpx",
                        key="output_path"))
 
 
@@ -254,7 +264,7 @@ def test_dangling_symlink_to_contract(ws):
     assert denied(call(ws, "docu-writer:writer", "Write", ws["cwd"] / "dangling"))
 
 
-@pytest.mark.parametrize("role", ["writer", "analyst", "researcher"])
+@pytest.mark.parametrize("role", ["writer", "analyst", "researcher", "planner"])
 def test_missing_protected_paths_fails_closed(ws, role):
     (ws["dw"] / "protected-paths").unlink()
     assert denied(call(ws, f"docu-writer:{role}", "Write", ws["dw"] / "work" / "a.yaml"))
@@ -287,3 +297,17 @@ def test_guard_never_exits_1(ws):
     """종료 코드 1은 Claude Code가 막지 않으므로 가드는 0 또는 2만 낸다."""
     for payload in ("[]", "null", '{"agent_type": "docu-writer:writer", "tool_name": "Write", "tool_input": 3}'):
         assert run_guard(payload).returncode in (0, 2)
+
+
+# --- planner (2단계) ----------------------------------------------------------------
+
+def test_planner_deny_reason_names_role(ws):
+    """거부 사유는 analyst와 같은 글에 역할 이름만 planner로 바뀝니다."""
+    proc = call(ws, "docu-writer:planner", "Write", ws["cwd"] / "out.docx")
+    reason = json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+    assert reason.startswith("[docu-writer:planner]")
+    assert "planner는 .docu-writer/ 안(계약 파일 제외)과 docu-writer-out/ 안에만 쓸 수 있습니다" in reason
+
+
+def test_planner_may_not_write_sample(ws):
+    assert denied(call(ws, "docu-writer:planner", "Write", ws["sample"]))

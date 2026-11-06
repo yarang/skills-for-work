@@ -18,8 +18,8 @@ CIRCLES = set("○ㅇᄋ◦")
 class Ctx:
     profile: dict
     mode: str
-    source: Path
-    expect: str
+    source: Path | None   # mode: new는 None — 견본 없음
+    expect: str | None
     output: Path
     src: Doc
     out: Doc
@@ -30,6 +30,11 @@ class Ctx:
 
 def entry(cid: str, status: str, detail: str, locations=None) -> dict:
     return {"id": cid, "status": status, "detail": detail, "locations": list(locations or [])}
+
+
+def new_mode_skip(cid: str, why: str) -> dict:
+    """mode: new에서 하지 않는 검사 — detail에 「신규 모드」를 적습니다(SKILL.md 「신규 모드」)."""
+    return entry(cid, "skip", f"신규 모드 — {why}")
 
 
 def brief(items: list, limit: int = 3) -> str:
@@ -44,6 +49,8 @@ def _unique(items) -> list:
 # --- hash ------------------------------------------------------------------------
 
 def check_hash(ctx: Ctx) -> dict:
+    if ctx.mode == "new":
+        return new_mode_skip("hash", "견본 없음 (원본 보호는 materials.sha256이 맡음)")
     got = hashlib.sha256(ctx.source.read_bytes()).hexdigest()
     if got == ctx.expect.strip().lower():
         return entry("hash", "pass", "견본 sha256 일치")
@@ -59,6 +66,8 @@ def _pages_with(ctx: Ctx, phrase: str) -> list:
 
 
 def check_residue(ctx: Ctx) -> dict:
+    if ctx.mode == "new":
+        return new_mode_skip("residue", "견본 문구 없음")
     if ctx.mode != "sample":
         return entry("residue", "skip", f"{ctx.mode} 모드는 검사하지 않음")
     raw = [s for s in ctx.profile.get("sample_text") or [] if isinstance(s, str)]
@@ -97,7 +106,12 @@ def _markup_kinds(text: str) -> list:
 
 
 def check_markup(ctx: Ctx) -> dict:
-    known = {kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
+    # 신규 모드는 견본이 없으므로 「견본에 같은 꼴이 있으면 뺀다」 예외 없이 모든 표지를 봅니다.
+    # 다만 MD 출력은 마크다운 자체가 출력 형식이라 표지가 모두 정상 문법이므로 보지 않습니다.
+    if ctx.mode == "new" and ctx.out.fmt == "md":
+        return new_mode_skip("markup", "MD 출력은 마크다운이 곧 형식")
+    known = set() if ctx.mode == "new" else {
+        kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
     hits, locs = [], []
     for text, loc in doc_search_items(ctx.out):
         kinds = [k for k in _markup_kinds(text) if k not in known]
@@ -158,6 +172,8 @@ def _field_problem(ctx: Ctx, field: dict, notes: list) -> str | None:
 
 
 def check_fields(ctx: Ctx) -> dict:
+    if ctx.mode == "new":
+        return new_mode_skip("fields", "양식 칸 없음")
     if ctx.mode != "form":
         return entry("fields", "skip", f"{ctx.mode} 모드는 검사하지 않음")
     fields = [f for f in ctx.profile.get("fields") or [] if isinstance(f, dict)]
@@ -205,6 +221,8 @@ def _scope_regions(ctx: Ctx, sections: list, updated: set) -> list:
 
 
 def check_scope(ctx: Ctx) -> dict:
+    if ctx.mode == "new":
+        return new_mode_skip("scope", "갱신 범위 대조할 견본 없음")
     if ctx.mode != "update":
         return entry("scope", "skip", f"{ctx.mode} 모드는 검사하지 않음")
     sections = sections_of(ctx.profile)
@@ -279,7 +297,8 @@ def _section_length(ctx: Ctx, res: dict) -> None:
         # 양식 섹션은 문서 끝까지(표 포함) 이어져 글자 수가 양식 전체가 됩니다 — 최상위 length만 봅니다.
         res["notes"].append("form 모드는 섹션 분량을 보지 않음")
         return
-    ranges = section_ranges(ctx.out, ctx.src, sections_of(ctx.profile))["ranges"]
+    loose = ctx.mode == "new"  # 신규 모드는 제목 앞 장 번호(Ⅰ.·1)·가.)를 빼고 h: anchor와 맞춥니다
+    ranges = section_ranges(ctx.out, ctx.src, sections_of(ctx.profile), loose)["ranges"]
     for s in sections:
         sid, spec = str(s.get("id")), s["length"]
         rng = ranges.get(s.get("id"))

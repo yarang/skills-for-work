@@ -1,0 +1,8 @@
+catalog_version: 1
+themes:
+  docx:
+    default: { reference_doc: themes/docx/default.docx, tokens: themes/docx/default.tokens.yaml }
+  hwpx:
+    default: { preset_map: { 보고서: 보고서, 계획서: 계획서, 기안문: 기안문, 회의록: 회의록, 보도자료: 보도자료 } }
+  md: {}
+fixed: []

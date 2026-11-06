@@ -69,7 +69,14 @@ Ghostscript는 필요 없습니다. PDF → PNG는 pymupdf가 맡습니다.
 - **자료 위치** — 폴더·파일. 웹 검색을 해도 되는지도 함께 적습니다.
 - **분량·줄여도 되는 섹션** — 표가 한 쪽에 안 들어갈 때 무엇을 줄일지 정해 줍니다.
 
-견본 없이 새 문서를 만드는 2단계(`newdoc`)는 아직 없습니다.
+견본 없이 새 문서를 만들 때는 2단계 `newdoc-workflow`가 「문서 종류」와 「출력 형식」(md·docx·hwpx)만으로 경로를 고릅니다.
+
+![신규 작성의 세 경로](diagrams/newdoc-routes.svg)
+
+- **고정 견본** — 카탈로그에 그 종류·형식의 견본이 있으면 1단계 `sample` 모드로 넘어갑니다(기안문처럼 칸이 정해진 서식).
+- **테마**(기본) — planner가 목차를 짜고, writer가 Markdown으로 쓴 뒤 테마를 입혀 변환합니다.
+- **기본값** — 테마가 없으면(md 등) 변환 도구 기본 서식이며, ④에서 「기본 서식」이라고 알립니다.
+- **견본 더하기** — `~/.config/docu-writer/templates/catalog.yaml`(또는 `$DOCU_WRITER_TEMPLATES`)에 `fixed` 항목을 한 줄 더하고 파일을 옆 폴더에 둡니다. 플러그인 갱신에 덮어쓰이지 않습니다. 형식은 `docs/design.md` §9.3, 점검은 `uv run newdoc/skills/newdoc-workflow/scripts/catalog.py check`.
 
 ## 5. 진행 순서와 사용자가 할 일
 

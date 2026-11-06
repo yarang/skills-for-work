@@ -14,6 +14,7 @@
     profile_extract.py tables <견본>
     profile_extract.py profile <견본> --mode sample|form|update --out <경로>
     profile_extract.py check <프로파일> --source <견본> [--tables <tables.yaml>]
+    profile_extract.py check <프로파일>            (mode: new — 견본 없음, --source·--tables 받지 않음)
 
 종료 코드: 0 성공, 1 check 실패 항목 있음, 2 사용법·형식·파일 오류(--out이 이미 있음 포함).
 견본은 읽기만 하고, 오류가 나면 아무 파일도 쓰지 않습니다.
@@ -21,6 +22,8 @@
 import argparse
 import sys
 from pathlib import Path
+
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -38,9 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_profile.add_argument("sample", type=Path)
     p_profile.add_argument("--mode", required=True, choices=["sample", "form", "update"])
     p_profile.add_argument("--out", required=True, type=Path)
-    p_check = sub.add_parser("check", help="프로파일 점검")
+    p_check = sub.add_parser("check", help="프로파일 점검 (mode: new는 --source·--tables 없이)")
     p_check.add_argument("profile", type=Path)
-    p_check.add_argument("--source", required=True, type=Path)
+    p_check.add_argument("--source", type=Path, help="견본 (mode: new가 아니면 필수)")
     p_check.add_argument("--tables", type=Path)
     return parser
 
@@ -95,10 +98,37 @@ def cmd_profile(args) -> int:
     return 0
 
 
-def cmd_check(args) -> int:
+def profile_mode(path: Path):
+    """(mode, 프로파일 사전). 파일이 없으면 UsageError, YAML·사전이 아니면 (None, None)."""
+    if not path.is_file():
+        raise UsageError(f"프로파일 파일 없음: {path}")
+    try:
+        prof = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, UnicodeDecodeError):
+        return None, None
+    return (prof.get("mode"), prof) if isinstance(prof, dict) else (None, None)
+
+
+def check_fails(args) -> list:
+    """모드에 맞게 --source·--tables를 확인하고 점검. 맞지 않으면 UsageError."""
+    mode, prof = profile_mode(args.profile)
+    if mode == "new":
+        if args.source is not None or args.tables is not None:
+            raise UsageError("mode: new 프로파일에는 --source·--tables를 주지 않음 (견본 없음)")
+        from _pe_check_new import run_check_new
+
+        return run_check_new(prof)
+    if args.source is None and prof is None:
+        raise UsageError(f"프로파일이 YAML 사전으로 읽히지 않아 mode를 알 수 없음: {args.profile}")
+    if args.source is None:
+        raise UsageError("--source가 필요함 (mode: new가 아닌 프로파일)")
     from _pe_check import run_check
 
-    fails = run_check(args.profile, args.source, args.tables)
+    return run_check(args.profile, args.source, args.tables)
+
+
+def cmd_check(args) -> int:
+    fails = check_fails(args)
     if fails:
         print(f"check: 실패 {len(fails)}건")
         for fail in fails:

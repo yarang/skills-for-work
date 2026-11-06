@@ -1,0 +1,41 @@
+# 신규 모드(mode: new) 프로파일 — planner가 내는 꼴. 견본이 없어 source 키가 없습니다.
+# design.route의 경로 값은 테스트가 tmp_path에 만든 실제 파일로 바꿔 넣습니다.
+profile_version: 1
+mode: new
+structure:
+  numbering: []
+  sections:
+    - id: s1
+      title: 추진 배경
+      level: 1
+      anchor: 'h:"추진 배경"'
+      kind: 서술
+      required: true
+      guide: 왜 이 일을 하는지 사실과 근거로 적음
+      length: {lines: [3, 8]}
+    - id: s2
+      title: 추진 계획
+      level: 1
+      anchor: 'h:"추진 계획"'
+      kind: 목록
+      required: true
+      guide: 무엇을 언제 누가 하는지 단계별로 적음
+      length: {lines: [4, 10]}
+    - id: s3
+      title: 기대 효과
+      level: 1
+      anchor: 'h:"기대 효과"'
+      kind: 서술
+      required: false
+      guide: 목표치를 숫자로 적음
+      length: {lines: [2, 5]}
+design:
+  page: {}
+  type: {}
+  color: {}
+  styles_allowed: []
+  route: {tool: copy}
+sample_text: []
+conflicts: []
+voice: {style: 개조식, ending: "-함", terms: {}}
+warnings: []
