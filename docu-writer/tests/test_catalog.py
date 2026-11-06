@@ -337,6 +337,55 @@ def test_relative_path_against_user_catalog(env):
 
 # --- 7·8 파일 없음·덮어쓰기 ------------------------------------------------------
 
+@pytest.mark.parametrize("name", ["부\n서.hwpx", "부\r서.hwpx", "부서.hwpx "])
+def test_match_rejects_paths_breaking_line_based_protection(env, name):
+    """보호 목록은 한 줄에 경로 하나(write_guard가 줄로 읽음) — 줄바꿈·앞뒤 공백이 든 경로는 거부."""
+    touch(env["plugin"] / "themes/hwpx" / name)
+    data = plugin_data()
+    data["themes"]["hwpx"]["default"] = {"template_path": f"themes/hwpx/{name}"}
+    env["plugin_cat"] = write_catalog(env["plugin"], data)
+    proc = match(env, "아무 종류", "hwpx")
+    assert_refused(proc, env)
+    assert "themes/hwpx" in proc.stderr
+
+
+def test_match_removes_partial_route_on_write_failure(env, monkeypatch, capsys):
+    """route.json을 배타로 만든 뒤 쓰기가 실패하면 잘린 파일을 지우고 exit 2(계약: 오류면 파일 없음)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("catalog", CATALOG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    real_open = open
+
+    class _Unwritable:
+        def __init__(self, handle):
+            self._handle = handle
+
+        def write(self, data):
+            raise OSError("디스크 가득 참")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self._handle.close()
+            return False
+
+    def fake_open(file, mode="r", *args, **kwargs):
+        return _Unwritable(real_open(file, mode, *args, **kwargs))
+
+    monkeypatch.setattr(mod, "open", fake_open, raising=False)
+    monkeypatch.setenv("DOCU_WRITER_TEMPLATES", str(env["user"]))
+    ret = mod.main(["--plugin-catalog", str(env["plugin_cat"]), "match",
+                    "--type", "보고서", "--format", "docx", "--out", str(env["out"])])
+    assert ret == 2
+    assert not env["out"].exists()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "route.json" in captured.err
+
+
 def test_missing_reference_doc(env):
     (env["plugin"] / "themes/docx/default.docx").unlink()
     proc = match(env, "보고서", "docx")

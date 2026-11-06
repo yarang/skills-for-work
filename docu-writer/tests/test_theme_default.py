@@ -4,6 +4,7 @@
 default.docx에서 토큰을 다시 뽑아 default.tokens.yaml과 비교하고, 플러그인 카탈로그가
 check를 통과하는지, pandoc 변환 결과가 styles_allowed·A4를 지키는지 봅니다.
 """
+import importlib.util
 import shutil
 import subprocess
 
@@ -207,3 +208,62 @@ def test_pandoc_output_obeys_tokens(tmp_path, tokens):
     assert (_mm(sec.page_width), _mm(sec.page_height)) == (210, 297)
     assert [_mm(sec.top_margin), _mm(sec.bottom_margin),
             _mm(sec.left_margin), _mm(sec.right_margin)] == tokens["page"]["margins_mm"]
+
+
+# --- 4 build_default.py 오류 처리 --------------------------------------------------
+
+BUILD_SCRIPT = THEME / "build_default.py"
+
+
+def _build_default_module():
+    spec = importlib.util.spec_from_file_location("build_default", BUILD_SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fake_pandoc(monkeypatch, mod, run=None):
+    monkeypatch.setattr(mod.shutil, "which", lambda *a, **k: "/usr/bin/pandoc")
+    if run is not None:
+        monkeypatch.setattr(mod.subprocess, "run", run)
+
+
+def test_build_default_pandoc_timeout_exits_2(tmp_path, monkeypatch, capsys):
+    """pandoc 시간 초과는 한국어 진단과 함께 exit 2 — 처리하지 않으면 TimeoutExpired 트레이스백."""
+    mod = _build_default_module()
+
+    def boom(*a, **k):
+        raise subprocess.TimeoutExpired("pandoc", 120)
+
+    _fake_pandoc(monkeypatch, mod, run=boom)
+    assert mod.main(["--out", str(tmp_path / "default.docx")]) == 2
+    err = capsys.readouterr().err
+    assert "오류" in err and "pandoc" in err
+    assert not (tmp_path / "default.docx").exists()
+
+
+def test_build_default_pandoc_exec_failure_exits_2(tmp_path, monkeypatch, capsys):
+    mod = _build_default_module()
+
+    def boom(*a, **k):
+        raise FileNotFoundError("pandoc 실행 파일 없음")
+
+    _fake_pandoc(monkeypatch, mod, run=boom)
+    assert mod.main(["--out", str(tmp_path / "default.docx")]) == 2
+    err = capsys.readouterr().err
+    assert "오류" in err and "pandoc" in err
+
+
+def test_build_default_write_failure_exits_2(tmp_path, monkeypatch, capsys):
+    """저장 중 OSError는 한국어 진단과 함께 exit 2 — 처리하지 않으면 트레이스백으로 exit 1."""
+    mod = _build_default_module()
+    ok = subprocess.CompletedProcess([], 0, stdout=DOCX.read_bytes())
+    _fake_pandoc(monkeypatch, mod, run=lambda *a, **k: ok)
+
+    def boom(document, out):
+        raise OSError("디스크 가득 참")
+
+    monkeypatch.setattr(mod, "save_new", boom)
+    assert mod.main(["--out", str(tmp_path / "default.docx")]) == 2
+    err = capsys.readouterr().err
+    assert "오류" in err and "쓸 수 없습니다" in err

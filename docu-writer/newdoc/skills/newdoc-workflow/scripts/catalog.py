@@ -61,6 +61,10 @@ def cmd_match(args) -> int:
     if found:
         raise CatalogError("카탈로그 항목이 잘못되었습니다(check로 확인하세요): " + "; ".join(found))
     route, protected = choose(merged_fixed(catalogs), merged_themes(catalogs), args.format, args.doc_type)
+    bad = [path for path in protected if "\n" in path or "\r" in path or path != path.strip()]
+    if bad:
+        raise CatalogError("줄바꿈·앞뒤 공백이 든 경로가 있어 보호 목록(한 줄에 경로 하나)을 쓸 수 없습니다: "
+                           + repr(bad[0]))
     if args.out.exists():
         raise CatalogError(f"이미 있는 파일은 덮어쓰지 않습니다: {args.out}")
     text = json.dumps(route, ensure_ascii=False, indent=2) + "\n"
@@ -69,6 +73,10 @@ def cmd_match(args) -> int:
         with open(args.out, "x", encoding="utf-8") as handle:
             handle.write(text)
     except OSError as err:
+        try:
+            args.out.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise CatalogError(f"route.json을 쓸 수 없습니다: {args.out}: {err}") from err
     sys.stdout.write("".join(f"{path}\n" for path in protected))
     return 0

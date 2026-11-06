@@ -99,13 +99,13 @@ def cmd_profile(args) -> int:
 
 
 def profile_mode(path: Path):
-    """(mode, 프로파일 사전). 파일이 없으면 UsageError, YAML·사전이 아니면 (None, None)."""
+    """(mode, 프로파일 사전). 파일이 없거나 YAML 문법이 틀리면 UsageError, 사전이 아니면 (None, None)."""
     if not path.is_file():
         raise UsageError(f"프로파일 파일 없음: {path}")
     try:
         prof = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, UnicodeDecodeError):
-        return None, None
+    except (yaml.YAMLError, UnicodeDecodeError) as exc:
+        raise UsageError(f"프로파일 YAML 오류: {exc}") from exc
     return (prof.get("mode"), prof) if isinstance(prof, dict) else (None, None)
 
 

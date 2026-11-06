@@ -65,7 +65,7 @@ def get_route(prof, fails):
         fails.append("신규 모드인데 design.route가 없음")
         return None
     tool = route.get("tool")
-    if tool not in ROUTE_KEYS:
+    if not isinstance(tool, str) or tool not in ROUTE_KEYS:
         fails.append(f"design.route.tool이 pandoc·generate_document·copy 가운데 하나가 아님: {tool!r}")
         return None
     return route

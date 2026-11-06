@@ -413,6 +413,8 @@ NEW_VIOLATIONS = {
     "no_route": (del_route, "design.route"),
     "tool_unknown": (set_route({"tool": "soffice"}), "tool"),
     "tool_missing": (set_route({"reference_doc": "/x.docx"}), "tool"),
+    "tool_list": (set_route({"tool": ["pandoc"]}), "tool"),
+    "tool_map": (set_route({"tool": {"pandoc": None}}), "tool"),
     "pandoc_preset": (set_route({"tool": "pandoc", "preset": "보고서"}), "preset"),
     "pandoc_template": (set_route(lambda t: {"tool": "pandoc", "template_path": t["hwpx"]}), "template_path"),
     "gd_preset_and_template": (set_route(lambda t: {"tool": "generate_document", "preset": "보고서",
@@ -465,3 +467,15 @@ def test_check_other_modes_need_source(valid, tmp_path, mode):
 
 def test_check_missing_profile_without_source(tmp_path):
     assert uv(PROFILE_EXTRACT, "check", tmp_path / "none.yaml").returncode == 2
+
+
+@pytest.mark.parametrize("with_source", [True, False])
+def test_check_broken_yaml_profile_is_usage_error(samples, tmp_path, with_source):
+    """YAML 문법 오류는 mode를 알 수 없어도 사용 오류(exit 2, 빈 표준 출력) — check 실패(exit 1)가 아님."""
+    p = tmp_path / "broken.yaml"
+    p.write_text("profile_version: [\n", encoding="utf-8")
+    args = ["check", p] + (["--source", samples["docx"]] if with_source else [])
+    proc = uv(PROFILE_EXTRACT, *args)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stdout == ""
+    assert "YAML" in proc.stderr

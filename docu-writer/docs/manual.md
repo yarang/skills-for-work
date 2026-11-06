@@ -15,7 +15,7 @@
 | 스크립트 | 1단계 6개(`write_guard.py`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`) + 2단계 `catalog.py`, `doc_verify.py` 신규 모드, `planner` 역할 hook | 완료 |
 | 테마 | 기본 DOCX 테마 `newdoc/templates/themes/docx/default.docx`(+토큰), HWPX는 kordoc 프리셋 | 완료 |
 | 시험 | 1단계 9개 경로(13장), 2단계 신규 3개 형식 + 고정 견본 `form` 1건(경로 B·동봉 프로파일 포함), v0.3.0 회귀 종단(14장) | **완료** |
-| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 1단계 반영 완료, 2단계는 이번 리뷰로 반영 |
+| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | codex 반영 완료(2단계 MEDIUM 6건). agy는 할당량 초과로 미실시 |
 
 알아 둘 한계는 다음과 같습니다.
 

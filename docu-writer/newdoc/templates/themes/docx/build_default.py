@@ -14,7 +14,7 @@ pandoc 스타일 이름은 그대로 두고 한국어 글꼴(맑은 고딕)·A4�
 테마 글꼴 속성(asciiTheme 등)은 지웁니다 — 남겨 두면 명시한 글꼴 이름보다 앞섭니다.
 결과는 default.tokens.yaml과 같아야 합니다(tests/test_theme_default.py가 재추출로 검사).
 
-종료 코드: 0 성공, 2 사용법 오류·pandoc 없음·--out이 이미 있음.
+종료 코드: 0 성공, 2 사용법 오류·pandoc 없음·pandoc 실패·쓰기 실패·--out이 이미 있음.
 """
 import argparse
 import io
@@ -45,8 +45,13 @@ def pandoc_reference() -> bytes:
     pandoc = shutil.which("pandoc") or shutil.which("pandoc", path="/opt/homebrew/bin")
     if pandoc is None:
         raise UsageError("pandoc을 찾을 수 없습니다")
-    proc = subprocess.run([pandoc, "--print-default-data-file", "reference.docx"],
-                          capture_output=True, timeout=120)
+    try:
+        proc = subprocess.run([pandoc, "--print-default-data-file", "reference.docx"],
+                              capture_output=True, timeout=120)
+    except subprocess.TimeoutExpired as err:
+        raise UsageError("pandoc이 120초 안에 기본 reference.docx를 내지 못했습니다") from err
+    except OSError as err:
+        raise UsageError(f"pandoc을 실행할 수 없습니다: {err}") from err
     if proc.returncode != 0 or not proc.stdout:
         raise UsageError("pandoc 기본 reference.docx를 꺼내지 못했습니다")
     return proc.stdout
@@ -131,6 +136,9 @@ def main(argv=None) -> int:
         save_new(build(pandoc_reference()), args.out)
     except UsageError as err:
         print(f"오류: {err}", file=sys.stderr)
+        return 2
+    except OSError as err:
+        print(f"오류: {args.out}에 쓸 수 없습니다: {err}", file=sys.stderr)
         return 2
     return 0
 

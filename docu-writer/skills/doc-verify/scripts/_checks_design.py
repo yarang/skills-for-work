@@ -82,13 +82,14 @@ def check_r4(ctx: Ctx) -> dict:
     if not groups:
         return entry("r4_headings", "skip", "제목 문단 없음")
     types = (ctx.profile.get("design") or {}).get("type") or {}
-    problems, locs = [], []
+    problems, locs, compared = [], [], False
     for key, effs in groups.items():
         if len(effs) > 1:
             shown = [f"{e[0]}/{e[1]}pt/{'굵게' if e[2] else '보통'}" for e in effs]
             problems.append(f"{key} 서식 {len(effs)}가지 섞임 ({brief(shown)})")
             locs.extend(loc for v in effs.values() for loc in v)
         token = types.get(key) if isinstance(types.get(key), dict) else None
+        compared = compared or bool(token)
         for eff, where in effs.items() if token else []:
             bad = _token_mismatch(key, eff, token)
             if bad:
@@ -96,6 +97,9 @@ def check_r4(ctx: Ctx) -> dict:
                 locs.extend(where)
     if problems:
         return entry("r4_headings", "fail", brief(problems, 5), _unique(locs))
+    if ctx.mode == "new" and not compared:
+        # 신규 모드는 견본이 없어 섞임 검사만으로 통과라 말할 근거가 없음 (SKILL.md 「신규 모드」 빈 토큰)
+        return entry("r4_headings", "skip", "비교할 토큰 없음 (design.type에 제목 토큰 없음)")
     return entry("r4_headings", "pass", f"제목 {len(groups)}종 서식 한 가지씩")
 
 

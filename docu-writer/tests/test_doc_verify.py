@@ -697,6 +697,17 @@ def test_new_mode_empty_tokens_skip_r5(tmp_path):
     assert r["r5_tokens"]["status"] == "skip", r["r5_tokens"]
 
 
+@pytest.mark.parametrize("types", [{}, {"body": {"font": "맑은 고딕", "pt": 10.5}}, {"h1": "맑은 고딕"}])
+def test_new_mode_empty_tokens_skip_r4(tmp_path, types):
+    """신규 모드에서 비교할 제목 토큰이 하나도 없으면 통과라 말할 근거가 없어 skip (SKILL 「신규 모드」 빈 토큰)."""
+    prof = new_profile()
+    prof["design"].update({"type": types, "color": {}, "styles_allowed": []})
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    assert r["r4_headings"]["status"] == "skip", r["r4_headings"]
+    assert "design.type" in r["r4_headings"]["detail"]
+
+
 def test_new_mode_hwpx_shape_ids_skip(samples, tmp_path):
     prof = new_profile()
     prof["structure"]["numbering"] = []
