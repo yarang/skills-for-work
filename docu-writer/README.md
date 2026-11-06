@@ -2,7 +2,7 @@
 
 견본·양식 파일을 받아 **견본의 모양은 그대로 두고 내용만** 채우는 문서 작업 절차를 Claude Code 플러그인으로 묶었습니다. 요구사항 → 견본 분석 → 근거 조사 → 승인 → 작성 → 검증 → 리뷰 → 전달 순서로 진행합니다.
 
-**역할은 에이전트 4개**로 나눕니다. **형식 지식**(HWPX·DOCX·PPTX·MD)과 **디자인 규칙**은 스킬로 불러옵니다. 형식이 하나 늘어도 에이전트는 늘지 않고 형식 스킬 하나만 추가하면 됩니다.
+**역할은 에이전트 5개**로 나눕니다(견본 없는 신규 작성용 `planner` 포함). **형식 지식**(HWPX·DOCX·PPTX·MD)과 **디자인 규칙**은 스킬로 불러옵니다. 형식이 하나 늘어도 에이전트는 늘지 않고 형식 스킬 하나만 추가하면 됩니다.
 
 ## 구성
 
@@ -12,8 +12,10 @@
 | 에이전트 | `researcher` | 섹션·칸마다 넣을 사실을 자료에서 찾아 출처와 함께 근거표로 만듦 (haiku) |
 | 에이전트 | `writer` | 견본 복사본에 내용만 넣고, 근거 없는 칸은 `○○` 자리표시로 남김 |
 | 에이전트 | `reviewer` | 읽기 전용 리뷰, `관점: fact`·`style`·`design` |
+| 에이전트 | `planner` | [2단계] 견본 없이 문서 종류·목적·독자에서 목차를 짜 프로파일(`mode: new`)을 만듦 (sonnet) |
 | 절차 | `template-workflow` | 메인 대화가 견본 우선 파이프라인을 진행하는 방법 |
 | 절차 | `template-analysis` | 견본 → 프로파일 절차와 `profile_extract.py` |
+| 절차 | `newdoc-workflow` | [2단계] 견본 없는 신규 작성 — 카탈로그(`catalog.py`)로 고정 견본·테마·기본값 경로를 고름 |
 | 공통 | `writing-principles` | 불변 규칙, 자리표시, 한국어 문체, 층 사이 우선순위 |
 | 디자인 | `info-design` | 정보 디자인: 두괄식, 위계, 표·목록 선택, 줄이는 순서 |
 | 디자인 | `visual-design` | 시각 디자인: 디자인 토큰 읽기와 지키기 |
@@ -32,7 +34,7 @@
 | `form` | 이 양식 채워 줘 | 칸만 채움 |
 | `update` | 이 문서의 일정 부분만 고쳐 줘 | 요청 범위만 고친 뒤, 승인을 받아 원본을 교체 (백업을 남김) |
 
-견본 없이 새 문서를 쓸 때는 2단계 `newdoc-workflow`를 씁니다. 카탈로그에 고정 견본이 있으면 그 견본으로(1단계 `sample`), 없으면 기본 테마(DOCX 참조 문서·HWPX 프리셋)로, 테마도 없으면 변환 도구 기본 서식으로 만듭니다. 부서 견본은 `~/.config/docu-writer/templates/catalog.yaml`에 더합니다(`docs/manual.md` §4).
+견본 없이 새 문서를 쓸 때는 2단계 `newdoc-workflow`를 씁니다. 카탈로그에 고정 견본이 있으면 그 견본으로(항목의 `mode`에 따라 1단계 `sample` 또는 `form`), 없으면 기본 테마(DOCX 참조 문서·HWPX 프리셋)로, 테마도 없으면 변환 도구 기본 서식으로 만듭니다. 부서 견본은 `~/.config/docu-writer/templates/catalog.yaml`에 더합니다(`docs/manual.md` §4).
 
 ## 사용
 
@@ -63,4 +65,4 @@ claude --plugin-dir /path/to/skills_for_work/docu-writer
 
 사용법은 [docs/manual.md](docs/manual.md), 설계 배경은 [docs/design.md](docs/design.md)에 있습니다.
 
-> **v0.2.0 상태**: 스크립트 6개(`hooks/`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`)가 들어와 테스트 256건이 통과하고, HWPX·DOCX·PPTX × sample·form·update 9개 경로의 종단 시험을 마쳤습니다(시험용 가상 견본, 결함 16건 수정). 시험 결과는 [매뉴얼 13장](docs/manual.md#13-종단-시험-결과-2026-11-04)에, 현재 상태는 [매뉴얼 1장](docs/manual.md#1-현재-상태-v020-2026-11-04)에 있습니다.
+> **v0.3.0 상태**: 1단계(견본 우선) 스크립트 6개에 2단계 신규 작성(`newdoc-workflow`·`planner`·`catalog.py`·기본 DOCX 테마·`doc_verify.py` 신규 모드)이 더해져 테스트 399건이 통과합니다. 종단 점검은 docx·hwpx·md 신규 작성 각 1건과 고정 견본 1건(법제처 공개 기안문 서식, `form` 모드)을 마쳤습니다. 현재 상태는 [매뉴얼 1장](docs/manual.md#1-현재-상태-v030-2026-11-06)에, 1단계 시험 결과는 [매뉴얼 13장](docs/manual.md#13-종단-시험-결과-2026-11-04)에 있습니다.

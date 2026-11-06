@@ -2,19 +2,20 @@
 
 견본·양식 파일을 주면 **견본의 모양은 그대로 두고 내용만** 채워 주는 Claude Code 플러그인입니다. 이 매뉴얼은 설치, 요청하는 법, 중간에 사용자가 답할 곳, 결과를 읽는 법을 다룹니다. 설계 배경은 [design.md](design.md)에 있습니다.
 
-## 1. 현재 상태 (v0.2.0, 2026-11-04)
+## 1. 현재 상태 (v0.3.0, 2026-11-06)
 
-> **HWPX·DOCX·PPTX × sample·form·update 9개 경로의 종단 시험을 마쳤습니다.** 시험에서 찾은 결함 16건(F1~F16)을 모두 고쳤고, 테스트 256건이 통과합니다. 시험 견본은 시험용으로 만든 가상 문서입니다. 실제 업무 문서는 처음 몇 번은 견본 복사본으로 쓰고 결과를 직접 확인하십시오. 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에 있습니다.
+> **견본 우선(1단계)에 더해 견본 없는 신규 작성(2단계)이 들어왔습니다.** 테스트 399건이 통과합니다. 2단계 종단 점검은 docx·hwpx·md 신규 작성 각 1건과, 법제처 공개 서식으로 만든 고정 견본 1건(기안문, `form` 모드)으로 했습니다. 1단계 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에 있습니다.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
-| 규칙 | 에이전트 4개, 스킬 13개(newdoc은 자리만) | 완료 |
-| 테스트 | `tests/` 10개 파일, 256건 (리뷰 회귀 34건, 종단 시험 회귀 포함) | **256 통과** (10장) |
-| 스크립트 | `hooks/write_guard.py`·`hooks.json`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py` | 완료 |
-| 시험 | HWPX·DOCX·PPTX × sample·form·update 종단 시험, hook 실동작 확인 | **완료** — 9개 경로 통과, 결함 16건 수정 (13장) |
-| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | CRITICAL·HIGH 반영 완료, MEDIUM 일부 보류, push 완료 |
+| 규칙 | 에이전트 5개(`planner` 추가), 스킬 13개(`newdoc-workflow` 채움) | 완료 |
+| 테스트 | `tests/` 13개 파일, 399건 (리뷰 회귀, 종단 시험 회귀 포함) | **399 통과** (10장) |
+| 스크립트 | 1단계 6개(`write_guard.py`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`) + 2단계 `catalog.py`, `doc_verify.py` 신규 모드, `planner` 역할 hook | 완료 |
+| 테마 | 기본 DOCX 테마 `newdoc/templates/themes/docx/default.docx`(+토큰), HWPX는 kordoc 프리셋 | 완료 |
+| 시험 | 1단계 9개 경로(13장), 2단계 신규 3개 형식 + 고정 견본 `form` 1건(경로 B·동봉 프로파일 포함) | **완료** |
+| 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 1단계 반영 완료, 2단계는 이번 리뷰로 반영 |
 
 알아 둘 한계는 다음과 같습니다.
 
@@ -73,7 +74,7 @@ Ghostscript는 필요 없습니다. PDF → PNG는 pymupdf가 맡습니다.
 
 ![신규 작성의 세 경로](diagrams/newdoc-routes.svg)
 
-- **고정 견본** — 카탈로그에 그 종류·형식의 견본이 있으면 1단계 `sample` 모드로 넘어갑니다(기안문처럼 칸이 정해진 서식).
+- **고정 견본** — 카탈로그에 그 종류·형식의 견본이 있으면 항목의 `mode`에 따라 1단계 `sample`(본문 있는 견본) 또는 `form`(기안문처럼 칸만 있는 법정 서식)으로 넘어갑니다. 항목에 `profile:`로 미리 만든 프로파일을 동봉하면 `profile_extract.py check`가 통과할 때 견본 분석(②)을 건너뜁니다.
 - **테마**(기본) — planner가 목차를 짜고, writer가 Markdown으로 쓴 뒤 테마를 입혀 변환합니다.
 - **기본값** — 테마가 없으면(md 등) 변환 도구 기본 서식이며, ④에서 「기본 서식」이라고 알립니다.
 - **견본 더하기** — `~/.config/docu-writer/templates/catalog.yaml`(또는 `$DOCU_WRITER_TEMPLATES`)에 `fixed` 항목을 한 줄 더하고 파일을 옆 폴더에 둡니다. 플러그인 갱신에 덮어쓰이지 않습니다. 형식은 `docs/design.md` §9.3, 점검은 `uv run newdoc/skills/newdoc-workflow/scripts/catalog.py check`.
@@ -267,7 +268,8 @@ uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf p
 
 ## 12. 제한 사항
 
-- 견본 없이 새 문서를 쓰는 `newdoc`은 자리만 있습니다.
+- 견본 없이 새 문서를 쓰는 `newdoc`의 테마는 DOCX 기본 테마 하나와 kordoc HWPX 프리셋뿐입니다. MD는 테마가 없어 기본 서식으로 만듭니다.
+- `form` 모드는 견본 문구 잔존(`residue`)을 보지 않습니다. 라벨과 안내 글이 한 칸에 든 법정 서식은 프로파일 `fields`의 `re:` 제약으로 안내 글이 남는 것을 막습니다(`format-hwpx` 「양식 채우기」).
 - 렌더는 근사입니다. HWPX는 한컴, DOCX는 Word에서 최종 확인이 필요합니다.
 - hook은 `Bash`로 쓰는 파일을 보지 못합니다. 그래서 ⑥의 해시 대조가 최종 방어선입니다.
 - 견본 서식을 바꾸는 일(서체 변경, 섹션 추가)은 하지 않습니다. 견본과 요청이 충돌하면 견본을 따르고 보고만 합니다.
