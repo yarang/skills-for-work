@@ -51,6 +51,7 @@ disable-model-invocation: true
 ```bash
 mkdir -p .docu-writer/{work,render,verify,backup} && printf '*\n' > .docu-writer/.gitignore
 : > .docu-writer/protected-paths                                   # 자료가 없어도 빈 파일은 꼭 만듦
+rm -f .docu-writer/route.json                                     # ①을 다시 할 때 — catalog.py는 있는 파일을 덮어쓰지 않음
 find <자료 경로…> -type f -exec realpath {} \; >> .docu-writer/protected-paths   # hook은 파일 단위로 비교 — 폴더 한 줄로는 보호되지 않음
 uv run "${CLAUDE_SKILL_DIR}/scripts/catalog.py" match --type "<문서 종류>" --format <md|docx|hwpx> \
   --out .docu-writer/route.json >> .docu-writer/protected-paths     # 표준 출력 = 보호할 테마·견본 파일(실제 경로, 한 줄에 하나)

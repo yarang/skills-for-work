@@ -15,8 +15,8 @@ Run all tests:
 
 Common requirements (all scripts):
 - PEP 723 header, `requires-python = ">=3.13"`, dependencies declared there (pyyaml where YAML is read).
-- argparse; exit codes 0 = ok, 1 = check failed / no match problems found, 2 = usage error, YAML syntax error, missing file. argparse errors must exit 2.
-- Never overwrite an existing output file (exit 2). On any error write nothing.
+- argparse; exit codes: 0 = ok, 1 = a check found problems (`catalog.py check`, `profile_extract.py check`, `doc_verify.py` fail), 2 = usage error, YAML syntax error, missing file. argparse errors must exit 2. `catalog.py match` exits 0 for every route including `none`; it never exits 1.
+- Never overwrite an existing output file (exit 2). On any error write no file AND print nothing to stdout (the workflow appends `catalog.py match` stdout to protected-paths with `>>`, so a partial list must never appear).
 - Functions < 50 lines, files < 800 lines; split helpers into sibling `_x.py` modules. No debug prints. Messages to stderr in Korean.
 
 ---
@@ -48,7 +48,7 @@ Matching (`match`):
 
 `check` rejects (exit 1): hwpx theme with zero or more than one of preset_map/template_path/pack_path; fixed entry without id/doc_type(list of non-empty strings)/format/file; format not in md|docx|hwpx; duplicate id within one catalog; docx theme without reference_doc; referenced file missing.
 
-Acceptance tests — create tests/test_catalog.py (use tmp_path catalogs; point the plugin catalog at a temp copy by running a temp copy of the script, or add a hidden `--plugin-catalog` option used only by tests — document it in --help as for tests):
+Acceptance tests — create tests/test_catalog.py (use tmp_path catalogs; add a global option `--plugin-catalog <path>` that replaces the `__file__`-derived plugin catalog — tests use it, the workflow never passes it; say so in --help):
 1. docx theme match → route theme, stdout = realpaths of reference_doc and tokens, route.json fields correct.
 2. hwpx preset_map: 「보고서」 → theme + preset; 「 보 고 서 」 (spaces) → same; 「보고」 → none.
 3. hwpx theme with both preset_map and template_path → `check` exit 1; `match` exit 2.
@@ -74,7 +74,7 @@ Create:
     md: {}
   fixed: []
   ```
-  Before writing preset_map, check which preset names kordoc `generate_document` accepts (its tool schema / docs); keep only names it accepts and report any you dropped.
+  All five preset names are in kordoc `generate_document`'s `preset` enum (checked against the tool schema); use them exactly as written.
 - `newdoc/templates/themes/docx/default.docx`: start from `pandoc -o default.docx --print-default-data-file reference.docx`, then with python-docx set: A4 (210×297 mm), margins 20 mm top/bottom, 20 mm left/right; Korean fonts — body style `Normal`/`Body Text` 「맑은 고딕」 10.5 pt (eastAsia + ascii + hAnsi), headings `Heading 1..3` 「맑은 고딕」 bold 16/13/11 pt. Keep pandoc's style names. Put the generating script in `newdoc/templates/themes/docx/build_default.py` (PEP 723) so the theme is reproducible.
 - `newdoc/templates/themes/docx/default.tokens.yaml`: same shape as the profile `design` block in design.md §5 (`page: {size: A4, orientation: portrait, margins_mm: [top, bottom, left, right]}`, `type.body`/`type.h1..h3` = `{font, pt, bold?}`, `color: {}` left empty, `styles_allowed` = style names a pandoc-converted document uses: Normal, Body Text, First Paragraph, Compact, Heading 1–3, Title, Table, Source Code etc. — list exactly what you include).
 
@@ -123,4 +123,4 @@ Acceptance tests — add to tests/test_write_guard.py: parametrize the existing 
 
 Only create/modify files under: newdoc/, skills/doc-verify/scripts/, template/skills/template-analysis/scripts/, hooks/write_guard.py, tests/. Do not edit any SKILL.md, agents/*.md or docs/.
 
-Run the full suite until it passes and report: files created/changed, test counts (before 256 → after), any contract point you could not meet and why, and the kordoc preset names you kept/dropped.
+Run the full suite until it passes and report: files created/changed, test counts (before 256 → after), and any contract point you could not meet and why.
