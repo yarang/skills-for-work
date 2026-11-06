@@ -170,6 +170,7 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 | 역할 | 허용되는 쓰기 |
 |---|---|
 | analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
+| planner | analyst와 같음 (2단계 `newdoc-workflow` ②) |
 | researcher | `.docu-writer/evidence.yaml` |
 | writer | `protected-paths`의 경로, `.docu-writer/protected-paths`·`approved.sha256`·`session.yaml`·`profile.yaml`·`evidence.yaml`을 뺀 곳 |
 | reviewer | 없음 |

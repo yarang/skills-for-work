@@ -11,7 +11,7 @@ description: DOCX 견본을 다루는 형식 스킬입니다. 견본 골격을 l
 
 - **견본 문단을 복제해 씁니다.** 새 문단은 비슷한 견본 문단(`like`)을 복제한 뒤 글만 바꿉니다. 그래야 스타일·번호 매기기·들여쓰기·run 서식이 그대로 옵니다.
 - **직접 서식을 넣지 않습니다.** 글꼴·크기·색을 run에 지정하지 않습니다. 쓸 수 있는 스타일은 프로파일 `design.styles_allowed`뿐입니다(`visual-design`).
-- **pandoc `--reference-doc`으로 다시 만들지 않습니다.** 스타일만 옮기고 표지·표 배치·머리글을 버립니다.
+- **견본이 있으면 pandoc `--reference-doc`으로 다시 만들지 않습니다.** 스타일만 옮기고 표지·표 배치·머리글을 버립니다. 버릴 견본이 없는 신규 모드는 예외입니다(아래 「신규 작성」).
 
 ## 분석 (②) — `profile_extract.py`
 
@@ -74,6 +74,19 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/patch_docx.py" apply <견본.docx> \
 | 2 | 사용법·환경 오류. `--out`이 견본 경로와 같거나 이미 있는 파일이면 2 |
 
 표준 출력은 JSON 한 개입니다: `{"applied": N, "failed": [{"op", "at", "reason"}], "warnings": […]}`. `failed`가 있으면 edits를 고쳐 다시 돌리고, 같은 실패가 3번 되풀이되면 멈추고 보고합니다.
+
+## 신규 작성 (`mode: new`)
+
+견본이 없으므로 위 dump·apply 경로를 쓰지 않습니다. writer는 `.docu-writer/work/draft.md`를 쓰고 pandoc으로 변환합니다.
+
+```bash
+pandoc .docu-writer/work/draft.md --reference-doc=<design.route.reference_doc> -o <출력 경로>
+```
+
+- `--reference-doc`은 **테마 파일**(카탈로그의 `reference_doc`)입니다. 테마가 서체·pt·여백·제목 스타일을 정하고, 프로파일 토큰은 그 테마에서 뽑은 값입니다(`docs/design.md` §9.5). route에 `reference_doc`이 없으면(`none`) 옵션 없이 pandoc 기본 스타일로 만듭니다.
+- 테마 파일은 `protected-paths`에 있습니다. 고치지 않습니다.
+- 스타일은 pandoc이 붙이는 이름(`Title`, `Heading 1`~`3`, `Body Text`, `First Paragraph`, `Compact`, `Table`)뿐이며 `styles_allowed`와 같아야 합니다. Markdown에 HTML·raw OpenXML을 넣어 다른 스타일을 만들지 않습니다.
+- 섹션 제목은 프로파일 `title` 그대로 씁니다. 번호를 손으로 붙이지 않습니다(doc-verify가 `h:` anchor를 제목 글로 찾음).
 
 ## 렌더 (⑥)
 

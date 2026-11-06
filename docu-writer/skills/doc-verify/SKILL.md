@@ -31,6 +31,17 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 | 1 | 차단 (`fail`이 하나 이상) | 실패한 검사를 ⑤에서 고치고 다시 실행합니다 |
 | 2 | 사용법·환경 오류 | 파일·프로파일이 없거나, 지원하지 않는 형식이거나, 렌더 도구(soffice·pandoc)가 없습니다 |
 
+### 신규 모드 (`mode: new`)
+
+2단계 `newdoc-workflow`가 만든 문서는 견본이 없습니다. 같은 스크립트가 프로파일 `mode: new`로 분기합니다(설계서 §9).
+
+- **`--source`·`--expect-sha256`은 선택입니다.** `mode: new`에서 둘 다 없어도 사용 오류가 아닙니다. 둘 중 하나만 주면 사용 오류(종료 코드 2)입니다. 다른 모드에서는 지금처럼 필수입니다.
+- **생략하는 검사.** `hash`·`residue`·`scope`·`fields`는 `skip`이며 detail에 「신규 모드」를 적습니다. 원본 보호는 ⑥의 `shasum -c .docu-writer/materials.sha256`(참고 자료·테마 파일)이 맡습니다.
+- **`markup`.** 견본이 없으므로 「견본에 같은 꼴이 있으면 뺀다」는 예외 없이 모든 표지를 봅니다.
+- **`h:` anchor.** 섹션 위치는 결과 문서에서 제목 글이 `h:"…"`의 글과 같은 문단(공백을 빼고 비교)으로 찾습니다. 앞에 붙은 장 번호(`Ⅰ.`·`1.`·`가.`)는 비교에서 뺍니다. 못 찾은 섹션은 `length`의 섹션 분량을 `skip`으로 두고 detail에 적습니다.
+- **빈 토큰.** `design.type.*`·`design.color`·`styles_allowed`가 비어 있으면 그 항목은 비교하지 않습니다(`r4_headings`·`r5_tokens`는 비교할 것이 하나도 없으면 `skip`). MD는 서체 정보가 없으므로 지금처럼 `skip`입니다.
+- `design.route`는 검사하지 않습니다(`profile_extract.py check`가 봄). 종료 코드 규약과 `report.json`의 13개 id는 그대로입니다.
+
 ## 렌더 (`render.py`)
 
 | 형식 | 경로 |

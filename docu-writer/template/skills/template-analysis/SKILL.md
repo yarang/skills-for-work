@@ -35,7 +35,7 @@ PEP 723 인라인 의존성(python-docx, python-pptx, pyyaml, lxml)을 적고 `u
 |---|---|---|
 | `tables <견본>` | HWPX·DOCX·PPTX·MD | 표준 출력에 YAML 표 목록 |
 | `profile <견본> --mode <sample\|form\|update> --out <경로>` | DOCX·PPTX·MD | 프로파일 초안 YAML |
-| `check <프로파일> --source <견본> [--tables <tables.yaml>]` | 모두 | 표준 출력에 점검 결과 |
+| `check <프로파일> --source <견본> [--tables <tables.yaml>]` (`mode: new`는 `--source` 없음) | 모두 | 표준 출력에 점검 결과 |
 
 | 종료 코드 | 뜻 |
 |---|---|
@@ -150,6 +150,13 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/profile_extract.py" check .docu-writer/profi
 - `sample_text`에 `○○`만 있는 토큰, 6자 미만 글, 섹션 제목과 같은 글이 없음
 - `guide` 글이 `sample_text`의 어느 항목도 포함하지 않음 (견본 글을 옮기지 않음)
 - `conflicts[].handling`이 모두 `report`
+
+**신규 모드 (`mode: new`, 2단계 planner가 냄)** — 위 목록에서 다음만 바꿉니다:
+- `--source`·`--tables`를 받지 않습니다. `mode: new`인데 `--source`를 주거나, 다른 모드인데 `--source`가 없으면 사용 오류(종료 코드 2)입니다.
+- `mode`는 sample·form·update·new 가운데 하나. `source` 키가 없어야 합니다(있으면 실패).
+- 섹션 키 검사는 그대로입니다. anchor는 모두 `h:"…"` 꼴이고 글이 비지 않으며 섹션끼리 겹치지 않아야 합니다(견본이 없으므로 풀이·순서는 보지 않음). `t:N` locator가 있으면 실패입니다.
+- `sample_text`는 비어 있어야 하고 `fields`·`update`가 없어야 합니다.
+- `design.route`가 있고 `tool`이 `pandoc`·`generate_document`·`copy` 가운데 하나입니다. `pandoc`은 `reference_doc`만, `generate_document`는 `preset`(+`gate`)·`template_path`·`pack_path` 가운데 하나만 또는 아무것도 없이, `copy`는 다른 키 없이 씁니다. 경로 값은 절대 경로이고 파일이 있어야 합니다.
 
 **analyst가 보는 것**:
 - 렌더로 확인할 수 없는 서체 이름·pt를 짐작해 적지 않았는가 (비우고 「확인 못 함」에 적음)

@@ -50,6 +50,15 @@ description: HWPX·HWP 견본을 다루는 형식 스킬입니다. kordoc MCP �
 - 출력은 언제나 복사본입니다. `patch_document(..., output_path=docu-writer-out/<이름>.updated.hwpx)`로 낸 뒤 `mkdir -p .docu-writer/work && mv docu-writer-out/<이름>.updated.hwpx .docu-writer/work/`로 옮깁니다. 원본 교체는 ⑧에서 메인 대화가 합니다.
 - 고칠 섹션 밖은 줄 하나도 바꾸지 않습니다. 요약 상자 줄도 `> `만 떼고 글은 그대로 둡니다(「함정」). doc-verify `scope`가 섹션 밖 변경을 잡습니다.
 
+## 신규 작성 (`mode: new`)
+
+견본이 없으므로 writer는 `.docu-writer/work/draft.md`를 쓰고 `generate_document`로 만듭니다. 위 「작성」의 `template_path` 제한(사용자 확인)은 견본 복사본에 대한 것이며, 신규 모드는 ④에서 경로를 승인받았으므로 멈추지 않습니다.
+
+- 옵션은 프로파일 `design.route`에 적힌 것만 넘깁니다: `preset`(+`gate`) **또는** `template_path` **또는** `pack_path`. kordoc은 `template_path`·`pack_path`를 `preset`·서식 옵션과 함께 받지 않습니다. route에 셋 다 없으면 preset 없이(범용 변환) 부릅니다.
+- `output_path`는 작업 폴더의 `docu-writer-out/`에 두었다가 출력 경로로 옮깁니다(「kordoc 출력 경로」).
+- Markdown 대응: `#` 제목, `##` 장, `###` □ 항목, 목록 1단 ㅇ·2단 -, `> …하고자 함` 요약 상자, `※` 참고.
+- 보고서·계획서 프리셋은 `##` 장 제목을 번호 칸(Ⅰ·Ⅱ)과 제목 칸으로 나눕니다. 장 제목에 번호를 쓰지 않습니다. 결과에서 `h:` anchor가 제목 칸 글로 찾히는지는 `docs/design.md` §11 위험 7.
+
 ## 함정
 
 - **대체본 `<출력>.rewrite.hwpx`.** `patch_document`가 일부 편집을 제자리에 반영하지 못하면 원본 서식으로 새로 쓴 대체본을 함께 만듭니다. 대체본이 생기면 어느 파일이 결과인지 정해 ⑤ 보고에 적습니다(편집이 다 들어간 쪽은 대체본, 서식이 정확한 쪽은 출력 파일). doc-verify `rewrite` 검사가 이를 잡습니다.
