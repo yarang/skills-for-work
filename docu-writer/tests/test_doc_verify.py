@@ -661,6 +661,18 @@ def test_new_mode_missing_section_length_skips(tmp_path):
     assert "s3" in r["length"]["detail"]
 
 
+@pytest.mark.parametrize("spec", [{"lines": [1, 3]}, {"pages": [0, 1]}])
+def test_new_mode_missing_section_noted_for_any_length_key(tmp_path, spec):
+    """종단 시험 결함: 글자 수(chars)가 없는 섹션은 제목을 못 찾아도 detail에 남지 않았습니다.
+    계약(SKILL 「신규 모드」)은 못 찾은 섹션을 length detail에 적으라고 합니다."""
+    prof = new_profile()
+    prof["structure"]["sections"].append(
+        {"id": "s3", "title": "기대 효과", "level": 1, "anchor": 'h:"기대효과"', "length": spec})
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    assert "s3 섹션 시작을 찾지 못" in r["length"]["detail"], r["length"]
+
+
 @pytest.mark.parametrize("locator,status", [("s2", "pass"), ("s1", "fail")])
 def test_new_mode_placeholder_uses_loose_anchor(tmp_path, locator, status):
     phs = [{"locator": locator, "expect": "이용 건수"}]

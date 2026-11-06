@@ -4,17 +4,17 @@
 
 ## 1. 현재 상태 (v0.3.0, 2026-11-06)
 
-> **견본 우선(1단계)에 더해 견본 없는 신규 작성(2단계)이 들어왔습니다.** 테스트 399건이 통과합니다. 2단계 종단 점검은 docx·hwpx·md 신규 작성 각 1건과, 법제처 공개 서식으로 만든 고정 견본 1건(기안문, `form` 모드)으로 했습니다. 1단계 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에 있습니다.
+> **견본 우선(1단계)에 더해 견본 없는 신규 작성(2단계)이 들어왔습니다.** 테스트 401건이 통과합니다. 2단계 종단 점검은 docx·hwpx·md 신규 작성 각 1건과, 법제처 공개 서식으로 만든 고정 견본 1건(기안문, `form` 모드)으로 했습니다. 1단계 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에, v0.3.0 회귀 종단 시험 결과는 [14장](#14-회귀-종단-시험-2026-11-06-v030)에 있습니다.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 규칙 | 에이전트 5개(`planner` 추가), 스킬 13개(`newdoc-workflow` 채움) | 완료 |
-| 테스트 | `tests/` 13개 파일, 399건 (리뷰 회귀, 종단 시험 회귀 포함) | **399 통과** (10장) |
+| 테스트 | `tests/` 13개 파일, 401건 (리뷰 회귀, 종단 시험 회귀 포함) | **401 통과** (10장) |
 | 스크립트 | 1단계 6개(`write_guard.py`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`) + 2단계 `catalog.py`, `doc_verify.py` 신규 모드, `planner` 역할 hook | 완료 |
 | 테마 | 기본 DOCX 테마 `newdoc/templates/themes/docx/default.docx`(+토큰), HWPX는 kordoc 프리셋 | 완료 |
-| 시험 | 1단계 9개 경로(13장), 2단계 신규 3개 형식 + 고정 견본 `form` 1건(경로 B·동봉 프로파일 포함) | **완료** |
+| 시험 | 1단계 9개 경로(13장), 2단계 신규 3개 형식 + 고정 견본 `form` 1건(경로 B·동봉 프로파일 포함), v0.3.0 회귀 종단(14장) | **완료** |
 | 리뷰·배포 | codex·agy 리뷰, git.agentthread.dev push | 1단계 반영 완료, 2단계는 이번 리뷰로 반영 |
 
 알아 둘 한계는 다음과 같습니다.
@@ -237,7 +237,7 @@ cd <이 저장소>/docu-writer
 uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf pytest tests
 ```
 
-2026-11-04 실행 결과는 `256 passed`입니다(약 80초, `test_render.py`·`test_render_fonts.py`는 `soffice`·`pandoc`이 있어야 합니다). lint는 `uvx ruff check --select F,E9 hooks template/skills/template-analysis/scripts skills/*/scripts tests`로 봅니다.
+2026-11-06 실행 결과는 `401 passed`입니다(약 90초, `test_render.py`·`test_render_fonts.py`는 `soffice`·`pandoc`이 있어야 합니다). lint는 `uvx ruff check --select F,E9 hooks template/skills/template-analysis/scripts skills/*/scripts newdoc/skills/*/scripts tests`로 봅니다.
 
 종단 시험에서 나온 회귀 테스트는 docstring에 「종단 시험 F번호」를 적어 두었습니다. `test_e2e_chain.py`(③→⑥ 연결), `test_render_fonts.py`(F3), `test_workflow_snippets.py`(F2, SKILL.md의 셸 명령을 그대로 실행)가 이때 생겼습니다.
 
@@ -344,3 +344,65 @@ uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf p
 | kordoc | `> ` 새어 듦(F12), 거짓 「반영 안 된 편집 있음 (수정 1)」, `parse_document`에서 첫 ○가 안 보임, 숨김 경로 쓰기 거부(F13·F15) | 문서 절차와 `markup` 검사로 비켜 감. kordoc 쪽 수정이 필요 |
 | 권한 | reviewer는 `Write` 도구가 없습니다(첫째 방어선). hook은 둘째 방어선입니다 | — |
 | 시험 양식 | 칸이 좁아 전화번호가 줄바꿈됩니다 | 파이프라인 결함이 아니라 양식 설계 문제 |
+
+## 14. 회귀 종단 시험 (2026-11-06, v0.3.0)
+
+v0.3.0(HEAD)에서 1단계 시험 산출물을 지금 스크립트로 다시 검증하고, 2단계 신규 작성을 처음부터 다시 돌렸습니다. 견본·양식 값은 13장과 같은 가상 자료입니다.
+
+### 14.1 1단계 회귀 — 19/19 일치
+
+13장 작업 폴더마다 `profile_extract.py check` → (DOCX·PPTX) `render.py` → `doc_verify.py`를 다시 돌려 종료 코드와 실패 검사를 기대값과 맞췄습니다.
+
+| 구분 | 사례 | 기대 | 결과 |
+|---|---|---|---|
+| 정상 | 9개 경로 결과 + PPTX update 대조군(`nodup`, s2만 고침) | 종료 0 | 10건 일치 |
+| 음성 | HWPX sample `> ` 새어 듦 | `markup` 실패 | 일치 |
+| 음성 | 양식 칸 형식 위반 (HWPX·DOCX 전화번호, PPTX 날짜) | `fields` 실패 | 3건 일치 |
+| 음성 | 섹션 밖 변경 (HWPX s3 표 칸, DOCX 범위 밖 문단, PPTX 범위 밖 장 삭제·복제) | `scope` 실패 | 4건 일치 |
+| 음성 | PPTX sample 견본 문구 남김 | `residue` 실패 | 일치 |
+
+update 경로는 ⑧에서 원본을 결과로 바꿨으므로 `.docu-writer/backup/`의 원본을 `--source`로 씁니다. `nodup`은 F8을 고치기 전에는 `scope` 실패였던 사례로, 지금은 통과해야 하는 대조군입니다.
+
+### 14.2 2단계 신규 작성
+
+`catalog.py match`로 경로를 고르고, `mode: new` 프로파일(장 5개, 모두 `h:` anchor)과 초안으로 형식마다 결과를 만든 뒤 `doc_verify.py`(새 모드, `--source` 없음)로 검증했습니다.
+
+| 형식 | 경로 | 만든 도구 | 결과 |
+|---|---|---|---|
+| DOCX | `theme` (기본 테마) | pandoc `--reference-doc` | 종료 0 |
+| MD | `none` | 초안 그대로 복사 | 종료 0 |
+| HWPX | `theme` (kordoc 프리셋 「보고서」) | `generate_document` → `render_document` SVG | 종료 0. 1쪽 끝에 제목만 남고 표가 2쪽으로 넘어감(⑦ 리뷰어가 볼 조판 문제) |
+
+일부러 틀린 입력도 넣었습니다.
+
+| 시도 | 기대 | 결과 |
+|---|---|---|
+| `route.json`이 있는데 `catalog.py match` 다시 실행 | 종료 2 | 일치 |
+| `catalog.py match --format pptx` | 종료 2 | 일치 |
+| DOCX에 Heading 4 사용 | `r5` 실패 | 일치 |
+| DOCX에 Block Text(인용) 사용 | `r5` 실패 | 일치 |
+| DOCX 본문에 `**` 남김 | `markup` 실패 | 일치 |
+| `--source`만 주고 `--expect-sha256` 없음 | 종료 2 | 일치 |
+| 필수 장 제목 바꿈(「기대 효과」→「효과 전망」) | `length` detail에 못 찾은 장 기록 | **불일치** → F17로 고침 |
+
+### 14.3 찾아서 고친 결함
+
+| # | 문제 | 고친 곳 |
+|---|---|---|
+| F17 | 새 모드에서 장 제목(`h:` anchor)을 못 찾아도, 그 장의 분량이 `chars`가 아니라 `lines`·`pages`·`slides`이면 `length` detail에 아무것도 남지 않음. 계약(doc-verify SKILL 「신규 모드」)은 못 찾은 섹션을 detail에 적으라고 함 | `_checks_content.py` `_section_length`가 분량 키와 상관없이 「섹션 시작을 찾지 못해 섹션 분량 skip」을 남김, `test_new_mode_missing_section_noted_for_any_length_key` |
+
+### 14.4 남은 판단과 다시 돌리지 않은 것
+
+- **필수 장 누락은 여전히 종료 0입니다.** 계약상 못 찾은 섹션은 `skip`이고 판정은 ⑦ 리뷰어 몫입니다. `required: true` 장이 없으면 새 모드에서 실패로 볼지는 계약을 바꾸는 일이라 이번에는 detail 기록까지만 고쳤습니다.
+- 이번 회귀에서는 HWPX·MD 새 모드 음성 사례와 고정 견본(`fixed`) 경로를 다시 돌리지 않았습니다. 고정 견본은 2단계 종단 점검(N8)에서 확인했고, HWPX·MD 새 모드 음성은 단위 테스트(`test_new_mode_hwpx_shape_ids_skip`, `test_new_mode_md_output_skips_markup`)만 있습니다.
+- `claude -p`로 플러그인을 띄우는 hook 실동작 시험(13.3)은 다시 돌리지 않았습니다. 대신 11-04 이후 `planner` 역할이 들어온 `write_guard.py`에 DOCX 신규 작업 폴더 기준 JSON을 넣어 확인했습니다.
+
+| # | 에이전트 | 쓰기 대상 | 기대 | 결과 |
+|---|---|---|---|---|
+| 1 | planner | `.docu-writer/work/plan.md` | 허용 | 허용 |
+| 2 | planner | `.docu-writer/profile.yaml` | 허용 | 허용 |
+| 3 | planner | 작업 폴더의 `plan-root.md` | 거부 | 거부 「planner는 .docu-writer/ 안(계약 파일 제외)과 docu-writer-out/ 안에만…」 |
+| 4 | planner | `.docu-writer/approved.sha256` | 거부 | 거부 (계약 파일) |
+| 5 | planner | 기본 테마 `default.docx` (`protected-paths`) | 거부 | 거부 「견본(protected-paths)은 읽기 전용입니다」 |
+| 6 | writer | 기본 테마 `default.docx` | 거부 | 거부 (같은 이유) |
+| 7 | writer | `.docu-writer/profile.yaml` | 거부 | 거부 「writer는 계약 파일과 profile.yaml·evidence.yaml을 쓸 수 없습니다」 |

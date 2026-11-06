@@ -302,11 +302,11 @@ def _section_length(ctx: Ctx, res: dict) -> None:
     for s in sections:
         sid, spec = str(s.get("id")), s["length"]
         rng = ranges.get(s.get("id"))
-        if "chars" in spec:
-            if rng is None:
-                res["notes"].append(f"{sid} 섹션 시작을 찾지 못해 글자 수 skip")
-            else:
-                _judge(res, f"{sid} 글자", _chars(ctx.out.blocks[rng[0]:rng[1]]), spec["chars"], "자", sid)
+        if rng is None:
+            # 분량 키와 상관없이 남깁니다 — 제목이 바뀌거나 빠진 섹션을 ⑦ 리뷰어가 알 수 있게
+            res["notes"].append(f"{sid} 섹션 시작을 찾지 못해 섹션 분량 skip")
+        elif "chars" in spec:
+            _judge(res, f"{sid} 글자", _chars(ctx.out.blocks[rng[0]:rng[1]]), spec["chars"], "자", sid)
         for key in ("lines", "pages", "slides"):
             if key in spec:
                 res["notes"].append(f"{sid} {key}는 ⑦ 리뷰어 확인")

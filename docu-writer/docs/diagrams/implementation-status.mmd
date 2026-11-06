@@ -1,4 +1,4 @@
-%% 구현 상태 (2026-11-06, v0.3.0): 1단계(견본 우선)에 이어 2단계(견본 없는 신규 작성)를 구현했다. 종단 점검(N8)을 마치고 테스트 399건이 통과한다. 남은 것은 2단계 codex·agy 리뷰(N9)와 실제 업무 문서 확인이다
+%% 구현 상태 (2026-11-06, v0.3.0): 1단계(견본 우선)에 이어 2단계(견본 없는 신규 작성)를 구현했다. 종단 점검(N8)과 v0.3.0 회귀 종단 시험(F17 수정)을 마치고 테스트 401건이 통과한다. 남은 것은 2단계 codex·agy 리뷰(N9)와 실제 업무 문서 확인이다
 flowchart LR
   subgraph S1G["완료 — 1단계 견본 우선 (v0.2.0)"]
     direction TB
@@ -20,14 +20,20 @@ flowchart LR
     E2["고정 견본 기안문 (법제처 별지 1호)<br/>form · 경로 B 동봉 프로파일<br/>정상 12/12 통과 · 원본 12/12 차단"]
     E3["교훈 문서화<br/>form은 residue 생략 → fields re: 제약<br/>patch 두 칸 공백 · 띠 행 · 가운데 정렬"]
   end
-  P{{"테스트 13개 파일 · 399건 통과<br/>git.agentthread.dev push"}}
+  subgraph REG["완료 — v0.3.0 회귀 종단 (11-06)"]
+    direction TB
+    R1["1단계 회귀 19/19<br/>정상 10 · 음성 9"]
+    R2["2단계 신규 3형식 통과<br/>음성 7 (1건 F17로 수정)<br/>planner hook 7/7"]
+    R3["F17 수정<br/>못 찾은 장을 length detail에 기록"]
+  end
+  P{{"테스트 13개 파일 · 401건 통과<br/>git.agentthread.dev push"}}
   subgraph TODO["남은 일"]
     direction TB
     T1["N9 codex · agy 리뷰<br/>(2단계 변경분)"]
     T2["실제 업무 문서로 확인<br/>병합 셀 많은 표 · 글상자"]
     T3["테마 추가<br/>DOCX 테마 1개뿐 · MD 테마 없음"]
   end
-  S1G --> S2G --> E2E --> P
+  S1G --> S2G --> E2E --> REG --> P
   P -.-> T1
   P -.-> T2
   S2G -.-> T3
@@ -35,10 +41,11 @@ flowchart LR
   classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
   classDef todo fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
   classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
-  class A1,A2,A3,B1,B2,B3,B4,B5,E1,E2,E3 done
+  class A1,A2,A3,B1,B2,B3,B4,B5,E1,E2,E3,R1,R2,R3 done
   class T1,T2,T3 todo
   class P gate
   style S1G fill:#F7FBF6,stroke:#4C8C4A
   style S2G fill:#F7FBF6,stroke:#4C8C4A
   style E2E fill:#F7FBF6,stroke:#4C8C4A
+  style REG fill:#F7FBF6,stroke:#4C8C4A
   style TODO fill:#F7F8FA,stroke:#6B7B8C
