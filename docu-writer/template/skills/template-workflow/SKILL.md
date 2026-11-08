@@ -169,10 +169,10 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 
 | 역할 | 허용되는 쓰기 |
 |---|---|
-| analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
+| analyst | `.docu-writer/` 안 (계약 파일 `protected-paths`·`approved.sha256`·`session.yaml`·`route.json`·`materials.sha256`과 `evidence.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
 | planner | analyst와 같음 (2단계 `newdoc-workflow` ②) |
 | researcher | `.docu-writer/evidence.yaml` |
-| writer | `protected-paths`의 경로, `.docu-writer/protected-paths`·`approved.sha256`·`session.yaml`·`profile.yaml`·`evidence.yaml`을 뺀 곳 |
+| writer | `protected-paths`의 경로, `.docu-writer/`의 계약 파일(`protected-paths`·`approved.sha256`·`session.yaml`·`route.json`·`materials.sha256`)과 `profile.yaml`·`evidence.yaml`을 뺀 곳 |
 | reviewer | 없음 |
 
 검사 대상 도구는 `Write`·`Edit`·`MultiEdit`와 kordoc 쓰기 도구(`patch_document`·`fill_form`·`generate_document`·`convert_to_hwpx`·`extract_profile`·`render_document`의 `output_path`)입니다. 경로는 실제 경로로 바꾼 뒤(없는 파일은 부모 디렉터리 기준, `../`·`/private` 심볼릭 링크 해소) 비교하고, 둘 다 있는 파일이면 같은 파일인지(하드 링크·대소문자)도 봅니다. 모르는 `docu-writer:*` 역할, 경로가 빠진 호출, 읽을 수 없는 입력은 막습니다.

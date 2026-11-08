@@ -17,7 +17,10 @@ KORDOC_TOOLS = (
     "patch_document", "fill_form", "generate_document",
     "convert_to_hwpx", "extract_profile", "render_document",
 )
-CONTRACT_NAMES = ("protected-paths", "approved.sha256", "session.yaml")
+# route.json·materials.sha256은 2단계 ①에서 메인 대화가 씁니다. materials.sha256이 바뀌면
+# ⑥의 참고 자료·테마 대조가 무력화되므로 서브에이전트는 아무도 쓰지 못합니다.
+CONTRACT_NAMES = ("protected-paths", "approved.sha256", "session.yaml",
+                  "route.json", "materials.sha256")
 APPROVED_NAMES = ("profile.yaml", "evidence.yaml")
 # kordoc은 숨김 경로에 쓰지 않으므로 kordoc 출력은 cwd의 보이는 이 폴더에 냈다가 옮긴다.
 STAGING_NAME = "docu-writer-out"
@@ -111,9 +114,12 @@ def decide(role, target, workspace, protected, cwd):
         return False, "견본(protected-paths)은 읽기 전용입니다"
     contract = workspace_files(workspace, CONTRACT_NAMES, cwd)
     if role in ANALYST_LIKE:
-        if (is_inside(real, workspace) or in_staging(real, cwd)) and not hits(mine, contract):
+        # 근거표는 researcher만 씁니다 — 분석·기획 역할이 사실을 끼워 넣지 못하게 막습니다.
+        others = contract | workspace_files(workspace, ("evidence.yaml",), cwd)
+        if (is_inside(real, workspace) or in_staging(real, cwd)) and not hits(mine, others):
             return True, ""
-        return False, f"{role}는 .docu-writer/ 안(계약 파일 제외)과 {STAGING_NAME}/ 안에만 쓸 수 있습니다"
+        return False, (f"{role}는 .docu-writer/ 안(계약 파일·evidence.yaml 제외)과 "
+                       f"{STAGING_NAME}/ 안에만 쓸 수 있습니다")
     if role == "researcher":
         others = contract | workspace_files(workspace, ("profile.yaml",), cwd)
         if same_file(real, os.path.join(workspace, "evidence.yaml")) and not os.path.islink(lexical(target, cwd)) \

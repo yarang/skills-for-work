@@ -251,9 +251,9 @@ R1·R2의 "내용을 줄인다"는 근거 있는 사실을 지우라는 뜻이 �
 
   | 역할 | 허용되는 쓰기 |
   |---|---|
-  | analyst | `.docu-writer/` 안 (`protected-paths`·`approved.sha256`·`session.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
+  | analyst | `.docu-writer/` 안 (계약 파일 `protected-paths`·`approved.sha256`·`session.yaml`·`route.json`·`materials.sha256`과 `evidence.yaml` 제외)과 kordoc 출력용 `docu-writer-out/` 안 (폴더가 링크면 막음) |
   | researcher | `.docu-writer/evidence.yaml` |
-  | writer | `protected-paths`의 경로와 `.docu-writer/`의 `protected-paths`·`approved.sha256`·`session.yaml`·`profile.yaml`·`evidence.yaml`을 뺀 곳 |
+  | writer | `protected-paths`의 경로와 `.docu-writer/`의 계약 파일(`protected-paths`·`approved.sha256`·`session.yaml`·`route.json`·`materials.sha256`)과 `profile.yaml`·`evidence.yaml`을 뺀 곳 |
   | reviewer | 없음 |
 
 - 사후: ⑥에서 견본 sha256을 ①의 값과, `profile.yaml`·`evidence.yaml`을 ④의 `approved.sha256`과 비교합니다. hook은 Bash로 쓴 것을 보지 못하므로 이것이 최종 그물입니다.

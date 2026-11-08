@@ -56,7 +56,7 @@
 
 | 에이전트 | 모델 | 하는 일 | 쓸 수 있는 곳 (hook) |
 |---|---|---|---|
-| `analyst` | sonnet | 견본 → 양식 프로파일 | `.docu-writer/`와 kordoc 임시 폴더 `docu-writer-out/`만 |
+| `analyst` | sonnet | 견본 → 양식 프로파일 | `.docu-writer/`(계약 파일·`evidence.yaml` 제외)와 kordoc 임시 폴더 `docu-writer-out/`만 |
 | `planner` | sonnet | [2단계] 목적·독자 → 목차 → 프로파일(`mode: new`) | analyst와 같음 |
 | `researcher` | haiku | 섹션·칸마다 사실을 찾아 출처와 함께 근거표로 | `.docu-writer/evidence.yaml` 하나만 |
 | `writer` | sonnet | 견본 **복사본**에 내용만 패치, 근거 없는 칸은 `○○` | 견본·계약 파일(`profile.yaml`·`evidence.yaml` 등) 밖 |
@@ -213,7 +213,7 @@
 
 | 층 | 언제 | 무엇을 | 규모 (e412ec4) |
 |---|---|---|---|
-| 단위 테스트 | 커밋마다 | 스크립트·hook·절차 스킬 속 명령 조각 | pytest **415건**, `test_*.py` 12개 + ruff `F`·`E9` |
+| 단위 테스트 | 커밋마다 | 스크립트·hook·절차 스킬 속 명령 조각 | pytest **427건**, `test_*.py` 12개 + ruff `F`·`E9` |
 | 종단 시험 | 큰 변경 뒤 | 실제 견본 파일로 ①~⑧을 처음부터 끝까지 | 1단계 9개 경로(HWPX·DOCX·PPTX × sample·form·update), 2단계 신규 docx·hwpx·md + 고정 견본 기안문 |
 | 회귀 | 스크립트를 고친 뒤 | 종단 시험 산출물을 HEAD 스크립트로 다시 검증 | `regress.py` **19건** (정상 10 · 음성 9, 저장소 밖 종단 시험 환경) |
 | 외부 리뷰 | 단계를 마칠 때 | 작성자와 문맥을 공유하지 않는 리뷰어 | codex exec(읽기 전용), agy(antigravity) |

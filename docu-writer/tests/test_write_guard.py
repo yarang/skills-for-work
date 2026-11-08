@@ -45,7 +45,8 @@ def ws(tmp_path):
     sample = sample_dir / "견본.hwpx"
     sample.write_bytes(b"PK")
     (dw / "protected-paths").write_text(f"{sample}\n", encoding="utf-8")
-    for name in ("approved.sha256", "session.yaml", "profile.yaml", "evidence.yaml"):
+    for name in ("approved.sha256", "session.yaml", "profile.yaml", "evidence.yaml",
+                 "route.json", "materials.sha256"):
         (dw / name).write_text("x", encoding="utf-8")
     return {"cwd": cwd, "dw": dw, "sample": sample}
 
@@ -84,6 +85,11 @@ ANALYST_LIKE = ["analyst", "planner"]
     ("protected-paths", False),
     ("approved.sha256", False),
     ("session.yaml", False),
+    # 2단계 ①에서 메인 대화가 쓰는 기록 — planner가 고치면 ⑥ 원본 대조가 무력화됨 (리뷰 3차 H1)
+    ("route.json", False),
+    ("materials.sha256", False),
+    # 근거표는 researcher 몫 — 분석·기획 역할이 사실을 넣지 못하게 (리뷰 3차 M11)
+    ("evidence.yaml", False),
 ])
 @pytest.mark.parametrize("role", ANALYST_LIKE)
 def test_analyst_scope(ws, rel, ok, role):
@@ -138,6 +144,8 @@ def test_staging_does_not_open_contract_or_sample(ws, role):
     ("evidence.yaml", True),
     ("profile.yaml", False),
     ("work/notes.md", False),
+    ("route.json", False),
+    ("materials.sha256", False),
 ])
 def test_researcher_scope(ws, rel, ok):
     assert denied(call(ws, "docu-writer:researcher", "Write", ws["dw"] / rel)) is not ok
@@ -152,6 +160,8 @@ def test_researcher_scope(ws, rel, ok):
     ("approved.sha256", False),
     ("protected-paths", False),
     ("session.yaml", False),
+    ("route.json", False),
+    ("materials.sha256", False),
 ])
 def test_writer_scope_inside_docu_writer(ws, rel, ok):
     assert denied(call(ws, "docu-writer:writer", "Edit", ws["dw"] / rel)) is not ok
@@ -253,7 +263,8 @@ def test_symlink_then_dotdot_follows_link_target(ws):
     assert denied(call(ws, "docu-writer:writer", "Write", ws["cwd"] / "lnk" / ".." / "profile.yaml"))
 
 
-@pytest.mark.parametrize("name", ["Profile.YAML", "SESSION.yaml", "Protected-Paths"])
+@pytest.mark.parametrize("name", ["Profile.YAML", "SESSION.yaml", "Protected-Paths", "Route.JSON",
+                                  "Materials.SHA256"])
 def test_case_variant_contract_file(ws, name):
     assert denied(call(ws, "docu-writer:writer", "Write", ws["dw"] / name))
 
@@ -306,7 +317,7 @@ def test_planner_deny_reason_names_role(ws):
     proc = call(ws, "docu-writer:planner", "Write", ws["cwd"] / "out.docx")
     reason = json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
     assert reason.startswith("[docu-writer:planner]")
-    assert "planner는 .docu-writer/ 안(계약 파일 제외)과 docu-writer-out/ 안에만 쓸 수 있습니다" in reason
+    assert "planner는 .docu-writer/ 안(계약 파일·evidence.yaml 제외)과 docu-writer-out/ 안에만 쓸 수 있습니다" in reason
 
 
 def test_planner_may_not_write_sample(ws):
