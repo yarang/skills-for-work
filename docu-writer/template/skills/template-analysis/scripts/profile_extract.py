@@ -77,6 +77,9 @@ def assemble_profile(sample: Path, fmt: str, mode: str, parts: dict) -> dict:
         "warnings": list(parts["warnings"]),
     }
     profile["warnings"].append("sample_text: analyst가 sample_text_candidates에서 골라 채움")
+    unlabeled = sum(1 for f in parts["fields"] if not str(f.get("label") or "").strip())
+    if unlabeled:  # check는 빈 label을 실패로 봄 — writer가 칸에 무엇을 넣을지 알 수 없기 때문
+        profile["warnings"].append(f"fields: 이름표를 못 찾은 칸 {unlabeled}개 — analyst가 주변 글을 보고 label을 채움")
     if mode == "update":
         profile["warnings"].append("update: 갱신 요청은 analyst가 채움")
     return profile

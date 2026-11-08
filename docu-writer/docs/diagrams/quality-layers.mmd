@@ -1,7 +1,7 @@
 %% 개발 품질은 네 겹으로 지킨다: 단위 테스트, 실제 파일로 도는 종단 시험, 그 산출물을 HEAD 코드로 다시 돌리는 회귀, 외부 모델 리뷰. 찾은 결함은 고친 뒤 테스트로 굳힌다
 %%{init: {"flowchart": {"wrappingWidth": 360}}}%%
 flowchart LR
-  T1["<b>1. 단위 테스트</b><br/>커밋마다<br/>pytest 551건 (파일 12개)<br/>ruff F · E9"]
+  T1["<b>1. 단위 테스트</b><br/>커밋마다<br/>pytest 595건 (파일 12개)<br/>ruff F · E9"]
   E1["<b>2. 종단 시험</b><br/>실제 견본 파일로<br/>1단계 9개 경로<br/>2단계 신규 3형식 + 고정 견본"]
   G1["<b>3. 회귀</b><br/>종단 산출물을 HEAD로<br/>regress.py 19건<br/>정상 10 · 음성 9"]
   X1["<b>4. 외부 리뷰</b><br/>작성자와 문맥 공유 안 함<br/>codex exec (read-only)<br/>agy (antigravity)"]

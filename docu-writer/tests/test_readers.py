@@ -443,6 +443,23 @@ def test_r1_symbol_cell_still_uses_word_fallback():
     assert not _checks_design._on_page(nows("○○○ 부서장 (서명)"), "부서장 ○○○ (서명)")
     assert not _checks_design._on_page(nows("수립 계획"), "계획 수립", loose=True)
 
+
+def test_r1_symbol_cell_without_space_uses_piece_fallback():
+    """공백 없는 「※비고」도 기호를 뺀 조각으로 찾습니다 (agy 6번 후속)."""
+    import _checks_design
+
+    assert _checks_design._on_page(nows("비고 ※"), "※비고", loose=True)
+    assert not _checks_design._on_page(nows("참고"), "※비고", loose=True)
+
+
+def test_r1_strict_first_page_is_kept_when_last_needs_fallback():
+    """글 그대로 찾은 첫 칸 쪽은 느슨한 다시 찾기로 앞쪽에 끌려가지 않습니다 (agy 6번 후속)."""
+    import _checks_design
+
+    pages = [nows("※ 참고 비고 담당 확인 ○○○"), nows("비고※ 표 첫 줄"), nows("○○○ 담당 확인")]
+    pf, pl, nxt = _checks_design._table_pages(pages, "비고 ※", "담당 ○○○ 확인", 0)
+    assert (pf, pl, nxt) == (1, 2, 2)
+
 # --- R6 날짜는 번호가 아님 (종단 시험 F10) ------------------------------------------
 
 @pytest.mark.parametrize("text, shape", [
@@ -493,6 +510,27 @@ def test_r4_unusable_token_is_not_compared(token):
     assert _checks_design._token_mismatch("h1", ("맑은 고딕", 16.0, True), token) == (None, False)
 
 
+@pytest.mark.parametrize("name, value", [
+    ("font", "확인 못 함"), ("font", "미확인"), ("font", "N/A"), ("font", "-"),
+    ("pt", 0), ("pt", -3), ("pt", float("nan")), ("pt", float("inf")),
+])
+def test_r4_placeholder_or_nonpositive_token_is_not_usable(name, value):
+    """「확인 못 함」 같은 글과 0 이하·무한 pt는 비교하지 않습니다 (SKILL.md R5, agy 6번 후속)."""
+    import _checks_design
+
+    assert not _checks_design._usable(name, value)
+
+
+@pytest.mark.parametrize("value, want", [
+    ("1f4e79", "#1F4E79"), (" #1F4E79 ", "#1F4E79"), ("확인 못 함", None), ("파랑", None),
+    ("#12345", None), ("#1234567", None), (None, None),
+])
+def test_r5_color_needs_six_hex_digits(value, want):
+    import _checks_design
+
+    assert _checks_design._color(value) == want
+
+
 def test_r4_token_bold_compares_as_bool():
     import _checks_design
 
@@ -537,3 +575,38 @@ def test_markup_multi_paragraph_cell_counted_once():
     table = Table("t:1", [["**준비**\n둘째 줄"]], texts=["**준비**", "둘째 줄"])
     r = _markup([table])
     assert r["status"] == "fail" and r["detail"].startswith("1건"), r
+
+
+# --- markup (agy 6번 후속) ---------------------------------------------------------------
+
+@pytest.mark.parametrize("text", ["신청 __135건__을 받았다", "__MVP__ 범위", "할 일 __TODO__ 남음"])
+def test_markup_bold_with_korean_particle_or_upper_fails(text):
+    """한글 조사가 붙은 「__」 굵게와 대문자 「__MVP__」도 마크다운 잔존입니다."""
+    assert _markup([Para(text)])["status"] == "fail", text
+
+
+@pytest.mark.parametrize("text", [r">C:\_work\보고", r"#__init__ 고침"])
+def test_markup_removed_path_does_not_make_fake_marker(text):
+    """경로·식별자를 지운 자리가 공백이 되어 「> 」·「# 」 표지처럼 보이지 않습니다."""
+    assert _markup([Para(text)])["status"] == "pass", text
+
+
+def test_markup_table_row_after_path_still_fails():
+    """Windows 경로 글자에 「|」는 없으므로 경로 뒤 표 줄 표지가 지워지지 않습니다."""
+    assert _markup([Para(r"|C:\a|b|")])["status"] == "fail"
+
+
+def test_markup_same_text_in_two_cells_counts_twice():
+    """다른 칸에 같은 잔존이 있으면 두 곳입니다 — 칸 글·표 문단 글 겹침은 한 번만 셉니다."""
+    table = Table("t:1", [["**준비**", "**준비**"]], texts=["**준비**", "**준비**"])
+    r = _markup([table])
+    assert r["status"] == "fail" and r["detail"].startswith("2건"), r
+    assert r["locations"] == ["t:1/r:1/c:1", "t:1/r:1/c:2"], r
+
+
+def test_markup_multi_kind_item_counted_once():
+    """한 문단에 표지가 두 종류여도 건수는 한 번이고, 그 문단의 일부인 표 문단 글도 다시 세지 않습니다."""
+    table = Table("t:1", [["# 제목 **굵게**\n둘째"]], texts=["# 제목 **굵게**", "둘째"])
+    r = _markup([table])
+    assert r["detail"].startswith("1건"), r
+    assert "제목 #" in r["detail"] and "굵게 **" in r["detail"], r

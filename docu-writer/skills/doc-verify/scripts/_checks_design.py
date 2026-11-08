@@ -2,6 +2,7 @@
 
 계약: skills/doc-verify/SKILL.md 「검사 항목」·「검사 세부」.
 """
+import math
 import re
 from collections import Counter
 
@@ -60,12 +61,18 @@ def _heading_styles(ctx: Ctx) -> dict:
     return groups
 
 
+# 분석자가 값을 못 정했을 때 적는 글 — 서체 이름이 아니므로 비교하지 않습니다(SKILL.md R5, agy 6번 후속).
+UNKNOWN = {"확인못함", "확인못했음", "미확인", "모름", "없음", "알수없음", "unknown", "n/a", "na",
+           "none", "null", "tbd", "-", "?"}
+
+
 def _usable(name: str, want) -> bool:
-    """토큰 값이 비교에 쓸 수 있는 꼴인지. null·빈 글·꼴이 틀린 값은 비교하지 않은 것으로 칩니다."""
+    """토큰 값이 비교에 쓸 수 있는 꼴인지. null·빈 글·「확인 못 함」·꼴이 틀린 값은 비교하지 않은 것으로 칩니다."""
     if name == "font":
-        return isinstance(want, str) and bool(want.strip())
+        return isinstance(want, str) and bool(want.strip()) and nows(want).lower() not in UNKNOWN
     if name == "pt":
-        return isinstance(want, (int, float)) and not isinstance(want, bool)
+        return (isinstance(want, (int, float)) and not isinstance(want, bool)
+                and math.isfinite(want) and want > 0)
     return isinstance(want, bool)
 
 
@@ -124,8 +131,9 @@ def check_r4(ctx: Ctx) -> dict:
 def _color(value) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    v = value.strip().upper()
-    return v if v.startswith("#") else f"#{v}"
+    # 여섯 자리 16진수만 색으로 봅니다 — 「확인 못 함」·「파랑」 같은 글은 비교하지 않습니다(agy 6번 후속).
+    m = re.fullmatch(r"#?([0-9A-Fa-f]{6})", value.strip())
+    return f"#{m.group(1).upper()}" if m else None
 
 
 def _token_sets(design: dict) -> tuple[set, set, set]:
@@ -247,12 +255,13 @@ def check_table_header(ctx: Ctx) -> dict:
 # --- R1 표 쪽 나뉨 ----------------------------------------------------------------
 
 FALLBACK = set("○●◦□■◇◆※▶☞·•")  # LibreOffice가 대체 글꼴로 그려 쪽 글 순서를 흩뜨리는 기호
+_FALLBACK_RUN = re.compile("[" + re.escape("".join(sorted(FALLBACK))) + "]+")
 
 
 def _on_page(page: str, cell: str, loose: bool = False) -> bool:
     """칸 글이 쪽 글(공백 없앰)에 있는지.
 
-    loose이고 칸 글에 대체 글꼴 기호가 있을 때만, 통째로 없으면 공백으로 나눈 낱말이 모두 있는지 봅니다.
+    loose이고 칸 글에 대체 글꼴 기호가 있을 때만, 통째로 없으면 기호 자리에서 나눈 조각이 모두 있는지 봅니다.
     LibreOffice가 ○·※ 같은 기호를 대체 글꼴로 그리면 pymupdf가 그 조각을 다른 줄로 떼어
     쪽 글 순서가 바뀝니다(「부서장 ○○○ (서명)」→「○○○부서장(서명)」). 기호 없는 칸까지 낱말로
     맞추면 다른 곳의 낱말(「계획 검토 후 예산 수립」)이 「계획 수립」을 대신 찾아 쪽 나뉨을 놓칩니다 (M4).
@@ -261,8 +270,9 @@ def _on_page(page: str, cell: str, loose: bool = False) -> bool:
         return True
     if not loose or not FALLBACK & set(cell):
         return False
-    words = [nows(w) for w in cell.split()]
-    return len(words) > 1 and all(w in page for w in words)
+    # 기호 자리에서 나눈 조각이 모두 있는지 봅니다 — 공백이 없는 「※비고」도 「비고」로 찾습니다(agy 6번 후속).
+    pieces = [nows(x) for x in _FALLBACK_RUN.split(cell) if nows(x)]
+    return bool(pieces) and all(x in page for x in pieces)
 
 
 def _first_page(pages: list, cell: str, start: int, loose: bool = False) -> int | None:
@@ -287,11 +297,16 @@ def _table_pages(pages: list, first: str, last: str, cursor: int) -> tuple[int |
     """(첫 칸 쪽, 끝 칸 쪽, 다음 커서). 한 쪽에 다 있으면 두 쪽 번호가 같습니다.
 
     pages는 공백을 없앤 쪽 글, first·last는 칸 글 그대로입니다. 글 그대로 먼저 찾고,
-    첫·끝 칸 가운데 하나를 못 찾았을 때만 기호 낱말 맞추기로 다시 찾습니다.
+    첫·끝 칸 가운데 하나를 못 찾았을 때만 기호 조각 맞추기로 다시 찾습니다. 글 그대로 찾은 첫 칸 쪽은
+    그대로 두고 끝 칸만 그 쪽부터 다시 찾습니다 — 처음부터 느슨하게 다시 찾으면 앞쪽의 비슷한 글이
+    첫 칸 쪽을 앞으로 끌어와 쪽 나뉨을 지어내거나 놓칩니다(agy 6번 후속).
     """
     pf, pl, nxt = _locate_table(pages, first, last, cursor, loose=False)
-    if pf is None or pl is None:
-        pf, pl, nxt = _locate_table(pages, first, last, cursor, loose=True)
+    if pf is None:
+        return _locate_table(pages, first, last, cursor, loose=True)
+    if pl is None:
+        pl = _first_page(pages, last, pf, loose=True)
+        nxt = pl if pl is not None else pf
     return pf, pl, nxt
 
 

@@ -150,16 +150,23 @@ def check_locators(prof, tables, fails):
             for m in T_LOC_RE.finditer(text):
                 problem = locator_problem(m, tables)
                 if problem:
-                    fails.append(f"{root}: {text} — {problem}")
+                    fails.append(f"{root}: {m.group(0).lstrip('/')} — {problem}")  # 글 전체가 아니라 locator만
 
 
-def field_problem(field) -> str:
-    """fields 항목 하나의 꼴 문제. 값(constraint 정규식 글)은 보고하지 않습니다."""
+def field_problem(field, fmt: str = "") -> str:
+    """fields 항목 하나의 꼴 문제. 값(locator·constraint 글)은 보고하지 않습니다."""
     if not isinstance(field, dict):
         return "사전이 아님"
-    absent = [k for k in FIELD_KEYS if k not in field or missing(field[k])]
+    # MD 앞머리 키는 locator 문법이 없어 profile_extract가 locator를 비워 냅니다 — MD만 빈 locator 허용
+    keys = [k for k in FIELD_KEYS if not (fmt == "md" and k == "locator" and field.get(k) == "")]
+    absent = [k for k in keys if k not in field or missing(field[k])]
     if absent:
         return f"칸이 없거나 비어 있음 — {', '.join(absent)}"
+    locator = field.get("locator")
+    if not isinstance(locator, str):
+        return "locator가 글이 아님"
+    if re.search(r"\s", re.sub(r'"[^"]*"', "", locator)):
+        return "locator에 공백이 섞임 (따옴표 안 글 밖)"  # 「 t:9/r:1/c:1」은 범위 검사를 비껴감
     if "constraint" not in field:
         return "constraint 키가 없음 (안내가 없으면 빈 글로 둠)"
     constraint = field["constraint"]
@@ -171,27 +178,29 @@ def field_problem(field) -> str:
         try:
             re.compile(constraint[3:])
         except re.error as e:
-            return f"constraint 정규식이 틀림 ({e.msg})"
+            # e.msg에도 정규식 조각이 들어갈 수 있어(「bad character range 홍-가」) 위치만 냅니다
+            where = f" — {e.pos + 1}번째 글자" if e.pos is not None else ""
+            return f"constraint 정규식이 틀림{where}"
     return ""
 
 
-def check_fields(fields, fails):
+def check_fields(fields, fails, fmt: str = ""):
     """form 모드 fields: id·label·locator가 있고 constraint의 re: 정규식이 풀리는지 (리뷰 3차 M13)."""
     for i, field in enumerate(fields, 1):
-        problem = field_problem(field)
+        problem = field_problem(field, fmt)
         if problem:
             fid = field.get("id") if isinstance(field, dict) and isinstance(field.get("id"), str) else ""
             fails.append(f"fields {fid or f'{i}번째'}: {problem}")
 
 
-def check_mode(prof, sections, fails):
+def check_mode(prof, sections, fails, fmt: str = ""):
     mode = prof.get("mode")
     if mode == "form":
         fields = prof.get("fields")
         if not isinstance(fields, list) or not fields:
             fails.append("form 모드인데 fields가 하나도 없음")
         else:
-            check_fields(fields, fails)
+            check_fields(fields, fails, fmt)
     if mode != "update":
         return
     update = prof.get("update") if isinstance(prof.get("update"), dict) else {}
@@ -257,6 +266,8 @@ def run_check(profile_path: Path, source: Path, tables_path):
     tables = load_tables(tables_path, source, fmt)
     try:
         prof = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise UsageError(f"프로파일을 읽지 못함: {exc.strerror or type(exc).__name__}") from exc
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
         return [f"프로파일이 YAML로 읽히지 않음: {yaml_error_brief(exc)}"]
     if not isinstance(prof, dict):
@@ -267,7 +278,7 @@ def run_check(profile_path: Path, source: Path, tables_path):
     check_section_keys(sections, fails, prof.get("mode"))
     check_anchors(sections, source, fmt, fails)
     check_locators(prof, tables, fails)
-    check_mode(prof, sections, fails)
+    check_mode(prof, sections, fails, fmt)
     check_sample_text(prof, sections, fails)
     check_conflicts(prof, fails)
     return fails

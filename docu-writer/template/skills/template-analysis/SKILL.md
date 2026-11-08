@@ -157,7 +157,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/profile_extract.py" check .docu-writer/profi
 - 섹션이 하나 이상이고, 섹션마다 `id·title·level·anchor·kind·required·guide·length`가 있고(form 모드는 `length` 제외), `id`가 겹치지 않음. 공백뿐인 글은 빈 값으로 봅니다
 - anchor가 견본에서 풀리고(문단·슬라이드·제목 글이 있음) 문서 순서대로 늘어섬
 - 모든 `t:N/r:R/c:C`가 표 목록 범위 안(`N ≤ 표 수`, `R ≤ rows`, `C ≤ cols`)
-- form 모드는 `fields`가 하나 이상이고 항목마다 `id·label·locator`가 비지 않으며 `constraint` 키가 있음(안내가 없으면 빈 글). `re:` constraint는 정규식으로 풀려야 합니다 — 틀리면 오류 종류만 보고하고 정규식 글은 보이지 않습니다. update 모드는 `update.sections`의 id가 모두 섹션에 있고 `requests`가 비어 있지 않음
+- form 모드는 `fields`가 하나 이상이고 항목마다 `id·label·locator`가 비지 않으며 `constraint` 키가 있음(안내가 없으면 빈 글). 예외로 MD 견본의 앞머리 키 칸은 locator 문법이 없어 `locator: ""`를 허용합니다. locator는 글이어야 하고 따옴표 밖에 공백이 없어야 합니다(` t:9/r:1/c:1`처럼 띄어 쓰면 표 범위 검사를 비껴가므로 실패). `extract`가 이름표를 못 찾은 칸은 `label`이 비고 경고(`fields: 이름표를 못 찾은 칸 N개`)가 붙으니, analyst가 주변 글을 보고 채웁니다. `re:` constraint는 정규식으로 풀려야 합니다 — 틀리면 몇 번째 글자에서 틀렸는지만 보고하고, 정규식 글이나 오류 문구(조각이 섞일 수 있음)는 보이지 않습니다. 실패 보고에도 locator만 적고 그 글이 들어 있던 값 전체는 옮기지 않습니다. update 모드는 `update.sections`의 id가 모두 섹션에 있고 `requests`가 비어 있지 않음
 - `sample_text`에 `○○`만 있는 토큰, 6자 미만 글, 섹션 제목과 같은 글이 없음
 - `guide` 글이 `sample_text`의 어느 항목도 포함하지 않음 (견본 글을 옮기지 않음)
 - `conflicts[].handling`이 모두 `report`

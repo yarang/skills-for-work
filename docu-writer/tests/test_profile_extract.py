@@ -577,3 +577,70 @@ def test_check_broken_tables_reports_line_only(valid, samples, tmp_path):
     proc = uv(PROFILE_EXTRACT, "check", p, "--source", samples["docx"], "--tables", t)
     assert proc.returncode == 2, proc.stdout + proc.stderr
     assert_no_pii(proc.stdout + proc.stderr)
+
+
+# --- agy 리뷰(6번 후속): fields 꼴 검사 ------------------------------------------
+
+def _pe_check():
+    import sys
+    scripts = str(PROFILE_EXTRACT.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import _pe_check
+    return _pe_check
+
+
+def _field(**kw):
+    return {"id": "f1", "label": "담당", "locator": "t:1/r:3/c:3", "constraint": "", **kw}
+
+
+@pytest.mark.parametrize("pattern", ["(?P<123비밀값>.*)", "[홍-가]", r"\N{비밀값}", "(?P=비밀값)"])
+def test_field_regex_error_reports_position_only(pattern):
+    """e.msg에도 정규식 조각이 들어가므로(「bad character range 홍-가」) 위치만 보고합니다."""
+    problem = _pe_check().field_problem(_field(constraint=f"re:{pattern}"))
+    assert problem.startswith("constraint 정규식이 틀림"), problem
+    assert not any(ch in problem for ch in "비밀값홍가"), problem
+
+
+def test_field_md_front_matter_may_have_empty_locator():
+    pc = _pe_check()
+    assert pc.field_problem(_field(locator=""), "md") == ""
+    assert "locator" in pc.field_problem(_field(locator=""), "docx")
+    assert "locator" in pc.field_problem(_field(locator=None), "md")  # 빈 글만 허용, 키 누락·null은 아님
+
+
+@pytest.mark.parametrize("locator", [" t:99/r:1/c:1", "t:1 /r:9/c:1", "t:1/r:1/c:1\n"])
+def test_field_locator_with_whitespace_fails(locator):
+    assert "공백" in _pe_check().field_problem(_field(locator=locator))
+
+
+def test_field_locator_spaces_inside_quotes_pass():
+    assert _pe_check().field_problem(_field(locator='h:"추진 배경"/p:1')) == ""
+
+
+def test_check_locators_reports_locator_not_text():
+    fails = []
+    _pe_check().check_locators({"structure": {"guide": "t:99/비밀문구"}}, [{"rows": 2, "cols": 2}], fails)
+    assert len(fails) == 1 and "t:99" in fails[0] and "비밀문구" not in fails[0], fails
+
+
+def test_assemble_profile_warns_unlabeled_fields(tmp_path):
+    import sys
+    sys.path.insert(0, str(PROFILE_EXTRACT.parent))
+    import profile_extract
+    sample = tmp_path / "s.docx"
+    sample.write_bytes(b"x")
+    parts = {"numbering": [], "sections": [], "design": {}, "candidates": [], "objects": [], "warnings": [],
+             "fields": [{"id": "f1", "label": " ", "locator": "t:1/r:1/c:1", "constraint": ""},
+                        {"id": "f2", "label": "담당", "locator": "t:1/r:1/c:2", "constraint": ""}]}
+    warns = profile_extract.assemble_profile(sample, "docx", "form", parts)["warnings"]
+    assert any("이름표를 못 찾은 칸 1개" in w for w in warns), warns
+
+
+def test_md_numbering_uses_verify_marker_rule():
+    """MD 본문 번호도 doc-verify R6 규칙: 연도 「2026.」은 빼고 「가.」·「(1)」·「Ⅰ.」은 잡습니다 (agy 6번 후속)."""
+    _pe_check()  # scripts 경로를 sys.path에 넣음
+    import _pe_md
+
+    lines = ["# 제목", "", "2026. 11. 12. 회의", "가. 목적", "(1) 세부", "Ⅰ. 개요", "- 항목", "* 별표", "보통 문장"]
+    assert _pe_md.numbering(lines) == ["가.", "(1)", "Ⅰ.", "-", "*"]

@@ -89,11 +89,16 @@ def link_fonts(profile: Path, dirs: list[Path]) -> list[Path]:
     """<profile>/user/fonts/ 아래에 글꼴 폴더 링크를 만듭니다. 글꼴 파일은 복사하지 않습니다."""
     target = profile / "user" / "fonts"
     target.mkdir(parents=True, exist_ok=True)
+    # 다시 부른 프로필의 옛 링크는 모두 걷어 냅니다 — 글꼴 폴더 목록이 줄거나 바뀌면 남은 링크가
+    # 지금 목록에 없는 폴더를 계속 싣습니다(agy 6번 후속). 링크만 지우고 진짜 파일·폴더는 건드리지 않습니다.
+    for old in target.iterdir():
+        if old.is_symlink() and re.fullmatch(r"\d{2}-.*", old.name):
+            old.unlink()
     links = []
     for i, d in enumerate(dirs):
         link = target / f"{i:02d}-{d.name or 'fonts'}"
-        if link.is_symlink() or link.is_file():  # 다시 부른 프로필의 옛 링크 — FileExistsError 대신 갈아 끼움 (L1)
-            link.unlink()
+        if link.exists() or link.is_symlink():
+            raise RenderError(f"글꼴 링크 자리에 링크가 아닌 것이 있습니다: {link.name}")
         link.symlink_to(d.resolve(), target_is_directory=True)
         links.append(link)
     return links
@@ -155,7 +160,10 @@ def norm_font(name: str) -> str:
 
 
 STYLE_SUFFIX = re.compile(r"(?:regular|book|roman|normal|medium|bold|italic|oblique|light|semi|demi|extra"
-                          r"|ultra|black|heavy|thin|condensed|narrow)+$")
+                          r"|ultra|black|heavy|thin)+$")
+# 「condensed」·「narrow」는 굵기가 아니라 다른 글꼴 가족입니다(Liberation Sans Narrow ≠ Liberation Sans, agy 6번 후속).
+# pymupdf는 글꼴 이름을 31바이트에서 자르므로, 잘린 내장 글꼴 이름은 앞부분으로 맞춥니다.
+NAME_LIMIT = 31
 
 
 def font_family(norm: str) -> str:
@@ -194,7 +202,7 @@ def substituted_chars(trace_spans, bundled) -> dict[str, set[str]]:
     for span in trace_spans:
         key = font_family(norm_font(span["font"]))
         # 가족 이름이 같은 것만 — 앞부분 맞추기는 「DejaVuSans」가 「DejaVuSansMono」까지 잡았습니다 (L1)
-        cands = [f for n, f in bundled if key and font_family(n) == key]
+        cands = [f for n, f in bundled if key and (font_family(n) == key or _truncated_match(n, f, key))]
         if not cands:
             continue
         for ch, *_ in span["chars"]:
@@ -205,15 +213,24 @@ def substituted_chars(trace_spans, bundled) -> dict[str, set[str]]:
     return missing
 
 
+def _truncated_match(norm: str, font, key: str) -> bool:
+    """이름이 잘린 내장 글꼴(31바이트)이면 앞부분이 PDF 쪽 가족 이름으로 시작하는지 봅니다."""
+    name = getattr(font, "name", "") or ""
+    return len(name.encode("utf-8")) >= NAME_LIMIT and norm.startswith(key)
+
+
+KINDS = ("한글", "한자", "기타")  # 보고 순서를 고정합니다 — set 순회 순서에 따라 글이 바뀌지 않게(agy 6번 후속)
+
+
 def char_kinds(chars) -> str:
     """글자 모음을 「한글 12자, 기타 3자」처럼 종류별 개수로."""
-    counts: dict[str, int] = {}
+    counts = dict.fromkeys(KINDS, 0)
     for ch in chars:
         o = ord(ch)
         kind = ("한글" if 0xAC00 <= o <= 0xD7A3 or 0x1100 <= o <= 0x11FF or 0x3130 <= o <= 0x318F
                 else "한자" if 0x4E00 <= o <= 0x9FFF else "기타")
-        counts[kind] = counts.get(kind, 0) + 1
-    return ", ".join(f"{k} {n}자" for k, n in counts.items())
+        counts[kind] += 1
+    return ", ".join(f"{k} {n}자" for k, n in counts.items() if n)
 
 
 def check_glyphs(pdf: Path, soffice: str) -> None:

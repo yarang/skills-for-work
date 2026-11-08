@@ -93,6 +93,67 @@ def test_char_kinds_counts_without_echoing_text():
     assert "한글 2자" in shown and "한자 1자" in shown and "기타 1자" in shown
 
 
+# --- agy 6번 후속 -------------------------------------------------------------------
+
+def test_link_fonts_drops_stale_links_when_dirs_shrink(tmp_path):
+    """글꼴 폴더 목록이 줄면 옛 링크가 남아 지금 목록에 없는 폴더를 싣지 않습니다."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    render.link_fonts(tmp_path / "profile", [a, b])
+    render.link_fonts(tmp_path / "profile", [a])
+    names = sorted(x.name for x in (tmp_path / "profile/user/fonts").iterdir())
+    assert names == ["00-a"]
+
+
+def test_link_fonts_keeps_real_file_and_refuses(tmp_path):
+    """링크 자리에 진짜 파일이 있으면 지우지 않고 멈춥니다. 상관없는 파일도 그대로 둡니다."""
+    fonts = tmp_path / "fonts"
+    fonts.mkdir()
+    target = tmp_path / "profile/user/fonts"
+    target.mkdir(parents=True)
+    (target / "00-fonts").write_text("keep", encoding="utf-8")
+    (target / "notes.txt").write_text("keep", encoding="utf-8")
+    with pytest.raises(render.RenderError):
+        render.link_fonts(tmp_path / "profile", [fonts])
+    assert (target / "00-fonts").read_text(encoding="utf-8") == "keep"
+    assert (target / "notes.txt").is_file()
+
+
+def test_font_family_keeps_width_variant_as_other_family():
+    """「Narrow」·「Condensed」는 굵기 꼬리가 아니라 다른 가족입니다."""
+    fam = render.font_family
+    assert fam(render.norm_font("LiberationSansNarrow-Bold")) == "liberationsansnarrow"
+    assert fam(render.norm_font("LiberationSans-Bold")) == "liberationsans"
+
+
+class _FakeFont:
+    def __init__(self, name):
+        self.name = name
+
+    def has_glyph(self, ch):
+        return ch < 0x80
+
+
+def test_substituted_chars_matches_truncated_bundled_name():
+    """pymupdf가 31바이트에서 자른 내장 글꼴 이름도 앞부분으로 맞춥니다."""
+    name = "Noto Sans CJK KR Regular Extended"[:31]
+    bundled = [(render.norm_font(name), _FakeFont(name))]
+    spans = [span("BAAAAA+NotoSansCJKkr-Regular", "A한")]
+    assert render.substituted_chars(spans, bundled) == {"NotoSansCJKkr-Regular": {"한"}}
+
+
+def test_substituted_chars_short_name_needs_whole_family():
+    """잘리지 않은 이름은 앞부분 맞추기를 쓰지 않습니다(DejaVuSansMono ≠ DejaVuSans)."""
+    bundled = [(render.norm_font("DejaVu Sans Mono"), _FakeFont("DejaVu Sans Mono"))]
+    assert render.substituted_chars([span("BAAAAA+DejaVuSans", "한")], bundled) == {}
+
+
+def test_char_kinds_order_is_fixed():
+    assert render.char_kinds({"é", "漢", "홍"}) == "한글 1자, 한자 1자, 기타 1자"
+    assert render.char_kinds({"é", "홍"}) == "한글 1자, 기타 1자"
+
+
 needs_soffice = pytest.mark.skipif(
     not (shutil.which("soffice") or Path("/Applications/LibreOffice.app").exists()), reason="soffice 없음")
 

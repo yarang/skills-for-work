@@ -103,17 +103,23 @@ MARKUP = {
     "인용 >": re.compile(rf"^[ \t]*>[ \t](?!{_NUMBER_AFTER})", re.M),
     "제목 #": re.compile(r"^[ \t]*#{1,6}[ \t]", re.M),
     # 「__」 굵게는 앞뒤에 글자·밑줄이 붙지 않아야 합니다 — 서명란 「___서명___」을 표지로 잡지 않습니다.
-    "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|(?<!\w)__[^_\s][^_]*__(?!\w)"),
+    # 앞뒤 판정은 ASCII 글자만 봅니다 — 「__135건__을」처럼 한글 조사가 붙은 굵게도 잡습니다(agy 6번 후속).
+    "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|(?<![0-9A-Za-z_])__[^_\s][^_]*__(?![0-9A-Za-z_])"),
     "탈출 \\": re.compile(r"\\[~*_#>|\[\]`-]"),
     "표 |": re.compile(r"^[ \t]*\|[^\n]*\|[ \t]*$", re.M),
 }
-# 「__init__」 같은 영문 식별자와 「C:\_work」 같은 Windows 경로는 마크다운 표지가 아닙니다(agy F-05).
-_DUNDER = re.compile(r"(?<!\w)__[A-Za-z][A-Za-z0-9_]*?__(?!\w)")
-_WIN_PATH = re.compile(r"(?:\b[A-Za-z]:|\\\\[^\s\\]+)(?:\\[^\s\\]*)+")
+# 「__init__」 같은 영문 소문자 식별자와 「C:\_work」 같은 Windows 경로는 마크다운 표지가 아닙니다(agy F-05).
+# 대문자 「__MVP__」·「__TODO__」는 굵게로 봅니다. 경로 글자에서 Windows가 금하는 |*<>"?는 뺍니다
+# — 「C:\a|b|」 같은 표 줄이 경로로 지워지지 않게(agy 6번 후속).
+_DUNDER = re.compile(r"(?<![0-9A-Za-z_])__[a-z][a-z0-9_]*?__(?![0-9A-Za-z_])")
+_PATH_CHAR = r'[^\s\\|*<>"?]'
+_WIN_PATH = re.compile(rf"(?:\b[A-Za-z]:|\\\\{_PATH_CHAR}+)(?:\\{_PATH_CHAR}*)+")
 
 
 def _markup_kinds(text: str) -> list:
-    text = _WIN_PATH.sub(" ", _DUNDER.sub(" ", text))
+    # 지운 자리는 공백이 아닌 개체 대체 글자로 채웁니다 — 「>C:\_work」·「#__init__」가 공백으로 바뀌어
+    # 「> 」·「# 」 표지처럼 보이지 않게(agy 6번 후속).
+    text = _WIN_PATH.sub("\ufffc", _DUNDER.sub("\ufffc", text))
     return [kind for kind, pattern in MARKUP.items() if pattern.search(text)]
 
 
@@ -127,22 +133,22 @@ def check_markup(ctx: Ctx) -> dict:
     known = set() if ctx.mode == "new" else {
         kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
     # 보고에는 종류와 위치만 적습니다 — 결과 글은 양식 값(전화번호·이름)일 수 있습니다(리뷰 3차 H2).
-    # 표 칸 글은 칸·표 단위로 두 번 나오므로 (종류, 글) 열쇠로 한 번만 셉니다. 열쇠는 보고에 나가지 않고,
-    # locator로 세면 locator 없는 MD·HWPX 문단이 한 건으로 뭉치고 표 칸은 두 건이 됩니다.
-    # 여러 문단 칸은 칸 글(문단을 줄바꿈으로 이은 것)과 문단 글로 따로 나오므로, 이미 센 같은 종류 글
-    # 안에 들어 있는 글도 한 번으로 봅니다(agy F-05).
-    seen, kinds_hit, locs = {}, Counter(), []
-    for text, loc in doc_search_items(ctx.out):
+    # 문단과 표 칸(locator가 있는 본문 단위)은 하나하나 셉니다 — 다른 칸·문단에 같은 글이 남아도 모두 셉니다.
+    # 표 안 문단 글·글상자 같은 보조 글은 본문 단위와 겹쳐 나오므로(HWPX는 모든 문단이 한 번 더 나옴),
+    # 이미 센 글 안에 들어 있으면 건너뜁니다. 한 곳에 표지가 여럿이면 종류마다 적되 건수는 한 번입니다(agy 6번 후속).
+    primary = block_items(ctx.out.blocks)
+    seen, kinds_hit, locs, total = [], Counter(), [], 0
+    for n, (text, loc) in enumerate(doc_search_items(ctx.out)):
         kinds = [k for k in _markup_kinds(text) if k not in known]
         key = nows(text)
-        if not kinds or any(key in prev for prev in seen.get(kinds[0], ())):
+        if not kinds or (n >= len(primary) and any(key in prev for prev in seen)):
             continue
-        seen.setdefault(kinds[0], []).append(key)
-        kinds_hit[kinds[0]] += 1
+        seen.append(key)
+        kinds_hit.update(kinds)
+        total += 1
         locs.append(loc)
     if kinds_hit:
         shown = [f"{kind} {n}곳" for kind, n in kinds_hit.items()]
-        total = sum(kinds_hit.values())
         return entry("markup", "fail", f"{total}건: {', '.join(shown)}", _unique(locs))
     return entry("markup", "pass", "마크다운 표지 없음")
 
@@ -186,7 +192,9 @@ def _field_problem(ctx: Ctx, field: dict, notes: list) -> str | None:
         try:
             ok = re.fullmatch(constraint[3:], text) is not None
         except re.error as exc:
-            return f"{fid} constraint 정규식 오류 ({exc})"
+            # 오류 글(exc.msg)에는 정규식 조각(이름·글자 범위)이 들어가므로 위치만 냅니다(agy 6번 후속).
+            where = f" — {exc.pos + 1}번째 글자" if exc.pos is not None else ""
+            return f"{fid} constraint 정규식 오류{where}"
         # 칸 값은 개인정보일 수 있어 보고에 값 대신 글자 수만 냅니다 (kordoc fields_file 마스킹과 같게).
         return None if ok else f"{fid} 값({len(text)}자)이 {constraint}에 맞지 않음"
     if constraint:

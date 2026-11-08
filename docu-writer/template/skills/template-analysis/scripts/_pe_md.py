@@ -128,11 +128,17 @@ def sections(lines):
 
 
 def numbering(lines):
+    # 본문 줄도 doc-verify R6와 같은 line_marker 규칙으로 봅니다 — 「2026.」 연도는 빼고 「가.」·「(1)」·「Ⅰ.」은
+    # 잡습니다(agy 6번 후속). R6가 부호로 보지 않는 MD 목록 「*」·「+」는 그대로 적어 둡니다(비교에 해가 없음).
     marks = []
     for _, line in classify(lines):
-        m = LIST_RE.match(line)
-        if m and not HEADING_RE.match(line):
-            marks.append(m.group(2))
+        if HEADING_RE.match(line):
+            continue
+        mark = line_marker(line)
+        if not mark and (m := LIST_RE.match(line)) and m.group(2) in ("*", "+"):
+            mark = m.group(2)
+        if mark:
+            marks.append(mark)
     marks += [line_marker(title) for _, _, title in headings(lines)]
     return unique(marks)
 

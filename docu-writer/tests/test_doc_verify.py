@@ -223,7 +223,8 @@ def test_markup_report_has_no_output_text(samples, tmp_path):
 
 
 def test_markup_counts_distinct_hits_without_locator():
-    """HWPX 최상위 문단은 locator가 없어도 서로 다른 두 줄은 2건으로 셉니다(중복 제거는 글 기준).
+    """HWPX 최상위 문단은 locator가 없어도 문단마다 셉니다 — 같은 글이 두 문단에 남아도 2곳입니다
+    (agy 6번 후속: 글 기준 중복 제거가 다른 자리의 같은 잔존을 숨기던 문제).
     (MD 출력은 리뷰 3차 M1로 markup을 보지 않으므로 locator 없는 HWPX 문단으로 확인합니다.)"""
     sys.path.insert(0, str(DOC_VERIFY.parent))
     from _checks_content import Ctx, check_markup
@@ -234,7 +235,7 @@ def test_markup_counts_distinct_hits_without_locator():
               None, None, None)
     r = check_markup(ctx)
     assert r["status"] == "fail", r
-    assert r["detail"].startswith("2건"), r
+    assert r["detail"].startswith("3건"), r
     assert "135" not in json.dumps(r, ensure_ascii=False), r
 
 
@@ -319,6 +320,15 @@ def test_fields_filled_passes(samples, tmp_path):
 def test_fields_regex_constraint(samples, tmp_path, text, status):
     _, r = verify(samples, tmp_path, form_profile(samples, r"re:^\d+건$"), output(samples, tmp_path, fill(text)))
     assert r["fields"]["status"] == status
+
+
+def test_fields_regex_error_reports_position_only(samples, tmp_path):
+    """정규식 오류 글에는 정규식 조각이 들어가므로 위치만 냅니다 (agy 6번 후속)."""
+    _, r = verify(samples, tmp_path, form_profile(samples, "re:(?P<1비밀값>.*)"),
+                  output(samples, tmp_path, fill("기획팀")))
+    assert r["fields"]["status"] == "fail", r["fields"]
+    assert "번째 글자" in r["fields"]["detail"], r["fields"]
+    assert "비밀값" not in json.dumps(r["fields"], ensure_ascii=False), r["fields"]
 
 
 def test_fields_violation_does_not_echo_value(samples, tmp_path):

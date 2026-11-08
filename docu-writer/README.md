@@ -67,4 +67,4 @@ claude --plugin-dir /path/to/skills_for_work/docu-writer
 
 사용법은 [docs/manual.md](docs/manual.md), 설계 배경은 [docs/design.md](docs/design.md)에 있습니다.
 
-> **v0.3.0 상태**: 1단계(견본 우선) 스크립트 6개에 2단계 신규 작성(`newdoc-workflow`·`planner`·`catalog.py`·기본 DOCX 테마·`doc_verify.py` 신규 모드)이 더해져 테스트 551건이 통과합니다. 종단 점검은 docx·hwpx·md 신규 작성 각 1건과 고정 견본 1건(법제처 공개 기안문 서식, `form` 모드)을 마쳤습니다. 현재 상태는 [매뉴얼 1장](docs/manual.md#1-현재-상태-v030-2026-11-06)에, 1단계 시험 결과는 [매뉴얼 13장](docs/manual.md#13-종단-시험-결과-2026-11-04)에 있습니다.
+> **v0.3.0 상태**: 1단계(견본 우선) 스크립트 6개에 2단계 신규 작성(`newdoc-workflow`·`planner`·`catalog.py`·기본 DOCX 테마·`doc_verify.py` 신규 모드)이 더해져 테스트 595건이 통과합니다. 종단 점검은 docx·hwpx·md 신규 작성 각 1건과 고정 견본 1건(법제처 공개 기안문 서식, `form` 모드)을 마쳤습니다. 현재 상태는 [매뉴얼 1장](docs/manual.md#1-현재-상태-v030-2026-11-06)에, 1단계 시험 결과는 [매뉴얼 13장](docs/manual.md#13-종단-시험-결과-2026-11-04)에 있습니다.
