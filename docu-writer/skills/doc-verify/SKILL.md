@@ -54,7 +54,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 
 **글꼴.** `render.py`는 LibreOffice 전용 프로필의 `user/fonts/`에 글꼴 폴더 링크를 둡니다(macOS: `/System/Library/Fonts`·`/Library/Fonts`·`~/Library/Fonts`, 그리고 `DOCU_WRITER_FONT_DIRS`에 `:`로 나눠 적은 폴더). macOS의 LibreOffice는 headless 변환에서 시스템 글꼴을 못 찾고 내장 Latin 글꼴로만 그리는 일이 있어, 링크가 없으면 한글이 빈 글리프로 찍히고 `pages.json` 글만 멀쩡합니다. 변환한 PDF에서 내장 글꼴에 없는 글자가 그 글꼴로 찍혔으면 PNG를 쓰지 않고 종료 코드 2로 멈춥니다. 한글 글꼴이 든 폴더를 `DOCU_WRITER_FONT_DIRS`에 적고 다시 실행합니다.
 
-**HWPX 렌더.** kordoc은 MCP 도구라 스크립트에서 부를 수 없습니다. 메인 대화가 `render_document(format: "svg", pages: "1-N", output_path: docu-writer-out/page.svg)`와 `format: "png"`를 같은 디렉터리에 낸 뒤 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음 — `format-hwpx` 「렌더」). `doc_verify.py`는 `pages.json`이 없으면 `page_NNN.svg`(한 쪽이면 `page.svg`)의 `<text>` 요소에서 쪽별 글을 읽습니다. 둘이 섞여 있으면 이전 렌더가 남은 것이므로 사용 오류로 멈춥니다. 조판 캐시가 없는 HWPX(AI가 만든 파일)는 근사 렌더이므로 R1·R3 판정은 ⑧에서 「한컴에서 확인 권장」을 붙입니다.
+**HWPX 렌더.** kordoc은 MCP 도구라 스크립트에서 부를 수 없습니다. 메인 대화가 `format-hwpx` 「렌더 (⑥)」의 명령 그대로 이전 쪽을 지우고, `render_document(format: "svg", pages: "1-N", output_path: docu-writer-out/page.svg)`와 `format: "png"`를 같은 디렉터리에 낸 뒤 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음). `doc_verify.py`는 `pages.json`이 없으면 `page_*.svg`(kordoc은 여러 쪽이면 `page_page_NNN.svg`, 한 쪽이면 `page.svg`로 냄)의 `<text>` 요소에서 쪽별 글을 읽습니다. 둘이 섞여 있으면 이전 렌더가 남은 것이므로 사용 오류로 멈춥니다. 조판 캐시가 없는 HWPX(AI가 만든 파일)는 근사 렌더이므로 R1·R3 판정은 ⑧에서 「한컴에서 확인 권장」을 붙입니다.
 
 ## 검사 항목
 

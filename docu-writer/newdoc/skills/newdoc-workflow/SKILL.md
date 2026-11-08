@@ -51,8 +51,8 @@ disable-model-invocation: true
 ```bash
 mkdir -p .docu-writer/{work,render,verify,backup} && printf '*\n' > .docu-writer/.gitignore
 : > .docu-writer/protected-paths                                   # 자료가 없어도 빈 파일은 꼭 만듦
-rm -f .docu-writer/route.json                                     # ①을 다시 할 때 — catalog.py는 있는 파일을 덮어쓰지 않음
-find <자료 경로…> -type f -exec realpath {} \; >> .docu-writer/protected-paths   # hook은 파일 단위로 비교 — 폴더 한 줄로는 보호되지 않음
+rm -f .docu-writer/route.json .docu-writer/materials.sha256       # ①을 다시 할 때 — catalog.py는 있는 파일을 덮어쓰지 않고, 옛 해시가 남으면 ⑥이 지난 자료를 대조함
+for m in <자료 경로…>; do find "$m" -type f -exec realpath {} \; >> .docu-writer/protected-paths; done   # 경로마다 따옴표, 자료가 없으면 비움 — hook은 파일 단위로 비교
 uv run "${CLAUDE_SKILL_DIR}/scripts/catalog.py" match --type "<문서 종류>" --format <md|docx|hwpx> \
   --out .docu-writer/route.json >> .docu-writer/protected-paths     # 표준 출력 = 보호할 테마·견본 파일(실제 경로, 한 줄에 하나)
 if [ -s .docu-writer/protected-paths ]; then                      # 빈 파일이면 shasum이 표준 입력을 기다리므로 건너뜀
@@ -66,7 +66,7 @@ fi
 
 | `route` | 다음 |
 |---|---|
-| `fixed` | **신규 절차를 끝내고 template-workflow로 넘깁니다. 모드는 `route.json`의 `mode`(`sample` 견본 · `form` 빈칸 양식)이며 다시 묻지 않습니다.** `route.json`의 `file`을 견본으로 삼아 template-workflow ①부터 다시 기록합니다(견본 파일이 `protected-paths`에 들어감). ②는 아래 「경로 B — 동봉 프로파일」을 먼저 봅니다. |
+| `fixed` | **신규 절차를 끝내고 template-workflow로 넘깁니다. 모드는 `route.json`의 `mode`(`sample` 견본 · `form` 빈칸 양식)이며 다시 묻지 않습니다.** `route.json`의 `file`을 견본으로 삼아 template-workflow ①부터 다시 기록하되, 기록 명령은 「newdoc fixed 경로에서 넘어옴」 블록을 씁니다. 이 블록은 위에서 쓴 `protected-paths`·`route.json`·`materials.sha256`을 지우지 않고 견본 줄만 덧붙이며, template ⑥이 `materials.sha256`으로 자료와 견본을 대조합니다. ②는 아래 「경로 B — 동봉 프로파일」을 먼저 봅니다. |
 | `theme` | 이 절차를 계속합니다. 테마 파일(`reference_doc`·`tokens`·`template_path`)은 위 명령으로 이미 보호됐습니다. |
 | `none` | 이 절차를 계속합니다. 변환 도구의 기본 서식을 쓰며 ④에서 「기본 서식」이라고 알립니다. |
 
@@ -204,7 +204,7 @@ template-workflow ⑥의 순서를 따르되 다음이 다릅니다.
 
 1. `shasum -c .docu-writer/approved.sha256` — 같음.
 2. `materials.sha256`이 있으면 `shasum -c .docu-writer/materials.sha256` — 견본 해시 대신 이것으로 참고 자료와 테마 파일에 대해 「원본에 쓰지 않음」을 확인합니다.
-3. 렌더 — 같음(`render/source/`는 없음). HWPX는 `render.py`가 거절하므로 `docu-writer:doc-verify` 「HWPX 렌더」대로 kordoc `render_document`를 `format: "svg"`로 불러 `page.svg`·`page_NNN.svg`를 `.docu-writer/render/`에 둡니다 — 이 파일이 없으면 `length`(쪽수)·`r1_tables`가 `skip`됩니다.
+3. 렌더 — 같음(`render/source/`는 없음). HWPX는 `render.py`가 거절하므로 `docu-writer:format-hwpx` 「렌더 (⑥)」의 명령 그대로 이전 쪽을 지우고 kordoc `render_document`를 svg·png로 불러 `page.svg`(한 쪽)나 `page_page_NNN.svg`(여러 쪽)를 `.docu-writer/render/`에 둡니다 — 이 파일이 없으면 `length`(쪽수)·`r1_tables`가 `skip`됩니다.
 4. `doc_verify.py` — `--source`·`--expect-sha256` 없이 실행합니다. 프로파일의 `mode: new`를 보고 신규 모드 규칙으로 검사합니다(`docu-writer:doc-verify` 「신규 모드」). 견본이 없어 `skip`되는 항목(r4, 토큰이 빈 r5, MD의 markup)은 렌더 PNG로 직접 확인하고 ⑧에 적습니다.
 
    명령은 `docu-writer:doc-verify` 스킬 「실행」의 2번에서 `--source …` `--expect-sha256 …` 줄만 뺀 것입니다(스크립트 경로는 그 스킬을 불러 얻습니다).

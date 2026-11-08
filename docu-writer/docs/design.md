@@ -256,7 +256,7 @@ R1·R2의 "내용을 줄인다"는 근거 있는 사실을 지우라는 뜻이 �
   | writer | `protected-paths`의 경로와 `.docu-writer/`의 계약 파일(`protected-paths`·`approved.sha256`·`session.yaml`·`route.json`·`materials.sha256`)과 `profile.yaml`·`evidence.yaml`을 뺀 곳 |
   | reviewer | 없음 |
 
-- 사후: ⑥에서 견본 sha256을 ①의 값과, `profile.yaml`·`evidence.yaml`을 ④의 `approved.sha256`과 비교합니다. hook은 Bash로 쓴 것을 보지 못하므로 이것이 최종 그물입니다.
+- 사후: ⑥에서 견본 sha256을 ①의 값과, 견본·참고 자료를 ①의 `materials.sha256`과, `profile.yaml`·`evidence.yaml`을 ④의 `approved.sha256`과 비교합니다. 참고 자료도 ①에서 파일 단위로 `protected-paths`에 넣습니다. hook은 Bash로 쓴 것을 보지 못하므로 이것이 최종 그물입니다.
 - update 모드의 원본 교체는 ⑧에서 사용자 승인을 받은 뒤 메인 대화가 백업(`.docu-writer/backup/`)을 남기고 합니다. 절차는 `template-workflow` 「⑧ 전달」.
 
 ## 9. 2단계 — 신규 작성
@@ -333,7 +333,8 @@ fixed: []
 
 ```
 ① catalog.py match → route: fixed
-   → 견본 파일을 protected-paths에 넣음 (번들 파일도 견본과 똑같이 보호)
+   → 견본 파일을 protected-paths에 덧붙임 (번들 파일도 견본과 똑같이 보호)
+     newdoc ①이 쓴 자료·테마 보호 줄과 materials.sha256은 지우지 않음 — template ⑥이 shasum -c로 대조
    → session.yaml: mode: <route.json의 mode — sample | form>, source: <견본 실제 경로>, catalog_id: <id>
 ② profile 있음: 복사 → source.path를 실제 경로로 바꿈 → profile_extract.py check --source <견본>
      통과 → analyst 생략  /  실패 → analyst가 다시 분석

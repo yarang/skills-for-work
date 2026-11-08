@@ -21,7 +21,7 @@ description: HWPX·HWP 견본을 다루는 형식 스킬입니다. kordoc MCP �
 | 양식 칸 (form 모드) | `parse_form(file_path)` → 프로파일 `fields` |
 | 표 서식 토큰 | `extract_profile(hwpx_path, output_path=docu-writer-out/table-profile.json)` → `.docu-writer/work/`로 옮김 → 프로파일 `design.table` |
 | 표 번호(`t:N`) 목록 | `profile_extract.py tables <견본>` — kordoc 마크다운의 표 개수로 세지 않음(설계서 §5) |
-| 쪽 모양 보기 | `render_document(file_path, format: "png", pages: "1-3")` |
+| 쪽 모양 보기 | `render_document(file_path, format: "png", pages: "1-3", output_path: docu-writer-out/page.png)` → `.docu-writer/render/source/`로 옮김(`template-analysis` ④) |
 
 - `parse_document` 결과의 부호(□·ㅇ·-·※·1.·가.)가 프로파일 `structure.numbering`입니다.
 - 서체·크기는 렌더 이미지와 `extract_profile` 결과로 읽습니다. 확인할 수 없는 토큰은 비워 두고 ④에서 보고합니다.
@@ -58,7 +58,19 @@ description: HWPX·HWP 견본을 다루는 형식 스킬입니다. kordoc MCP �
 ### 문서 갱신 (`update`) — `patch_document(structure: false)`
 
 - 프로파일 `update.sections` 안의 문구만 고칩니다. 줄 수를 바꿔야 하면 `structure`를 빼고(기본 true) 그 사실을 보고합니다.
-- 출력은 언제나 복사본입니다. `patch_document(..., output_path=docu-writer-out/<이름>.updated.hwpx)`로 낸 뒤 `mkdir -p .docu-writer/work && mv docu-writer-out/<이름>.updated.hwpx .docu-writer/work/`로 옮깁니다. 원본 교체는 ⑧에서 메인 대화가 합니다.
+- 출력은 언제나 복사본입니다. `patch_document(..., output_path=docu-writer-out/<이름>.updated.hwpx)`로 낸 뒤 아래 명령으로 `.docu-writer/work/`에 옮깁니다. 원본 교체는 ⑧에서 메인 대화가 합니다.
+  - 대체본(「함정」)이 생기면 같은 폴더에 `<이름>.updated.hwpx.rewrite.hwpx`나 `<이름>.updated.rewrite.hwpx`로 나옵니다. 함께 옮겨야 doc-verify `rewrite`가 결과 옆에서 찾고, 남으면 `rmdir`도 실패합니다. 지난 시도의 대체본은 먼저 지웁니다.
+  - 이름에 공백이 있을 수 있으므로 따옴표 안의 `<이름>`만 바꿉니다. glob을 쓰지 않습니다(zsh는 맞는 파일이 없으면 명령 전체를 멈춤).
+
+```bash
+mkdir -p .docu-writer/work
+for f in "<이름>.updated.hwpx" "<이름>.updated.hwpx.rewrite.hwpx" "<이름>.updated.rewrite.hwpx"; do
+  rm -f ".docu-writer/work/$f"                                     # 지난 시도의 결과·대체본
+  [ ! -e "docu-writer-out/$f" ] || mv "docu-writer-out/$f" .docu-writer/work/
+done
+[ -e ".docu-writer/work/<이름>.updated.hwpx" ] && rmdir docu-writer-out   # 출력이 없거나 다른 파일이 남으면 실패
+```
+
 - 고칠 섹션 밖은 줄 하나도 바꾸지 않습니다. 요약 상자 줄도 `> `만 떼고 글은 그대로 둡니다(「함정」). doc-verify `scope`가 섹션 밖 변경을 잡습니다.
 
 ## 신규 작성 (`mode: new`)
@@ -81,14 +93,24 @@ description: HWPX·HWP 견본을 다루는 형식 스킬입니다. kordoc MCP �
 
 ## 렌더 (⑥)
 
+먼저 지난 렌더를 지웁니다. 이전 `page*`·`pages.json`이 남으면 한 쪽 렌더(`page.svg`)와 여러 쪽 렌더(`page_page_NNN.svg`)가 섞여 doc-verify가 사용 오류로 멈추고, 실패한 시도가 `docu-writer-out/`에 남긴 쪽도 새 렌더에 끼어듭니다. 견본 렌더 `render/source/`는 폴더라 남습니다.
+
+```bash
+mkdir -p .docu-writer/render && find .docu-writer/render -maxdepth 1 -type f \( -name 'page*' -o -name pages.json \) -delete
+[ ! -d docu-writer-out ] || find docu-writer-out -maxdepth 1 -type f -name 'page*' -delete
+```
+
 ```
 render_document(file_path=<결과>, format: "svg", pages: "1-N", output_path: docu-writer-out/page.svg)
 render_document(file_path=<결과>, format: "png", pages: "1-N", output_path: docu-writer-out/page.png)
-mkdir -p .docu-writer/render && mv docu-writer-out/page* .docu-writer/render/ && rmdir docu-writer-out
+```
+
+```bash
+mv docu-writer-out/page* .docu-writer/render/ && rmdir docu-writer-out
 ```
 
 - kordoc은 숨김 경로에 쓰지 않으므로 보이는 `docu-writer-out/`에 낸 뒤 `.docu-writer/render/`로 옮깁니다(「준비」의 「kordoc 출력 경로」).
-- 여러 쪽이면 `page_page_NNN.svg`처럼 `_page_NNN` 접미가 붙고, 한 쪽뿐이면 접미 없이 `page.svg` 하나입니다. 그래서 옮기고 지울 때 `page_*`가 아니라 `page*`를 씁니다(zsh는 맞는 파일이 없으면 명령 전체를 멈춥니다). doc-verify는 둘 다 읽고, 섞여 있으면 이전 렌더가 남은 것으로 보고 멈춥니다. SVG의 `<text>`가 doc-verify의 쪽별 글이 됩니다.
+- 여러 쪽이면 `page_page_NNN.svg`처럼 `_page_NNN` 접미가 붙고, 한 쪽뿐이면 접미 없이 `page.svg` 하나입니다. 그래서 옮기고 지울 때 `page_*`가 아니라 `page*`를 씁니다. 지울 때 `rm -f …/page*` 대신 `find`를 쓰는 것은 zsh가 맞는 파일이 없는 glob을 오류로 멈추기 때문입니다. doc-verify는 둘 다 읽고, 섞여 있으면 이전 렌더가 남은 것으로 보고 멈춥니다. SVG의 `<text>`가 doc-verify의 쪽별 글이 됩니다.
 - 쪽 수는 `parse_document` 머리 줄(`페이지: N`)에서 읽습니다. 이미지 응답은 한 번에 8쪽까지라 그보다 길면 나눠 부릅니다.
 - **AI가 만든 HWPX는 근사 렌더입니다**(조판 캐시 없음, reflow). 쪽 경계에 걸린 판정(R1·R3)은 ⑧에서 「한컴에서 열어 확인 권장」을 붙입니다.
 - `highlights`로 바꾼 문구나 자리표시를 표시해 렌더하면 ⑦ 리뷰어가 위치를 찾기 쉽습니다.

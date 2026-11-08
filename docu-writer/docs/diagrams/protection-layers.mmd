@@ -13,7 +13,7 @@ flowchart LR
   subgraph P["사후: ⑥ 해시 대조 — 마지막 그물"]
     direction TB
     H1["견본 sha256 = ①의 값<br/>(1단계 · doc_verify hash)"]
-    H2["materials.sha256<br/>(2단계 · 테마·참고 자료)"]
+    H2["materials.sha256<br/>(견본·테마·참고 자료)"]
     H3["approved.sha256<br/>(④ 승인한 profile · evidence)"]
   end
   P -->|하나라도 다름| X["차단 · 사용자에게 diff 보고"]

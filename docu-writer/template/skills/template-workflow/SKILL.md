@@ -37,7 +37,8 @@ when_to_use: '"이 서식대로 써줘", "이 양식 채워줘", "견본처럼 �
 ```
 .docu-writer/
 ├── .gitignore          # *
-├── protected-paths     # 견본 원본 절대 경로 — hook이 읽음
+├── protected-paths     # 견본 원본·참고 자료 절대 경로 — hook이 읽음
+├── materials.sha256    # ① 견본·참고 자료 해시 — ⑥이 대조
 ├── session.yaml        # ① 기록
 ├── approved.sha256     # ④ 승인 시점의 profile·evidence 해시
 ├── profile.yaml        # ② analyst  (④ 승인 대상)
@@ -65,12 +66,23 @@ when_to_use: '"이 서식대로 써줘", "이 양식 채워줘", "견본처럼 �
 2. **형식과 도구를 확인합니다.** HWPX·HWP는 kordoc 도구(`mcp__plugin_moai-officer_kordoc__*`)가 있어야 합니다. 없으면 알리고 멈춥니다. DOCX·PPTX·MD는 `uv`, `soffice`, `pandoc`(MD)를 확인합니다.
 3. **출력 경로를 정합니다.** 견본과 같은 경로는 안 됩니다. 이미 있는 파일이면 다른 이름을 받습니다(스크립트가 덮어쓰지 않음). update 모드의 출력은 `.docu-writer/work/<이름>.updated.<확장자>`이고, 원본 교체는 ⑧에서 따로 승인받습니다. kordoc은 숨김 경로에 쓰지 않으므로 HWPX는 `docu-writer-out/`에 낸 뒤 옮깁니다(`format-hwpx` 「kordoc 출력 경로」).
 4. **자료 위치를 받습니다.** 파일·디렉터리 경로와, 웹 검색을 허용하는지(`웹: 허용 | 금지`, 기본 금지).
-5. **기록합니다.**
+5. **기록합니다.** 따옴표 안의 `<견본>`만 바꿉니다(경로에 공백이 있을 수 있음). 직접 시작했으면 첫 블록, newdoc-workflow가 `fixed` 경로로 넘겼으면 둘째 블록입니다. 첫 블록의 `>`는 newdoc ①이 쓴 자료·테마 보호 목록을 지우고, 지난 newdoc 기록(`route.json`·`materials.sha256`)도 지운 뒤, 4에서 받은 자료 파일을 보호 목록에 더하고 견본·자료 해시를 `materials.sha256`에 새로 적습니다(⑥이 대조). `<자료 경로…>`에는 경로마다 따옴표를 씌워 적고, 자료가 없으면 비웁니다(hook은 파일 단위로 비교하므로 폴더는 안의 파일로 풂).
 
 ```bash
+# 직접 시작
 mkdir -p .docu-writer/{work,render/source,verify,backup} && printf '*\n' > .docu-writer/.gitignore
-realpath <견본> > .docu-writer/protected-paths          # HWP를 변환하면 원본 HWP도 한 줄 더
-shasum -a 256 <견본>                                     # 값을 session.yaml에 적음
+realpath "<견본>" > .docu-writer/protected-paths        # HWP를 변환하면 원본 HWP도 한 줄 더(>>)
+rm -f .docu-writer/route.json .docu-writer/materials.sha256       # 지난 newdoc 기록
+for m in <자료 경로…>; do find "$m" -type f -exec realpath {} \; >> .docu-writer/protected-paths; done
+tr '\n' '\0' < .docu-writer/protected-paths | xargs -0 shasum -a 256 > .docu-writer/materials.sha256   # 견본·자료 — ⑥이 대조
+shasum -a 256 "<견본>"                                   # 값을 session.yaml에 적음
+```
+
+```bash
+# newdoc fixed 경로에서 넘어옴 — newdoc ①의 보호 목록·route.json·materials.sha256을 두고 견본만 덧붙임
+mkdir -p .docu-writer/render/source
+realpath "<견본>" >> .docu-writer/protected-paths
+shasum -a 256 "<견본>"                                   # 값을 session.yaml에 적음
 ```
 
 ```yaml
@@ -185,8 +197,8 @@ shasum -a 256 .docu-writer/profile.yaml .docu-writer/evidence.yaml > .docu-write
 
 writer의 보고를 믿지 않고 메인 대화가 다시 실행합니다. 모두 종료 코드로 판정하며, 모델이 결과를 해석해 통과시키지 않습니다. 스크립트 경로를 얻으려면 먼저 `Skill` 도구로 `docu-writer:doc-verify`를 불러옵니다.
 
-1. `shasum -c .docu-writer/approved.sha256` — 실패하면 writer가 계약 파일을 바꾼 것입니다. ⑤로 되돌리기 전에 사용자에게 diff를 보여 줍니다.
-2. 렌더 — DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`(이전 `page_*`·`pages.json`을 스스로 지우고 냄). HWPX는 먼저 `mkdir -p .docu-writer/render && find .docu-writer/render -maxdepth 1 -type f \( -name 'page*' -o -name pages.json \) -delete`로 writer가 남긴 렌더를 지운 뒤(zsh는 맞는 파일이 없는 `rm -f …/page*`를 오류로 멈추므로 `find`를 씁니다), kordoc `render_document`를 svg와 png로 작업 폴더의 `docu-writer-out/`에 내고 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음 — `format-hwpx` 「렌더」). `render/source/`는 지우지 않습니다.
+1. `shasum -c .docu-writer/approved.sha256` — 실패하면 writer가 계약 파일을 바꾼 것입니다. ⑤로 되돌리기 전에 사용자에게 diff를 보여 줍니다. 이어서 `[ ! -f .docu-writer/materials.sha256 ] || shasum -c .docu-writer/materials.sha256` — ①이 적은 해시로 견본과 참고 자료(newdoc `fixed` 경로로 왔으면 newdoc ①의 자료·카탈로그 견본)가 바뀌지 않았는지 봅니다. 파일이 없으면(이 규칙 전에 시작한 작업) 건너뜁니다. 실패하면 원본 자료가 바뀐 것이므로 멈추고 알립니다.
+2. 렌더 — DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`(이전 `page_*`·`pages.json`을 스스로 지우고 냄). HWPX는 `format-hwpx` 「렌더」의 명령을 그대로 씁니다 — writer가 남긴 `page*`·`pages.json`과 `docu-writer-out/`의 쪽 잔여를 `find`로 지우고, kordoc `render_document`를 svg와 png로 작업 폴더의 `docu-writer-out/`에 낸 뒤 `.docu-writer/render/`로 옮깁니다(kordoc은 숨김 경로에 쓰지 않음). `render/source/`는 지우지 않습니다.
 3. `doc_verify.py` — `doc-verify` 스킬의 「실행」 명령 그대로. 종료 코드 1이면 `fail` 목록을 붙여 ⑤로 되돌립니다. 2이면 원인(경로·도구)을 고쳐 다시 실행합니다. 2는 통과가 아닙니다.
 4. 통과하면 결과 파일 해시를 남깁니다: `shasum -a 256 <결과 파일> > .docu-writer/verify/output.sha256`. ⑦ 뒤에 대조합니다.
 

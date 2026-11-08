@@ -89,7 +89,7 @@
 
 | 단계 | 누가 | 하는 일 | 남기는 것 |
 |---|---|---|---|
-| ① 요구사항 | 메인 | 모드·견본·출력 경로를 묻고 견본 해시를 잡음 | `session.yaml`, `protected-paths` |
+| ① 요구사항 | 메인 | 모드·견본·출력 경로·자료를 묻고 견본·자료 해시를 잡음 | `session.yaml`, `protected-paths`, `materials.sha256` |
 | ② 분석 | analyst | 견본 → 프로파일 | `profile.yaml` |
 | ③ 조사 | researcher | 섹션·칸별 근거 | `evidence.yaml` |
 | ④ 승인 | **사용자** | 프로파일·근거표를 보고 승인 | `approved.sha256` |
@@ -161,7 +161,7 @@
 | 해시 | 대상 | 단계 |
 |---|---|---|
 | 견본 sha256 | ①에서 잡은 견본 해시를 `doc_verify --expect-sha256`의 `hash` 검사로 대조 | 1단계 |
-| `materials.sha256` | 테마·참고 자료 (`shasum -c`) | 2단계 |
+| `materials.sha256` | 견본·참고 자료(1단계), 테마·참고 자료·카탈로그 견본(2단계) (`shasum -c`) | 두 단계 모두 |
 | `approved.sha256` | ④에서 승인한 `profile.yaml`·`evidence.yaml` | 두 단계 모두 |
 
 사각지대로 무엇이 바뀌었든 ⑥에서 해시가 하나라도 다르면 차단하고 사용자에게 차이를 보고합니다.
@@ -213,7 +213,7 @@
 
 | 층 | 언제 | 무엇을 | 규모 (e412ec4) |
 |---|---|---|---|
-| 단위 테스트 | 커밋마다 | 스크립트·hook·절차 스킬 속 명령 조각 | pytest **473건**, `test_*.py` 12개 + ruff `F`·`E9` |
+| 단위 테스트 | 커밋마다 | 스크립트·hook·절차 스킬 속 명령 조각 | pytest **502건**, `test_*.py` 12개 + ruff `F`·`E9` |
 | 종단 시험 | 큰 변경 뒤 | 실제 견본 파일로 ①~⑧을 처음부터 끝까지 | 1단계 9개 경로(HWPX·DOCX·PPTX × sample·form·update), 2단계 신규 docx·hwpx·md + 고정 견본 기안문 |
 | 회귀 | 스크립트를 고친 뒤 | 종단 시험 산출물을 HEAD 스크립트로 다시 검증 | `regress.py` **19건** (정상 10 · 음성 9, 저장소 밖 종단 시험 환경) |
 | 외부 리뷰 | 단계를 마칠 때 | 작성자와 문맥을 공유하지 않는 리뷰어 | codex exec(읽기 전용), agy(antigravity) |

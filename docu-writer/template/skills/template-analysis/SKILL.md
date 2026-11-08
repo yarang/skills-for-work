@@ -23,7 +23,18 @@ description: 견본·양식 파일(HWPX·HWP·DOCX·PPTX·MD)을 읽어 양식 �
    | HWPX | 스크립트 초안 없음. 형식 스킬 「분석」 표의 kordoc 도구로 읽어 직접 씁니다 |
 
 3. **형식 스킬 확인**: 형식 스킬의 「분석」 항목(편집 불가 개체, `styles_allowed`, 노트 등)을 확인합니다.
-4. **견본 렌더**: 1~3쪽을 `.docu-writer/render/source/`에 냅니다. DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`, HWPX는 kordoc `render_document(format: "png", pages: "1-3", output_path: docu-writer-out/page.png)`로 낸 뒤 `mkdir -p .docu-writer/render/source && mv docu-writer-out/page* .docu-writer/render/source/ && rmdir docu-writer-out`(kordoc은 숨김 경로에 쓰지 않음). 이 이미지로 서체 분위기, 강조 방식, 표 모양을 봅니다.
+4. **견본 렌더**: 1~3쪽을 `.docu-writer/render/source/`에 냅니다. 이 이미지로 서체 분위기, 강조 방식, 표 모양을 봅니다. DOCX·PPTX·MD는 `doc-verify` 스킬의 `render.py`(이전 `page_*`를 스스로 지움)입니다. HWPX는 kordoc이 숨김 경로에 쓰지 않으므로 `docu-writer-out/`에 낸 뒤 옮깁니다. 지난 분석의 쪽(여러 쪽이면 `page_page_NNN.png`, 한 쪽이면 `page.png`)이 남아 섞이지 않게 먼저 지웁니다(`format-hwpx` 「렌더」와 같은 이유로 `find`).
+
+   ```bash
+   mkdir -p .docu-writer/render/source && find .docu-writer/render/source -maxdepth 1 -type f -name 'page*' -delete
+   [ ! -d docu-writer-out ] || find docu-writer-out -maxdepth 1 -type f -name 'page*' -delete
+   ```
+
+   `render_document(file_path, format: "png", pages: "1-3", output_path: docu-writer-out/page.png)`를 부른 뒤:
+
+   ```bash
+   mv docu-writer-out/page* .docu-writer/render/source/ && rmdir docu-writer-out
+   ```
 5. **사람이 채우는 칸**: 아래 「analyst가 채우는 칸」.
 6. **점검**: 「프로파일 점검」을 통과시키고 `.docu-writer/profile.yaml`로 씁니다.
 
