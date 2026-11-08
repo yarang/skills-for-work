@@ -217,7 +217,8 @@ def _diff_at(a: list, b: list) -> str | None:
 
 def _scope_regions(ctx: Ctx, sections: list, updated: set) -> list:
     src_r = section_ranges(ctx.src, ctx.src, sections)
-    out_r = section_ranges(ctx.out, ctx.src, sections)
+    # 보호 섹션은 첫 슬라이드를 지웠으면 남은 장으로 대신 풀지 않습니다(_locate._section_last_slides)
+    out_r = section_ranges(ctx.out, ctx.src, sections, editable=updated)
     regions = [("첫 섹션 앞", (0, src_r["first"]), (0, out_r["first"]))]
     for s in sections:
         sid = s.get("id")

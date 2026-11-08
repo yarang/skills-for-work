@@ -206,7 +206,7 @@ def test_slide_fallback_stops_at_next_heading_section(tmp_path):
     src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
     sections = [{"id": "s1", "anchor": "sl:1"}, {"id": "s2", "anchor": "sl:2"},
                 {"id": "s3", "anchor": 'h:"같은 제목"#2'}, {"id": "s4", "anchor": "sl:4"}]
-    assert _locate._section_last_slides(src, sections) == [1, 2, None, 4]
+    assert _locate._section_last_slides(doc, src, sections) == [1, 2, None, 4]
     assert _locate.section_starts(doc, src, sections)[1] is None
 
 
@@ -235,6 +235,27 @@ def test_slide_fallback_skips_slide_without_text(tmp_path):
     ranges = _locate.section_ranges(doc, src, sections)["ranges"]
     assert {doc.blocks[i].slide for i in range(*ranges["s1"])} == {1}
     assert doc.blocks[ranges["s2"][0]].slide == 3
+
+
+def test_slide_fallback_blocked_for_protected_section(tmp_path):
+    """리뷰 3차 재검토(agy HIGH3-1): 보호 섹션 s2(편집 범위 밖)의 첫 장을 지우면 남은 장으로 대체
+    시작을 잡지 않습니다 — 잡으면 s2 첫 장 삭제가 scope에서 「s2 변경」 대신 조용히 넘어갑니다.
+    편집 범위를 주지 않으면(분량 등) 지금처럼 남은 장에서 시작합니다."""
+    src_path, out_path = tmp_path / "src.pptx", tmp_path / "out.pptx"
+    _four_slide_deck(src_path)
+    _drop_slide(src_path, out_path, 2)
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    assert _locate.section_ranges(doc, src, DECK_SECTIONS, editable={"s1"})["ranges"]["s2"] is None
+    assert _locate.section_ranges(doc, src, DECK_SECTIONS, editable={"s2"})["ranges"]["s2"]
+    assert _locate.section_ranges(doc, src, DECK_SECTIONS)["ranges"]["s2"]
+
+
+def test_slide_anchor_position_beyond_deck_is_zero(samples, tmp_path):
+    """id가 다 바뀐 결과에서 자리 N이 장 수보다 크면 0(찾지 못함)입니다 — N을 그대로 돌려주면
+    없는 장을 찾다가 엉뚱한 블록을 잡습니다."""
+    src, doc = _dup_slide2(samples, tmp_path)
+    renumbered = dataclasses.replace(doc, slide_ids=tuple(i + 1000 for i in doc.slide_ids))
+    assert _locate.slide_anchor(renumbered, src, f"sl:{len(doc.slide_ids) + 1}") == 0
 
 
 @pytest.mark.parametrize("anchor", ["sl:0", "sl:00"])

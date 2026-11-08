@@ -74,3 +74,5 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/patch_pptx.py" apply <견본.pptx> \
 같은 경로입니다. `update.sections`는 프로파일 섹션 id로 적고, 섹션마다 `anchor: "sl:N"`이 범위를 정합니다. 그 밖 편집은 doc-verify `scope`가 잡습니다.
 
 `sl:N` anchor는 견본 N번째 **슬라이드 자체**(`p:sldId`)를 가리킵니다. 고치는 섹션 안에서 `slide_dup`으로 장을 늘리거나 `slide_delete`로 줄여도 뒤 섹션의 시작이 함께 따라가므로, 뒤 섹션이 밀렸다고 `scope`가 실패하지 않습니다. 복제한 장은 `after`가 가리킨 장이 속한 섹션 몫입니다. 고치지 않는 섹션의 장을 지우거나 그 섹션 안에 장을 끼우면 `scope`가 실패합니다. `patch_pptx.py`는 이를 막지 않으니, 장을 늘리고 줄이는 일은 `update.sections` 안에서만 합니다.
+
+고치는 섹션의 **첫 장은 지우지 말고 제자리에서 고칩니다.** 다른 레이아웃이 필요해 `slide_dup` 후 첫 장을 `slide_delete`하면, 새 장은 견본 id가 없어 섹션 시작으로 잡히지 않고 남은 장이 시작이 됩니다. 그러면 새 장이 앞 섹션 몫으로 셈해져 앞 섹션이 보호 섹션일 때 `scope`가 실패합니다(섹션 장을 모두 바꾼 경우도 같음). 레이아웃을 바꿔야 하면 복제한 장을 섹션에 남는 장 **뒤**(`after`)에 두고, 첫 장은 남깁니다.

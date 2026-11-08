@@ -351,6 +351,53 @@ def test_scope(samples, tmp_path, name, edit, status):
     assert r["scope"]["status"] == status, name
 
 
+def test_scope_pptx_protected_first_slide_swap_fails(tmp_path):
+    """리뷰 3차 재검토(agy HIGH3-1): 보호 섹션 s2의 첫 장(글 없는 그림 장)을 지우고 그 자리에 글 장을
+    끼우면, s2를 남은 장(견본 3장)에서 시작으로 잡을 때 끼운 장이 편집 섹션 s1에 묻혀 scope가 통과합니다.
+    보호 섹션은 첫 장이 없으면 「찾지 못함」으로 fail입니다."""
+    from pptx import Presentation
+
+    src, out = tmp_path / "src.pptx", tmp_path / "out.pptx"
+    prs = Presentation()
+    for title in ("표지", None, "본문", "실적"):
+        if title is None:
+            prs.slides.add_slide(prs.slide_layouts[6])
+        else:
+            prs.slides.add_slide(prs.slide_layouts[5]).shapes.title.text = title
+    prs.save(src)
+    prs = Presentation(src)
+    prs.slides.add_slide(prs.slide_layouts[5]).shapes.title.text = "끼운 글"   # 지우기 전에 넣어야 부품 이름이 안 겹침
+    ids = prs.slides._sldIdLst
+    new, gone = ids[-1], ids[1]
+    prs.part.drop_rel(gone.rId)
+    ids.remove(gone)
+    ids.remove(new)
+    ids.insert(1, new)
+    prs.save(out)
+    prof = {
+        "profile_version": 1,
+        "source": {"path": str(src), "format": "pptx", "sha256": sha256(src)},
+        "mode": "update",
+        "update": {"sections": ["s1"], "requests": ["표지 갱신"]},
+        "structure": {"numbering": [], "sections": [
+            {"id": "s1", "title": "표지", "level": 1, "anchor": "sl:1"},
+            {"id": "s2", "title": "본문", "level": 1, "anchor": "sl:2"},
+            {"id": "s3", "title": "실적", "level": 1, "anchor": "sl:4"},
+        ]},
+        "design": {"styles_allowed": ALLOWED},
+        "sample_text": [],
+    }
+    pf = tmp_path / "profile.yaml"
+    pf.write_text(yaml.safe_dump(prof, allow_unicode=True), encoding="utf-8")
+    proc = uv(DOC_VERIFY, "--profile", pf, "--source", src, "--expect-sha256", sha256(src),
+              "--output", out, "--out-dir", tmp_path / "verify")
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    report = {e["id"]: e for e in json.loads((tmp_path / "verify" / "report.json").read_text(encoding="utf-8"))}
+    assert report["scope"]["status"] == "fail", report["scope"]
+    assert "s2" in report["scope"]["locations"], report["scope"]
+    assert "s3" not in report["scope"]["locations"], report["scope"]
+
+
 # --- R4 제목 -----------------------------------------------------------------------
 
 def headings(doc):
@@ -748,6 +795,67 @@ def test_new_mode_fall_forward_start_does_not_cut_previous_section(tmp_path):
     assert proc.returncode == 1, proc.stdout
     assert r["length"]["status"] == "fail", r["length"]
     assert "s1" in r["length"]["locations"]
+
+
+LONG = "가" * 120
+
+
+@pytest.mark.parametrize("body", [
+    [("1. 추진 배경", None), ("2. 현황", None),
+     ("Ⅰ. 추진 배경", "Heading 1"), (LONG, None), ("Ⅱ. 현황", "Heading 1"), ("짧다", None)],
+    [("Ⅰ. 추진 배경", "Heading 1"), ("○ 현황", None), (LONG, None), ("1) 현황", "Heading 2"), ("짧다", None)],
+    [("추진 배경", None), ("현황", None),
+     ("Ⅰ. 추진 배경", "Heading 1"), (LONG, None), ("Ⅱ. 현황", "Heading 1"), ("짧다", None)],
+], ids=["toc-lines-before-headings", "bullet-line-inside-s1", "plain-summary-lines"])
+def test_new_mode_body_line_does_not_steal_heading_anchor(tmp_path, body):
+    """리뷰 3차 재검토(agy HIGH1·HIGH2): 목차 줄 「1. 추진 배경」이나 본문 「○ 현황」이 제목보다 먼저
+    h: anchor에 잡히면 s1이 잘려 분량 초과가 pass로 숨습니다. 제목 스타일 문단이 있으면 그 문단만
+    셉니다."""
+    prof = _section_limits(new_profile(), [100, 100])
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path, body))
+    assert proc.returncode == 1, proc.stdout
+    assert r["length"]["status"] == "fail", r["length"]
+    assert "s1" in r["length"]["locations"]
+    assert "찾지 못" not in r["length"]["detail"]
+
+
+def test_new_mode_body_line_after_sections_is_not_heading(tmp_path):
+    """agy HIGH2 반대 순서: s2 제목이 없고 s1 뒤 본문에 「○ 현황」만 있으면 s2는 찾지 못함(skip 메모)이지
+    그 줄로 s2를 잡아 분량을 재지 않습니다."""
+    body = [("Ⅰ. 현황", "Heading 1"), (LONG, None), ("Ⅱ. 추진 배경", "Heading 1"), ("○ 현황", None)]
+    prof = _section_limits(new_profile(), [500, 500])
+    _, r = verify_new(tmp_path, prof, new_output(tmp_path, body))
+    assert "s2" in r["length"]["detail"] and "찾지 못" in r["length"]["detail"], r["length"]
+
+
+def test_new_mode_normal_style_heading_still_anchors(tmp_path):
+    """리뷰 3차 재검토(codex HIGH1): 다른 제목은 Heading 스타일인데 섹션 제목 한 줄만 일반 스타일이면,
+    제목 스타일 문단만 세는 규칙으로는 그 섹션을 놓쳐 분량 초과가 skip으로 숨습니다. 제목에 맞는 글이
+    없으면 일반 문단을 글이 똑같을 때 셉니다."""
+    body = [("표지", "Heading 1"), ("추진 배경", None), (LONG, None)]
+    prof = _section_limits(new_profile(), [100])
+    prof["structure"]["sections"] = prof["structure"]["sections"][:1]
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path, body))
+    assert proc.returncode == 1, proc.stdout
+    assert r["length"]["status"] == "fail", r["length"]
+    assert "s1" in r["length"]["locations"]
+
+
+def test_new_mode_normal_style_heading_ends_previous_section(tmp_path):
+    """codex HIGH1 후반: s2 제목만 일반 스타일이면 s1이 s2 글까지 먹어 s1 자리표시 검사가 s2의 글로
+    거짓 통과합니다."""
+    body = [("Ⅰ. 추진 배경", "Heading 1"), ("짧다", None), ("현황", None), ("[담당자]", None)]
+    _, r = verify_new(tmp_path, new_profile(), new_output(tmp_path, body),
+                      placeholders=[{"locator": "s1", "expect": "[담당자]"}])
+    assert r["placeholder"]["status"] == "fail", r["placeholder"]
+
+
+def test_new_mode_unstyled_list_bullet_heading_skips_with_note(tmp_path):
+    """제목 스타일이 없는 문서에서 「○ 현황」은 본문 목록 줄과 가를 수 없어 제목으로 보지 않습니다
+    (codex 재검토 HIGH2, 받지 않음). 대신 못 찾은 섹션은 detail에 드러나야 합니다."""
+    body = [("□ 추진배경", None), (LONG, None), ("○ 현황", None), ("짧다", None)]
+    _, r = verify_new(tmp_path, _section_limits(new_profile(), [500, 500]), new_output(tmp_path, body))
+    assert "s2" in r["length"]["detail"] and "찾지 못" in r["length"]["detail"], r["length"]
 
 
 def test_new_mode_missing_section_length_skips(tmp_path):
