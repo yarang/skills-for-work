@@ -82,7 +82,7 @@ class Doc:
     styles: list = field(default_factory=list)  # [(스타일·레이아웃 이름, locator)]
     ids: tuple | None = None                    # HWPX (글자 모양 id 집합, 문단 모양 id 집합)
     slides: int | None = None
-    anchors: list | None = None                 # h:"…" anchor 대상 [(공백 뺀 글, 블록 번호)]. None = 최상위 문단
+    anchors: list | None = None                 # h:"…" anchor 대상 [(공백 뺀 글, 블록 번호[, 원래 글])]. None = 최상위 문단
     slide_ids: tuple = ()                       # PPTX 슬라이드 순서대로 p:sldId/@id — sl:N anchor를 정체성으로 찾음
 
     @property
@@ -420,7 +420,8 @@ def read_pptx(path: Path) -> Doc:
             elif getattr(shape, "has_text_frame", False) and shape.has_text_frame:
                 if title is not None and shape.shape_id == title.shape_id:
                     # h:"…" anchor는 슬라이드 제목 글입니다 (_pe_pptx.heading_texts와 같은 대상).
-                    anchors.append((nows(title.text_frame.text), len(blocks)))
+                    # 원래 글은 신규 모드 장 번호 빼기용 — 여러 문단 제목은 첫 블록 글과 다릅니다.
+                    anchors.append((nows(title.text_frame.text), len(blocks), title.text_frame.text))
                 blocks.extend(_pptx_paras(shape, sn, theme))
     return Doc("pptx", blocks, [], styles, None, len(prs.slides), anchors,
                tuple(s.slide_id for s in prs.slides))
@@ -607,5 +608,6 @@ def _hwpx_top_para(p, blocks: list, anchors: list, tn: int, maps: tuple) -> int:
         if _in_header_footer(q):
             continue
         top = next((a for a in reversed(list(q.iterancestors(tbl_tag))) if a in owner), None)
-        anchors.append((nows(_hwpx_ptext(q)), owner[top] if top is not None else para_idx))
+        text = _hwpx_ptext(q)  # 표 안 문단은 블록이 Table이라 원래 글을 따로 적어 둡니다
+        anchors.append((nows(text), owner[top] if top is not None else para_idx, text))
     return tn

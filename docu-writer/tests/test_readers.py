@@ -126,6 +126,198 @@ def test_slide_anchor_falls_back_to_position_when_ids_renumbered(samples, tmp_pa
     assert _locate.slide_anchor(renumbered, src, "sl:3") == 3
 
 
+def _four_slide_deck(path: Path) -> None:
+    """s1=1장, s2=2·3장, s3=4장인 견본 (리뷰 3차 M3)."""
+    from pptx import Presentation
+
+    prs = Presentation()
+    for title in ("표지", "추진 일정", "추진 일정 (계속)", "실적"):
+        prs.slides.add_slide(prs.slide_layouts[5]).shapes.title.text = title
+    prs.save(path)
+
+
+def _drop_slide(src: Path, dst: Path, n: int) -> None:
+    from pptx import Presentation
+
+    prs = Presentation(src)
+    ids = prs.slides._sldIdLst
+    sld = ids[n - 1]
+    prs.part.drop_rel(sld.rId)
+    ids.remove(sld)
+    prs.save(dst)
+
+
+DECK_SECTIONS = [{"id": "s1", "anchor": "sl:1"}, {"id": "s2", "anchor": "sl:2"}, {"id": "s3", "anchor": "sl:4"}]
+
+
+def test_slide_anchor_deleted_first_slide_falls_to_next_slide_of_section(tmp_path):
+    """s2 첫 장(sl:2)을 지워도 s2의 남은 장(견본 sl:3)이 s2 시작입니다 — s1에 빨려 들어가면
+    scope가 「s1 변경」으로 거짓 실패합니다."""
+    src_path, out_path = tmp_path / "src.pptx", tmp_path / "out.pptx"
+    _four_slide_deck(src_path)
+    _drop_slide(src_path, out_path, 2)
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    ranges = _locate.section_ranges(doc, src, DECK_SECTIONS)["ranges"]
+    s1, s2 = ranges["s1"], ranges["s2"]
+    assert s1 and s2, ranges
+    assert {doc.blocks[i].slide for i in range(*s1)} == {1}
+    assert doc.blocks[s2[0]].slide == 2
+
+
+def test_slide_anchor_whole_section_deleted_is_zero(tmp_path):
+    src_path, mid, out_path = tmp_path / "src.pptx", tmp_path / "mid.pptx", tmp_path / "out.pptx"
+    _four_slide_deck(src_path)
+    _drop_slide(src_path, mid, 3)
+    _drop_slide(mid, out_path, 2)
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    assert _locate.section_starts(doc, src, DECK_SECTIONS)[1] is None
+
+
+def _deck(path: Path, titles: list) -> None:
+    """titles 차례로 제목 슬라이드를 만듭니다. None은 글 없는 빈 슬라이드(그림만 둔 장과 같음)."""
+    from pptx import Presentation
+
+    prs = Presentation()
+    for title in titles:
+        if title is None:
+            prs.slides.add_slide(prs.slide_layouts[6])
+        else:
+            prs.slides.add_slide(prs.slide_layouts[5]).shapes.title.text = title
+    prs.save(path)
+
+
+def _move_slide(src: Path, dst: Path, n: int, to: int) -> None:
+    from pptx import Presentation
+
+    prs = Presentation(src)
+    ids = prs.slides._sldIdLst
+    sld = ids[n - 1]
+    ids.remove(sld)
+    ids.insert(to - 1, sld)
+    prs.save(dst)
+
+
+def test_slide_fallback_stops_at_next_heading_section(tmp_path):
+    """다음 섹션이 h: anchor여도 그 장을 앞 섹션 대체 시작으로 쓰지 않습니다 — 보호 섹션 s2(2장)를
+    지웠는데 같은 제목인 s3의 3장이 s2로 잡히면 scope가 통과합니다 (리뷰 3차 M3 재검토)."""
+    src_path, out_path = tmp_path / "src.pptx", tmp_path / "out.pptx"
+    _deck(src_path, ["표지", "같은 제목", "같은 제목", "실적"])
+    _drop_slide(src_path, out_path, 2)
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    sections = [{"id": "s1", "anchor": "sl:1"}, {"id": "s2", "anchor": "sl:2"},
+                {"id": "s3", "anchor": 'h:"같은 제목"#2'}, {"id": "s4", "anchor": "sl:4"}]
+    assert _locate._section_last_slides(src, sections) == [1, 2, None, 4]
+    assert _locate.section_starts(doc, src, sections)[1] is None
+
+
+def test_slide_fallback_uses_earliest_surviving_slide_in_output(tmp_path):
+    """s2 첫 장을 지우고 남은 장 순서를 바꾸면 결과에서 앞선 장이 s2 시작입니다 — 견본 순서로 고르면
+    그 앞 장이 s1에 들어가 「s1 변경」 거짓 실패가 납니다."""
+    src_path, mid, out_path = tmp_path / "src.pptx", tmp_path / "mid.pptx", tmp_path / "out.pptx"
+    _deck(src_path, ["A", "B", "C", "D", "E"])
+    _drop_slide(src_path, mid, 2)            # A C D E
+    _move_slide(mid, out_path, 3, 2)         # A D C E
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    sections = [{"id": "s1", "anchor": "sl:1"}, {"id": "s2", "anchor": "sl:2"}, {"id": "s3", "anchor": "sl:5"}]
+    ranges = _locate.section_ranges(doc, src, sections)["ranges"]
+    assert {doc.blocks[i].slide for i in range(*ranges["s1"])} == {1}
+    assert doc.blocks[ranges["s2"][0]].slide == 2
+
+
+def test_slide_fallback_skips_slide_without_text(tmp_path):
+    """s2 첫 장을 지웠고 다음 남은 장이 글 없는 장이면 그다음 남은 장이 s2 시작입니다."""
+    src_path, out_path = tmp_path / "src.pptx", tmp_path / "out.pptx"
+    _deck(src_path, ["A", "B", None, "C", "D"])
+    _drop_slide(src_path, out_path, 2)       # A (빈 장) C D
+    src, doc = _readers.read_doc(src_path), _readers.read_doc(out_path)
+    assert not any(getattr(b, "slide", None) == 2 for b in doc.blocks)
+    sections = [{"id": "s1", "anchor": "sl:1"}, {"id": "s2", "anchor": "sl:2"}, {"id": "s3", "anchor": "sl:5"}]
+    ranges = _locate.section_ranges(doc, src, sections)["ranges"]
+    assert {doc.blocks[i].slide for i in range(*ranges["s1"])} == {1}
+    assert doc.blocks[ranges["s2"][0]].slide == 3
+
+
+@pytest.mark.parametrize("anchor", ["sl:0", "sl:00"])
+def test_slide_anchor_below_one_is_zero(samples, anchor):
+    """sl:0이 견본 slide_ids[-1](마지막 장)로 풀리면 엉뚱한 섹션을 잡습니다."""
+    src = _readers.read_doc(samples["pptx"])
+    assert _locate.slide_anchor(src, src, anchor) == 0
+
+
+# --- 신규 모드 느슨한 제목 맞추기 (리뷰 3차 H3) ----------------------------------------
+
+LOOSE_MD = """# 보고서
+
+## □ 추진 배경
+
+본문 하나
+
+## ○ 1. 현황
+
+본문 둘
+"""
+
+
+@pytest.mark.parametrize("key", ["추진배경", "현황"])
+def test_loose_heading_strips_bullet_marks(tmp_path, key):
+    p = tmp_path / "loose.md"
+    p.write_text(LOOSE_MD, encoding="utf-8")
+    doc = _readers.read_doc(p)
+    idx = _locate.find_para(doc, key, 1, 0, loose=True)
+    assert idx is not None and key in nows(doc.blocks[idx].text)
+    assert _locate.find_para(doc, key, 1, 0) is None  # 갱신 모드(엄격)는 그대로
+
+
+def test_loose_bullet_alone_is_not_stripped():
+    assert _locate.chapter_stripped("□") == "□"
+    assert _locate.chapter_stripped("12개월 계획") == "12개월계획"
+    assert _locate.chapter_stripped("○○사업 추진계획(안)") == "○○사업추진계획(안)"  # 붙은 ○는 글머리표 아님
+    assert _locate.chapter_stripped("□ Ⅰ. 개요") == "개요"
+
+
+def _hwpx_replace_text(src: Path, dst: Path, old: str, new: str) -> None:
+    with zipfile.ZipFile(src) as zf:
+        items = [(i, zf.read(i.filename)) for i in zf.infolist()]
+    with zipfile.ZipFile(dst, "w") as zf:
+        for info, data in items:
+            if info.filename == "Contents/section0.xml":
+                data = data.replace(old.encode(), new.encode(), 1)
+            zf.writestr(info, data)
+
+
+def test_hwpx_table_heading_chapter_without_period_matches_loose(samples, tmp_path):
+    """띠 표 안 제목 「1 추진 배경」 — 표 안 anchor는 원래 글(공백 포함)로 장 번호를 찾아야 합니다."""
+    dst = tmp_path / "band.hwpx"
+    _hwpx_replace_text(samples["hwpx"], dst, "○○사업 추진계획(안)", "1 추진 배경")
+    doc = _readers.read_doc(dst)
+    idx = _locate.find_para(doc, "추진배경", 1, 0, loose=True)
+    assert idx is not None
+    assert isinstance(doc.blocks[idx], Table) and doc.blocks[idx].at == "t:1"
+
+
+def test_loose_stray_match_before_previous_section_falls_forward(tmp_path):
+    """요약 상자의 「현황」 한 줄이 s1 제목보다 앞에 있어도 s2는 그 뒤 「Ⅱ. 현황」에서 찾습니다.
+    전에는 앞줄이 첫 번째로 세어져 None → length가 fail 대신 skip이 됐습니다."""
+    from docx import Document
+
+    path = tmp_path / "new.docx"
+    d = Document()
+    d.add_paragraph("보고서", style="Title")
+    d.add_paragraph("현황")
+    d.add_paragraph("Ⅰ. 개요", style="Heading 1")
+    d.add_paragraph("본문 하나")
+    d.add_paragraph("Ⅱ. 현황", style="Heading 1")
+    d.add_paragraph("본문 둘")
+    d.save(path)
+    doc = _readers.read_doc(path)
+    sections = [{"id": "s1", "anchor": 'h:"개요"'}, {"id": "s2", "anchor": 'h:"현황"'}]
+    s1, s2 = _locate.section_starts(doc, doc, sections, loose=True)
+    assert doc.blocks[s1].text == "Ⅰ. 개요"
+    assert s2 is not None and doc.blocks[s2].text == "Ⅱ. 현황"
+    strict = [{"id": "s1", "anchor": 'h:"Ⅰ. 개요"'}, {"id": "s2", "anchor": 'h:"현황"'}]
+    assert _locate.section_starts(doc, doc, strict)[1] is None  # 갱신 모드는 순서 어긋남을 그대로 알림
+
+
 # --- HWPX --------------------------------------------------------------------------
 
 def test_hwpx_band_table_title_is_anchor(samples):

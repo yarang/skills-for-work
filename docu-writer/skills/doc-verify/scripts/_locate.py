@@ -14,9 +14,12 @@ SHAPE_CELL = re.compile(r"(sl:\d+/sh:\d+)/t/r:(\d+)/c:(\d+)")
 HEADING = re.compile(r'h:"(.*)"(?:#(\d+))?')
 SECTION_ID = re.compile(r"s\d+")
 FIELD_ID = re.compile(r"f\d+")
-# 신규 모드 제목 앞 장 번호 — 「Ⅰ.」「1.」「1)」「가.」「가)」와 점 없는 꼴(SKILL.md 「신규 모드」).
-# 점·괄호가 없는 숫자·한글 번호는 뒤에 공백이 있을 때만 번호로 봅니다(「12개월」·「가나다」를 자르지 않음).
-CHAPTER = re.compile(r"\s*(?:[Ⅰ-Ⅹ][.)]?|(?:\d{1,2}|[가나다라마바사아자차카타파하])(?:[.)]|(?=\s)))\s*")
+# 신규 모드 제목 앞 글머리표·장 번호 — 「□」「○」 뒤 「Ⅰ.」「1.」「1)」「가.」「가)」와 점 없는 꼴
+# (SKILL.md 「신규 모드」). 글머리표와 점·괄호가 없는 숫자·한글 번호는 뒤에 공백이 있을 때만 뺍니다
+# (「○○사업」·「12개월」·「가나다」를 자르지 않음).
+BULLET = r"[□■◆◇○●◎▶▷•▪]\s+"
+NUMBER = r"(?:[Ⅰ-Ⅹ][.)]?|(?:\d{1,2}|[가나다라마바사아자차카타파하])(?:[.)]|(?=\s)))\s*"
+CHAPTER = re.compile(rf"\s*(?:{BULLET})?(?:{NUMBER})?")
 
 
 def _cell(table, r: int, c: int) -> str | None:
@@ -62,25 +65,31 @@ def anchor_items(doc: Doc) -> list:
 
     Doc.anchors가 없으면(DOCX) 최상위 문단입니다."""
     if doc.anchors is not None:
-        return doc.anchors
+        return [(a[0], a[1]) for a in doc.anchors]
     return [(nows(b.text), i) for i, b in enumerate(doc.blocks) if isinstance(b, Para)]
 
 
 def chapter_stripped(text: str) -> str:
-    """앞 장 번호를 뺀 공백 없는 글. 번호가 없거나 빼면 아무 글도 남지 않으면 그대로."""
+    """앞 글머리표·장 번호를 뺀 공백 없는 글. 없거나 빼면 아무 글도 남지 않으면 그대로."""
     m = CHAPTER.match(text or "")
     rest = nows(text[m.end():]) if m and m.end() else ""
     return rest or nows(text)
 
 
+def _raw_text(doc: Doc, k: int, text: str, i: int) -> str:
+    """k번째 anchor의 공백을 빼기 전 글. 리더가 적어 둔 원래 글(표 안 문단·여러 줄 제목)을
+    먼저 쓰고, 없으면 그 블록 문단 글, 그것도 맞지 않으면 공백 뺀 글 그대로입니다."""
+    if doc.anchors is not None and len(doc.anchors[k]) > 2:
+        return doc.anchors[k][2]
+    block = doc.blocks[i] if 0 <= i < len(doc.blocks) else None
+    return block.text if isinstance(block, Para) and nows(block.text) == text else text
+
+
 def _loose_items(doc: Doc) -> list:
-    """[(공백 뺀 글, 장 번호 뺀 글, 블록 번호)]. 번호는 공백을 빼기 전 원래 글에서 찾습니다."""
-    items = []
-    for text, i in anchor_items(doc):
-        block = doc.blocks[i] if 0 <= i < len(doc.blocks) else None
-        raw = block.text if isinstance(block, Para) and nows(block.text) == text else text
-        items.append((text, chapter_stripped(raw), i))
-    return items
+    """[(공백 뺀 글, 장 번호 뺀 글, 블록 번호)]. 번호는 공백을 빼기 전 원래 글에서 찾습니다
+    (점 없는 「1 추진 배경」은 뒤 공백으로만 번호임을 압니다)."""
+    return [(text, chapter_stripped(_raw_text(doc, k, text, i)), i)
+            for k, (text, i) in enumerate(anchor_items(doc))]
 
 
 def _occurrence(items: list, key: str, idx: int) -> int:
@@ -111,36 +120,64 @@ def anchor_key(src: Doc, anchor) -> tuple[str, int] | None:
     return key, _occurrence(anchor_items(src), key, idx)
 
 
-def slide_anchor(doc: Doc, src: Doc, anchor) -> int | None:
-    """PPTX `sl:N` → 결과 슬라이드 번호. 슬라이드 anchor가 아니면 None, 결과에 없으면 0.
+def _slide_no(anchor) -> int | None:
+    m = re.fullmatch(r"sl:(\d+)", anchor.strip()) if isinstance(anchor, str) else None
+    return int(m.group(1)) if m else None
+
+
+def slide_candidates(doc: Doc, src: Doc, anchor, last: int | None = None) -> list | None:
+    """PPTX `sl:N` → 섹션 시작 후보 결과 슬라이드 번호들(결과 순서). 슬라이드 anchor가 아니면 None.
 
     견본 N번 슬라이드의 id(p:sldId)를 결과에서 찾습니다. 그래서 제목 글이 바뀌어도, slide_dup·
     slide_delete로 앞 슬라이드가 늘거나 줄어도 섹션이 밀리지 않습니다(종단 시험 F8). 견본 id가
-    결과에 하나도 없으면(다른 프로그램이 다시 저장해 id를 새로 매김) 자리 N으로 찾습니다."""
-    if doc.fmt != "pptx" or not isinstance(anchor, str):
+    결과에 하나도 없으면(다른 프로그램이 다시 저장해 id를 새로 매김) 자리 N으로 찾습니다.
+
+    last(견본 슬라이드 번호)를 주면 N…last 가운데 결과에 남은 장을 모두 후보로 내고, 결과에서
+    앞선 장부터 놓습니다 — 섹션 첫 장을 지우거나 섹션 안 순서를 바꿔도 그 섹션의 남은 장이
+    시작이 됩니다(리뷰 3차 M3). 하나도 없거나 N < 1이면 빈 목록입니다."""
+    if doc.fmt != "pptx":
         return None
-    m = re.fullmatch(r"sl:(\d+)", anchor.strip())
-    if not m:
+    n = _slide_no(anchor)
+    if n is None:
         return None
-    n = int(m.group(1))
+    if n < 1:
+        return []
     if not set(src.slide_ids) & set(doc.slide_ids):
-        return n
-    sid = src.slide_ids[n - 1] if n <= len(src.slide_ids) else None
-    return doc.slide_ids.index(sid) + 1 if sid in doc.slide_ids else 0
+        return [n]
+    span = src.slide_ids[n - 1:min(max(last or n, n), len(src.slide_ids))]
+    return sorted(doc.slide_ids.index(sid) + 1 for sid in span if sid in doc.slide_ids)
 
 
-def find_para(doc: Doc, key: str, occ: int, start: int, loose: bool = False) -> int | None:
-    """key 글의 occ번째 anchor 대상을 담은 블록 번호. start 앞이면 None.
+def slide_anchor(doc: Doc, src: Doc, anchor, last: int | None = None) -> int | None:
+    """PPTX `sl:N` → 결과 슬라이드 번호(slide_candidates의 첫 후보). 아니면 None, 없으면 0."""
+    found = slide_candidates(doc, src, anchor, last)
+    return None if found is None else (found[0] if found else 0)
 
-    loose(신규 모드)면 글이 같거나, 앞 장 번호를 뺀 글이 같은 문단도 맞는 것으로 셉니다."""
+
+def _find_para(doc: Doc, key: str, occ: int, start: int, loose: bool = False) -> tuple[int | None, bool]:
+    """(블록 번호 | None, 뒤로 찾았나). find_para 참고."""
     items = _loose_items(doc) if loose else [(t, t, i) for t, i in anchor_items(doc)]
     n = 0
     for text, bare, i in items:
         if text == key or bare == key:
             n += 1
             if n == occ:
-                return i if i >= start else None
-    return None
+                if i >= start or not loose:
+                    return (i if i >= start else None), False
+            elif n > occ and i >= start:
+                return i, True
+    return None, False
+
+
+def find_para(doc: Doc, key: str, occ: int, start: int, loose: bool = False) -> int | None:
+    """key 글의 occ번째 anchor 대상을 담은 블록 번호. start 앞이면 None.
+
+    loose(신규 모드)면 글이 같거나, 앞 글머리표·장 번호를 뺀 글이 같은 문단도 맞는 것으로 셉니다.
+    그리고 occ번째가 start 앞이면(앞 섹션 제목보다 먼저 나온 요약·목차 줄) None 대신 그 뒤 처음
+    맞는 문단을 씁니다 — 결과 문서는 새로 쓴 글이라 앞쪽 같은 글 한 줄 때문에 섹션을 놓치면
+    length가 fail 대신 skip이 됩니다(리뷰 3차 H3). 이렇게 뒤로 찾은 문단은 제목이 아닌 본문 줄일 수
+    있어 앞 섹션 끝으로 쓰지 않습니다(section_ranges). 갱신 모드는 순서가 어긋나면 None 그대로입니다."""
+    return _find_para(doc, key, occ, start, loose)[0]
 
 
 def find_slide(doc: Doc, sn: int, start: int) -> int | None:
@@ -149,31 +186,72 @@ def find_slide(doc: Doc, sn: int, start: int) -> int | None:
     return idx if idx is not None and idx >= start else None
 
 
-def section_starts(doc: Doc, src: Doc, sections: list, loose: bool = False) -> list:
+def _source_slide(src: Doc, anchor) -> int | None:
+    """섹션 anchor가 견본에서 시작하는 슬라이드 번호. `sl:N`은 N, 글 anchor는 그 문단의 장."""
+    n = _slide_no(anchor)
+    if n is not None:
+        return n
+    key = anchor_key(src, anchor)
+    idx = find_para(src, key[0], key[1], 0) if key else None
+    return getattr(src.blocks[idx], "slide", None) if idx is not None and 0 <= idx < len(src.blocks) else None
+
+
+def _section_last_slides(src: Doc, sections: list) -> list:
+    """섹션마다 견본에서 그 섹션이 차지하는 마지막 슬라이드 번호(다른 섹션 시작 앞 장).
+
+    다른 섹션은 anchor 종류(`sl:`·`h:`)와 목록 순서에 관계없이 견본 시작 장으로 셉니다 — 다음
+    섹션의 장을 이 섹션 대체 시작으로 쓰면 지운 보호 섹션이 통과합니다(리뷰 3차 M3 재검토).
+    슬라이드 anchor가 아닌 섹션은 None이고, 그 섹션은 첫 장이 지워지면 찾지 못함입니다."""
+    if src.fmt != "pptx":
+        return [None] * len(sections)
+    firsts = [_source_slide(src, s.get("anchor")) for s in sections]
+    lasts = []
+    for s, n in zip(sections, firsts):
+        if _slide_no(s.get("anchor")) is None or n is None:
+            lasts.append(None)
+            continue
+        after = [m for m in firsts if m is not None and m > n]
+        lasts.append(min(after) - 1 if after else len(src.slide_ids))
+    return lasts
+
+
+def _section_starts(doc: Doc, src: Doc, sections: list, loose: bool = False) -> list:
+    """[(시작 블록 | None, 뒤로 찾았나)] — 섹션 순서대로."""
     starts, prev = [], 0
-    for s in sections:
-        sn = slide_anchor(doc, src, s.get("anchor"))
-        if sn is not None:
-            idx = find_slide(doc, sn, prev)
+    for s, last in zip(sections, _section_last_slides(src, sections)):
+        found = slide_candidates(doc, src, s.get("anchor"), last)
+        forward = False
+        if found is not None:
+            # 글 없는 장(그림만)은 블록이 없으니 그 섹션의 다음 남은 장으로 넘어갑니다.
+            idx = next((i for i in (find_slide(doc, sn, prev) for sn in found) if i is not None), None)
         else:
             key = anchor_key(src, s.get("anchor"))
-            idx = find_para(doc, key[0], key[1], prev, loose) if key else None
-        starts.append(idx)
+            idx, forward = _find_para(doc, key[0], key[1], prev, loose) if key else (None, False)
+        starts.append((idx, forward))
         if idx is not None:
             prev = idx
     return starts
 
 
+def section_starts(doc: Doc, src: Doc, sections: list, loose: bool = False) -> list:
+    return [idx for idx, _ in _section_starts(doc, src, sections, loose)]
+
+
 def section_ranges(doc: Doc, src: Doc, sections: list, loose: bool = False) -> dict:
-    """{섹션 id: (시작 블록, 끝 블록) | None}과 첫 섹션 시작 블록. loose는 find_para 참고."""
-    starts = section_starts(doc, src, sections, loose)
-    resolved = sorted(i for i in starts if i is not None)
+    """{섹션 id: (시작 블록, 끝 블록) | None}과 첫 섹션 시작 블록. loose는 find_para 참고.
+
+    섹션 끝은 다음 섹션 시작 앞이되, 뒤로 찾은 시작(find_para)은 끝으로 쓰지 않습니다 — 그 줄이
+    제목 아닌 본문이면 앞 섹션이 잘려 분량 초과가 숨습니다(리뷰 3차 H3 재검토). 그래서 뒤로 찾은
+    섹션이 있으면 앞 섹션 범위는 그 섹션을 못 찾았을 때와 같습니다."""
+    starts = _section_starts(doc, src, sections, loose)
+    resolved = sorted(i for i, _ in starts if i is not None)
+    bounds = sorted(i for i, fwd in starts if i is not None and not fwd)
     ranges = {}
-    for s, idx in zip(sections, starts):
+    for s, (idx, _) in zip(sections, starts):
         if idx is None:
             ranges[s.get("id")] = None
             continue
-        end = next((j for j in resolved if j > idx), len(doc.blocks))
+        end = next((j for j in bounds if j > idx), len(doc.blocks))
         ranges[s.get("id")] = (idx, end)
     first = resolved[0] if resolved else len(doc.blocks)
     return {"ranges": ranges, "first": first}

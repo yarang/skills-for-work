@@ -722,6 +722,34 @@ def test_new_mode_heading_anchor_ignores_chapter_number(tmp_path):
     assert r["length"]["status"] == "pass", r["length"]
 
 
+@pytest.mark.parametrize("body", [
+    [("□ 추진 배경", "Heading 1"), ("○ 지역 수요가 늘어 사업을 시작한다", None),
+     ("○ 1) 현황", "Heading 2"), ("○ 이용 건수는 지난해보다 늘었다", None)],
+    [("현황", None)] + NEW_BODY,
+], ids=["bullet-heading", "stray-line-before-s1"])
+def test_new_mode_section_length_fails_not_skips(tmp_path, body):
+    """리뷰 3차 H3: 「□ 추진 배경」 제목이나 s1 앞의 「현황」 한 줄 때문에 섹션을 놓치면 분량 초과가
+    fail 대신 skip으로 숨었습니다."""
+    prof = _section_limits(new_profile(), [5, 5])
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path, body))
+    assert proc.returncode == 1, proc.stdout
+    assert r["length"]["status"] == "fail", r["length"]
+    assert {"s1", "s2"} <= set(r["length"]["locations"])
+    assert "찾지 못" not in r["length"]["detail"]
+
+
+def test_new_mode_fall_forward_start_does_not_cut_previous_section(tmp_path):
+    """리뷰 3차 H3 재검토(codex): s2 제목이 빠졌고 본문에 「현황」 한 줄만 있을 때, 그 줄을 뒤로 찾아
+    s2 시작으로 잡더라도 s1 끝을 자르면 안 됩니다 — 자르면 s1 분량 초과가 pass로 숨습니다."""
+    long = "가" * 60
+    body = [("현황", None), ("Ⅰ. 추진 배경", "Heading 1"), (long, None), ("현황", None), (long, None)]
+    prof = _section_limits(new_profile(), [100, 100])
+    proc, r = verify_new(tmp_path, prof, new_output(tmp_path, body))
+    assert proc.returncode == 1, proc.stdout
+    assert r["length"]["status"] == "fail", r["length"]
+    assert "s1" in r["length"]["locations"]
+
+
 def test_new_mode_missing_section_length_skips(tmp_path):
     prof = _section_limits(new_profile(), [500, 500])
     prof["structure"]["sections"].append(
