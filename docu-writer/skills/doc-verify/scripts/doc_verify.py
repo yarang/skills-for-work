@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -172,13 +173,23 @@ def build_ctx(args) -> Ctx:
                placeholders, pages, args.pages_dir)
 
 
+def error_kind(exc: BaseException) -> str:
+    """예상하지 못한 오류의 종류와 난 자리(파일:줄)만 냅니다.
+
+    오류 글(str(exc))에는 결과 문서의 글이 들어갈 수 있습니다(「invalid literal for int(): '…'」).
+    """
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f" ({Path(frames[-1].filename).name}:{frames[-1].lineno})" if frames else ""
+    return f"{type(exc).__name__}{where}"
+
+
 def run_checks(ctx: Ctx) -> list:
     report = []
     for cid, check in CHECKS:
         try:
             report.append(check(ctx))
         except Exception as exc:  # 검사 하나의 오류가 나머지 검사를 막지 않게 합니다.
-            report.append(entry(cid, "fail", f"검사 오류: {type(exc).__name__}: {exc}"))
+            report.append(entry(cid, "fail", f"검사 오류: {error_kind(exc)}"))
     return report
 
 
@@ -225,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"doc_verify.py: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:  # 입력 결함(깨진 pages.json 등)이 종료 코드 1(차단)로 보이지 않게 합니다.
-        print(f"doc_verify.py: 입력을 처리할 수 없습니다: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"doc_verify.py: 입력을 처리할 수 없습니다: {error_kind(exc)}", file=sys.stderr)
         return 2
     code = 1 if any(e["status"] == "fail" for e in report) else 0
     print(summary(args.output, report, code))

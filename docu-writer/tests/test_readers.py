@@ -604,6 +604,18 @@ def test_markup_same_text_in_two_cells_counts_twice():
     assert r["locations"] == ["t:1/r:1/c:1", "t:1/r:1/c:2"], r
 
 
+def test_markup_contained_text_with_new_kind_still_counts():
+    """이미 센 글 안에 들어 있어도 거기서 못 센 종류(줄 머리 「> 」)가 나오면 셉니다."""
+    from _checks_content import Ctx, check_markup
+    from _readers import Doc
+
+    out = Doc("hwpx", [Para("**굵게** 참고 > 인용")], extra=["> 인용"])
+    ctx = Ctx({}, "sample", None, None, Path("out.hwpx"), Doc("hwpx", [Para("견본 글")]),
+              out, None, None, None)
+    r = check_markup(ctx)
+    assert r["detail"].startswith("2건") and "인용 >" in r["detail"], r
+
+
 def test_markup_multi_kind_item_counted_once():
     """한 문단에 표지가 두 종류여도 건수는 한 번이고, 그 문단의 일부인 표 문단 글도 다시 세지 않습니다."""
     table = Table("t:1", [["# 제목 **굵게**\n둘째"]], texts=["# 제목 **굵게**", "둘째"])

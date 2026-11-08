@@ -992,3 +992,17 @@ def test_r6_passes_without_markers_when_no_numbering_declared(tmp_path):
     out = new_output(tmp_path, [("추진 배경", "Heading 1"), ("지역 수요가 늘어 사업을 시작한다", None)])
     _, r = verify_new(tmp_path, prof, out)
     assert r["r6_numbering"]["status"] == "pass", r["r6_numbering"]
+
+
+def test_check_crash_reports_kind_without_message(monkeypatch):
+    """검사 하나가 예상 못 한 오류로 멈춰도 오류 글(결과 문서 글일 수 있음)은 보이지 않습니다."""
+    sys.path.insert(0, str(DOC_VERIFY.parent))
+    import doc_verify
+
+    def boom(ctx):
+        int("비밀값")
+
+    monkeypatch.setattr(doc_verify, "CHECKS", [("markup", boom)])
+    (r,) = doc_verify.run_checks(None)
+    assert r["status"] == "fail" and r["detail"].startswith("검사 오류: ValueError ("), r
+    assert "비밀값" not in r["detail"], r

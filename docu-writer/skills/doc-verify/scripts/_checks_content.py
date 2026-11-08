@@ -135,15 +135,18 @@ def check_markup(ctx: Ctx) -> dict:
     # 보고에는 종류와 위치만 적습니다 — 결과 글은 양식 값(전화번호·이름)일 수 있습니다(리뷰 3차 H2).
     # 문단과 표 칸(locator가 있는 본문 단위)은 하나하나 셉니다 — 다른 칸·문단에 같은 글이 남아도 모두 셉니다.
     # 표 안 문단 글·글상자 같은 보조 글은 본문 단위와 겹쳐 나오므로(HWPX는 모든 문단이 한 번 더 나옴),
-    # 이미 센 글 안에 들어 있으면 건너뜁니다. 한 곳에 표지가 여럿이면 종류마다 적되 건수는 한 번입니다(agy 6번 후속).
+    # 이미 센 글 안에 들어 있고 그 글에서 같은 종류를 이미 셌으면 건너뜁니다. 줄 머리 표지는 자리에 따라 달라
+    # (「참고 > 인용」 안의 「> 인용」) 글이 들어 있어도 종류가 다를 수 있습니다.
+    # 한 곳에 표지가 여럿이면 종류마다 적되 건수는 한 번입니다(agy 6번 후속).
     primary = block_items(ctx.out.blocks)
     seen, kinds_hit, locs, total = [], Counter(), [], 0
     for n, (text, loc) in enumerate(doc_search_items(ctx.out)):
         kinds = [k for k in _markup_kinds(text) if k not in known]
         key = nows(text)
-        if not kinds or (n >= len(primary) and any(key in prev for prev in seen)):
+        if not kinds or (n >= len(primary) and any(
+                key in prev and set(kinds) <= got for prev, got in seen)):
             continue
-        seen.append(key)
+        seen.append((key, set(kinds)))
         kinds_hit.update(kinds)
         total += 1
         locs.append(loc)
