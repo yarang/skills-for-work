@@ -30,7 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _cat_check import problems  # noqa: E402
 from _cat_load import (  # noqa: E402
-    FORMATS, CatalogError, load_all, load_catalog, merged_fixed, merged_themes, normalize, resolve,
+    FORMATS, CatalogError, load_all, load_catalog, merged_fixed, merged_themes, normalize, one_line,
+    resolve,
 )
 from _cat_match import choose  # noqa: E402
 
@@ -61,7 +62,7 @@ def cmd_match(args) -> int:
     if found:
         raise CatalogError("카탈로그 항목이 잘못되었습니다(check로 확인하세요): " + "; ".join(found))
     route, protected = choose(merged_fixed(catalogs), merged_themes(catalogs), args.format, args.doc_type)
-    bad = [path for path in protected if "\n" in path or "\r" in path or path != path.strip()]
+    bad = [path for path in protected if not one_line(path)]
     if bad:
         raise CatalogError("줄바꿈·앞뒤 공백이 든 경로가 있어 보호 목록(한 줄에 경로 하나)을 쓸 수 없습니다: "
                            + repr(bad[0]))
@@ -70,7 +71,13 @@ def cmd_match(args) -> int:
     text = json.dumps(route, ensure_ascii=False, indent=2) + "\n"
     try:
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        with open(args.out, "x", encoding="utf-8") as handle:
+        handle = open(args.out, "x", encoding="utf-8")
+    except OSError as err:
+        # 여기서 실패하면 이 실행이 만든 파일이 없습니다 — 그사이 남이 만든 route.json(FileExistsError)을
+        # 지우지 않도록 unlink는 「x」로 연 뒤의 쓰기 실패에서만 합니다 (리뷰 3차 M7)
+        raise CatalogError(f"route.json을 쓸 수 없습니다: {args.out}: {err}") from err
+    try:
+        with handle:
             handle.write(text)
     except OSError as err:
         try:

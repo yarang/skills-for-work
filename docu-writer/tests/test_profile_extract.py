@@ -265,17 +265,74 @@ def mutate_mode(p):
     p["mode"] = "bogus"
 
 
+def mutate_blank_guide(p):
+    """리뷰 3차 M12: 공백만 있는 글은 빈 글로 봅니다."""
+    p["structure"]["sections"][0]["guide"] = "   "
+
+
+def mutate_no_sections(p):
+    p["structure"]["sections"] = []
+
+
+def _form_field(**field):
+    def mutate(p):
+        p["mode"] = "form"
+        p["fields"] = [field]
+    mutate.__name__ = "mutate_field_" + "_".join(field) if field else "mutate_field_empty"
+    return mutate
+
+
+# 리뷰 3차 M13: form fields는 id·label·locator·constraint 꼴을 봅니다.
+mutate_field_no_constraint = _form_field(id="f1", label="담당", locator="t:1/r:3/c:3")
+mutate_field_bad_regex = _form_field(id="f1", label="담당", locator="t:1/r:3/c:3", constraint="re:[가-")
+mutate_field_blank_label = _form_field(id="f1", label=" ", locator="t:1/r:3/c:3", constraint="")
+mutate_field_constraint_list = _form_field(id="f1", label="담당", locator="t:1/r:3/c:3", constraint=["x"])
+
+
+def mutate_field_not_dict(p):
+    p["mode"] = "form"
+    p["fields"] = ["담당"]
+
+
 @pytest.mark.parametrize("mutate", [
     mutate_sha, mutate_dup_id, mutate_missing_guide, mutate_bad_anchor, mutate_anchor_order,
     mutate_table_range, mutate_cell_range, mutate_form_without_fields,
     mutate_update_unknown_section, mutate_update_no_requests, mutate_short_sample_text,
     mutate_placeholder_sample_text, mutate_sample_text_is_title, mutate_guide_copies_sample,
     mutate_conflict_handling, mutate_version, mutate_mode,
+    mutate_blank_guide, mutate_no_sections, mutate_field_no_constraint, mutate_field_bad_regex,
+    mutate_field_blank_label, mutate_field_constraint_list, mutate_field_not_dict,
 ])
 def test_check_failures_exit_1(samples, valid, tmp_path, mutate):
     mutate(valid)
     proc = check(samples, "docx", valid, tmp_path)
     assert proc.returncode == 1, (mutate.__name__, proc.stdout, proc.stderr)
+
+
+def test_check_field_regex_error_hides_pattern(samples, valid, tmp_path):
+    """정규식 오류 보고에는 오류 종류만 적고 constraint 원문은 옮기지 않습니다."""
+    mutate_field_bad_regex(valid)
+    valid["fields"][0]["constraint"] = "re:[비밀값-"
+    proc = check(samples, "docx", valid, tmp_path)
+    assert proc.returncode == 1 and "정규식" in proc.stdout, proc.stdout
+    assert "비밀값" not in proc.stdout + proc.stderr
+
+
+def test_check_unreadable_profile_is_usage_error(samples, valid, tmp_path):
+    """리뷰 3차 L2: 읽을 권한이 없는 프로파일은 추적이 아니라 사용 오류(2)입니다."""
+    import os
+
+    if os.geteuid() == 0:
+        pytest.skip("root는 권한 없이도 읽음")
+    p = tmp_path / "locked.yaml"
+    p.write_text(yaml.safe_dump(valid, allow_unicode=True), encoding="utf-8")
+    p.chmod(0)
+    try:
+        proc = uv(PROFILE_EXTRACT, "check", p, "--source", samples["docx"])
+    finally:
+        p.chmod(0o600)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr
 
 
 
@@ -389,6 +446,24 @@ def del_design(p, t):
     del p["design"]
 
 
+def spaced_table_locator(p, t):
+    """리뷰 3차 M7: 공백이 든 글 안의 「t:1」도 표 위치 지정자입니다."""
+    p["structure"]["sections"][0]["guide"] = "표 t:1 의 칸을 채움"
+
+
+def title_differs_from_anchor(p, t):
+    """리뷰 3차 M7: 신규 모드는 writer가 title을 제목 글로 쓰므로 anchor 글과 같아야 합니다."""
+    p["structure"]["sections"][0]["title"] = "사업 배경"
+
+
+def blank_guide(p, t):
+    p["structure"]["sections"][0]["guide"] = " \t"
+
+
+def no_sections(p, t):
+    p["structure"]["sections"] = []
+
+
 def del_route(p, t):
     del p["design"]["route"]
 
@@ -404,6 +479,10 @@ NEW_VIOLATIONS = {
     "anchor_nth": (set_anchor(1, 'h:"추진 배경"#2'), "anchor"),
     "anchor_duplicate": (set_anchor(1, 'h:"추진배경"'), "anchor"),
     "table_locator": (add_table_locator, "t:1"),
+    "table_locator_spaced": (spaced_table_locator, "t:1"),
+    "title_anchor_mismatch": (title_differs_from_anchor, "title"),
+    "guide_blank": (blank_guide, "guide"),
+    "sections_empty": (no_sections, "sections"),
     "sample_text": (set_key("sample_text", ["2026년 상반기 신청 건수 120건"]), "sample_text"),
     "fields": (set_key("fields", [{"id": "f1", "label": "담당"}]), "fields"),
     "fields_empty": (set_key("fields", []), "fields"),

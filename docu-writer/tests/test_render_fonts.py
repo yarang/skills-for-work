@@ -62,6 +62,37 @@ def test_link_fonts_makes_directory_links(tmp_path):
     assert links[0].is_symlink() and (links[0] / "x.ttf").is_file()
 
 
+
+def test_link_fonts_twice_replaces_old_links(tmp_path):
+    """리뷰 3차 L1: 같은 프로필로 다시 부르면 옛 링크를 갈아 끼웁니다(FileExistsError 없음)."""
+    fonts = tmp_path / "fonts"
+    fonts.mkdir()
+    render.link_fonts(tmp_path / "profile", [fonts])
+    links = render.link_fonts(tmp_path / "profile", [fonts])
+    assert links[0].is_symlink() and links[0].resolve() == fonts.resolve()
+
+
+def test_font_family_matches_whole_family_only():
+    """리뷰 3차 L1: 「DejaVuSans」는 「DejaVuSans-Bold」와 한 가족이지만 「DejaVuSansMono」와는 다릅니다."""
+    fam = render.font_family
+    assert fam(render.norm_font("DejaVuSans-Bold")) == fam(render.norm_font("DejaVu Sans")) == "dejavusans"
+    assert fam(render.norm_font("DejaVuSansMono")) != "dejavusans"
+
+
+def test_substituted_chars_ignores_other_family_with_same_prefix():
+    import pymupdf
+
+    bundled = [(render.norm_font("DejaVu Sans Mono"), pymupdf.Font("helv"))]
+    assert render.substituted_chars([span("BAAAAA+DejaVuSans", "한글")], bundled) == {}
+
+
+def test_char_kinds_counts_without_echoing_text():
+    """리뷰 3차 L1: 빈 글리프 보고에는 글자 대신 종류별 개수만 적습니다(문서 글이 새지 않게)."""
+    shown = render.char_kinds({"홍", "길", "漢", "é"})
+    assert "홍" not in shown and "漢" not in shown and "é" not in shown
+    assert "한글 2자" in shown and "한자 1자" in shown and "기타 1자" in shown
+
+
 needs_soffice = pytest.mark.skipif(
     not (shutil.which("soffice") or Path("/Applications/LibreOffice.app").exists()), reason="soffice 없음")
 

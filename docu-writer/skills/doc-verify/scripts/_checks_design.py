@@ -11,16 +11,20 @@ from _readers import Para, all_paras, first_last, nows
 SYMBOLS = set("□■◇◆○ㅇᄋ◦●-–•·※▶☞")
 SYMBOL_ALIAS = {"ㅇ": "○", "ᄋ": "○", "◦": "○", "·": "•"}
 YEAR = re.compile(r"\d{4}\.")  # 「2026. 11. 12.」·「2026.11.12.」 — 날짜의 연도는 번호가 아님 (종단 시험 F10)
+HANGUL = "가나다라마바사아자차카타파하"  # 한글 번호 차례 — _locate.CHAPTER·_pe_common.MARKER_RE와 같은 집합
+CORP = {"(주)", "(사)", "(유)", "(재)", "(합)"}  # 법인 약칭은 번호가 아님 (리뷰 3차 M13)
 SHAPES = [
     (re.compile(r"\d+(\.\d+)+\.?"), "1.1"),
     (re.compile(r"\d+\."), "1."),
     (re.compile(r"\d+\)"), "1)"),
     (re.compile(r"\(\d+\)"), "(1)"),
     (re.compile(r"[①-⑳]"), "①"),
-    (re.compile(r"[가-힣]\."), "가."),
-    (re.compile(r"[가-힣]\)"), "가)"),
-    (re.compile(r"\([가-힣]\)"), "(가)"),
+    (re.compile(rf"[{HANGUL}]\."), "가."),
+    (re.compile(rf"[{HANGUL}]\)"), "가)"),
+    (re.compile(rf"\([{HANGUL}]\)"), "(가)"),
     (re.compile(r"[A-Za-z]\."), "A."),
+    (re.compile(r"[A-Za-z]\)"), "A)"),
+    (re.compile(r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.?"), "Ⅰ."),
 ]
 
 
@@ -56,20 +60,32 @@ def _heading_styles(ctx: Ctx) -> dict:
     return groups
 
 
-def _token_mismatch(key: str, eff: tuple, token: dict) -> str | None:
+def _usable(name: str, want) -> bool:
+    """토큰 값이 비교에 쓸 수 있는 꼴인지. null·빈 글·꼴이 틀린 값은 비교하지 않은 것으로 칩니다."""
+    if name == "font":
+        return isinstance(want, str) and bool(want.strip())
+    if name == "pt":
+        return isinstance(want, (int, float)) and not isinstance(want, bool)
+    return isinstance(want, bool)
+
+
+def _token_mismatch(key: str, eff: tuple, token: dict) -> tuple[str | None, bool]:
+    """(어긋남, 실제로 비교한 속성이 있었는지)."""
+    compared = False
     for i, name in enumerate(("font", "pt", "bold")):
         want, got = token.get(name), eff[i]
-        if want is None or want == "" or got is None:
+        if not _usable(name, want) or got is None:
             continue
+        compared = True
         if name == "pt":
             same = float(want) == float(got)
         elif name == "bold":
-            same = bool(want) == bool(got)
+            same = want == bool(got)
         else:
-            same = nows(str(want)) == nows(str(got))
+            same = nows(want) == nows(str(got))
         if not same:
-            return f"{key} {name} {got} ≠ 토큰 {want}"
-    return None
+            return f"{key} {name} {got} ≠ 토큰 {want}", True
+    return None, compared
 
 
 def check_r4(ctx: Ctx) -> dict:
@@ -89,9 +105,9 @@ def check_r4(ctx: Ctx) -> dict:
             problems.append(f"{key} 서식 {len(effs)}가지 섞임 ({brief(shown)})")
             locs.extend(loc for v in effs.values() for loc in v)
         token = types.get(key) if isinstance(types.get(key), dict) else None
-        compared = compared or bool(token)
         for eff, where in effs.items() if token else []:
-            bad = _token_mismatch(key, eff, token)
+            bad, did = _token_mismatch(key, eff, token)
+            compared = compared or did  # 값이 빈 토큰({font: null})·모르는 키만 있으면 비교한 것이 아님 (M8)
             if bad:
                 problems.append(bad)
                 locs.extend(where)
@@ -115,8 +131,8 @@ def _color(value) -> str | None:
 def _token_sets(design: dict) -> tuple[set, set, set]:
     types = design.get("type") or {}
     tokens = [t for t in types.values() if isinstance(t, dict)] if isinstance(types, dict) else []
-    fonts = {nows(str(t["font"])) for t in tokens if t.get("font")}
-    pts = {float(t["pt"]) for t in tokens if isinstance(t.get("pt"), (int, float))}
+    fonts = {nows(t["font"]) for t in tokens if _usable("font", t.get("font"))}
+    pts = {float(t["pt"]) for t in tokens if _usable("pt", t.get("pt"))}
     raw = design.get("color") or {}
     values = raw.values() if isinstance(raw, dict) else raw if isinstance(raw, list) else []
     colors = {c for c in (_color(v) for v in values) if c}
@@ -172,7 +188,7 @@ def shape_of(token: str) -> str | None:
     """번호·부호 토큰의 모양. 번호가 아니면 None."""
     if len(token) == 1 and token in SYMBOLS:
         return SYMBOL_ALIAS.get(token, token)
-    if YEAR.match(token):
+    if YEAR.match(token) or token in CORP:
         return None
     for pattern, shape in SHAPES:
         if pattern.fullmatch(token):
@@ -230,38 +246,53 @@ def check_table_header(ctx: Ctx) -> dict:
 
 # --- R1 표 쪽 나뉨 ----------------------------------------------------------------
 
-def _on_page(page: str, cell: str) -> bool:
-    """칸 글이 쪽 글(공백 없앰)에 있는지. 통째로 없으면 공백으로 나눈 낱말이 모두 있는지 봅니다.
+FALLBACK = set("○●◦□■◇◆※▶☞·•")  # LibreOffice가 대체 글꼴로 그려 쪽 글 순서를 흩뜨리는 기호
 
+
+def _on_page(page: str, cell: str, loose: bool = False) -> bool:
+    """칸 글이 쪽 글(공백 없앰)에 있는지.
+
+    loose이고 칸 글에 대체 글꼴 기호가 있을 때만, 통째로 없으면 공백으로 나눈 낱말이 모두 있는지 봅니다.
     LibreOffice가 ○·※ 같은 기호를 대체 글꼴로 그리면 pymupdf가 그 조각을 다른 줄로 떼어
-    쪽 글 순서가 바뀝니다(「부서장 ○○○ (서명)」→「○○○부서장(서명)」).
+    쪽 글 순서가 바뀝니다(「부서장 ○○○ (서명)」→「○○○부서장(서명)」). 기호 없는 칸까지 낱말로
+    맞추면 다른 곳의 낱말(「계획 검토 후 예산 수립」)이 「계획 수립」을 대신 찾아 쪽 나뉨을 놓칩니다 (M4).
     """
     if nows(cell) in page:
         return True
+    if not loose or not FALLBACK & set(cell):
+        return False
     words = [nows(w) for w in cell.split()]
     return len(words) > 1 and all(w in page for w in words)
 
 
-def _first_page(pages: list, cell: str, start: int) -> int | None:
-    return next((i for i in range(start, len(pages)) if _on_page(pages[i], cell)), None)
+def _first_page(pages: list, cell: str, start: int, loose: bool = False) -> int | None:
+    return next((i for i in range(start, len(pages)) if _on_page(pages[i], cell, loose)), None)
+
+
+def _locate_table(pages: list, first: str, last: str, cursor: int, loose: bool) -> tuple:
+    both = next((i for i in range(cursor, len(pages))
+                 if _on_page(pages[i], first, loose) and _on_page(pages[i], last, loose)), None)
+    if both is not None:
+        return both, both, both
+    pf = _first_page(pages, first, cursor, loose)
+    if pf is None:
+        pf = _first_page(pages, first, 0, loose)
+    if pf is None:
+        return None, None, cursor
+    pl = _first_page(pages, last, pf, loose)
+    return pf, pl, pl if pl is not None else pf
 
 
 def _table_pages(pages: list, first: str, last: str, cursor: int) -> tuple[int | None, int | None, int]:
     """(첫 칸 쪽, 끝 칸 쪽, 다음 커서). 한 쪽에 다 있으면 두 쪽 번호가 같습니다.
 
-    pages는 공백을 없앤 쪽 글, first·last는 칸 글 그대로입니다.
+    pages는 공백을 없앤 쪽 글, first·last는 칸 글 그대로입니다. 글 그대로 먼저 찾고,
+    첫·끝 칸 가운데 하나를 못 찾았을 때만 기호 낱말 맞추기로 다시 찾습니다.
     """
-    both = next((i for i in range(cursor, len(pages))
-                 if _on_page(pages[i], first) and _on_page(pages[i], last)), None)
-    if both is not None:
-        return both, both, both
-    pf = _first_page(pages, first, cursor)
-    if pf is None:
-        pf = _first_page(pages, first, 0)
-    if pf is None:
-        return None, None, cursor
-    pl = _first_page(pages, last, pf)
-    return pf, pl, pl if pl is not None else pf
+    pf, pl, nxt = _locate_table(pages, first, last, cursor, loose=False)
+    if pf is None or pl is None:
+        pf, pl, nxt = _locate_table(pages, first, last, cursor, loose=True)
+    return pf, pl, nxt
 
 
 def check_r1(ctx: Ctx) -> dict:

@@ -152,12 +152,12 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/profile_extract.py" check .docu-writer/profi
 ```
 
 **`check`가 보는 것** (실패하면 종료 코드 1):
-- YAML로 읽히고 `profile_version: 1`, `mode`가 sample·form·update 가운데 하나
+- YAML로 읽히고 `profile_version: 1`, `mode`가 sample·form·update 가운데 하나 (프로파일 파일을 읽을 수 없으면 사용 오류, 종료 코드 2)
 - `source.sha256`이 견본 파일의 실제 값과 같음
-- 섹션마다 `id·title·level·anchor·kind·required·guide·length`가 있고(form 모드는 `length` 제외), `id`가 겹치지 않음
+- 섹션이 하나 이상이고, 섹션마다 `id·title·level·anchor·kind·required·guide·length`가 있고(form 모드는 `length` 제외), `id`가 겹치지 않음. 공백뿐인 글은 빈 값으로 봅니다
 - anchor가 견본에서 풀리고(문단·슬라이드·제목 글이 있음) 문서 순서대로 늘어섬
 - 모든 `t:N/r:R/c:C`가 표 목록 범위 안(`N ≤ 표 수`, `R ≤ rows`, `C ≤ cols`)
-- form 모드는 `fields`가 하나 이상, update 모드는 `update.sections`의 id가 모두 섹션에 있고 `requests`가 비어 있지 않음
+- form 모드는 `fields`가 하나 이상이고 항목마다 `id·label·locator`가 비지 않으며 `constraint` 키가 있음(안내가 없으면 빈 글). `re:` constraint는 정규식으로 풀려야 합니다 — 틀리면 오류 종류만 보고하고 정규식 글은 보이지 않습니다. update 모드는 `update.sections`의 id가 모두 섹션에 있고 `requests`가 비어 있지 않음
 - `sample_text`에 `○○`만 있는 토큰, 6자 미만 글, 섹션 제목과 같은 글이 없음
 - `guide` 글이 `sample_text`의 어느 항목도 포함하지 않음 (견본 글을 옮기지 않음)
 - `conflicts[].handling`이 모두 `report`
@@ -165,7 +165,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/profile_extract.py" check .docu-writer/profi
 **신규 모드 (`mode: new`, 2단계 planner가 냄)** — 위 목록에서 다음만 바꿉니다:
 - `--source`·`--tables`를 받지 않습니다. `mode: new`인데 `--source`를 주거나, 다른 모드인데 `--source`가 없으면 사용 오류(종료 코드 2)입니다.
 - `mode`는 sample·form·update·new 가운데 하나. `source` 키가 없어야 합니다(있으면 실패).
-- 섹션 키 검사는 그대로입니다. anchor는 모두 `h:"…"` 꼴이고 글이 비지 않으며 섹션끼리 겹치지 않아야 합니다(견본이 없으므로 풀이·순서는 보지 않음). `t:N` locator가 있으면 실패입니다.
+- 섹션 키 검사는 그대로입니다. anchor는 모두 `h:"…"` 꼴이고 글이 비지 않으며 섹션끼리 겹치지 않아야 하고, 제목 글이 그 섹션 `title`과 같아야 합니다(공백 무시 — writer는 `title`을 제목으로 쓰고 doc-verify는 anchor 글로 섹션을 찾기 때문). 견본이 없으므로 풀이·순서는 보지 않습니다. `t:N` locator가 있으면 실패입니다(`t: 2`처럼 띄어 쓴 꼴도 잡음).
 - `sample_text`는 비어 있어야 하고 `fields`·`update`가 없어야 합니다.
 - `design.route`가 있고 `tool`이 `pandoc`·`generate_document`·`copy` 가운데 하나입니다. `pandoc`은 `reference_doc`만, `generate_document`는 `preset`(+`gate`)·`template_path`·`pack_path` 가운데 하나만 또는 아무것도 없이, `copy`는 다른 키 없이 씁니다. 경로 값은 절대 경로이고 파일이 있어야 합니다.
 

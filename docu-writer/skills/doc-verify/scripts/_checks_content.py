@@ -102,13 +102,18 @@ _NUMBER_AFTER = r"[ \t]*[+\-−±]?\d[\d,]*(?:\.\d+)?(?![\d.)]|,\d)"
 MARKUP = {
     "인용 >": re.compile(rf"^[ \t]*>[ \t](?!{_NUMBER_AFTER})", re.M),
     "제목 #": re.compile(r"^[ \t]*#{1,6}[ \t]", re.M),
-    "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|__[^_\s][^_]*__"),
+    # 「__」 굵게는 앞뒤에 글자·밑줄이 붙지 않아야 합니다 — 서명란 「___서명___」을 표지로 잡지 않습니다.
+    "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|(?<!\w)__[^_\s][^_]*__(?!\w)"),
     "탈출 \\": re.compile(r"\\[~*_#>|\[\]`-]"),
     "표 |": re.compile(r"^[ \t]*\|[^\n]*\|[ \t]*$", re.M),
 }
+# 「__init__」 같은 영문 식별자와 「C:\_work」 같은 Windows 경로는 마크다운 표지가 아닙니다(agy F-05).
+_DUNDER = re.compile(r"(?<!\w)__[A-Za-z][A-Za-z0-9_]*?__(?!\w)")
+_WIN_PATH = re.compile(r"(?:\b[A-Za-z]:|\\\\[^\s\\]+)(?:\\[^\s\\]*)+")
 
 
 def _markup_kinds(text: str) -> list:
+    text = _WIN_PATH.sub(" ", _DUNDER.sub(" ", text))
     return [kind for kind, pattern in MARKUP.items() if pattern.search(text)]
 
 
@@ -124,17 +129,21 @@ def check_markup(ctx: Ctx) -> dict:
     # 보고에는 종류와 위치만 적습니다 — 결과 글은 양식 값(전화번호·이름)일 수 있습니다(리뷰 3차 H2).
     # 표 칸 글은 칸·표 단위로 두 번 나오므로 (종류, 글) 열쇠로 한 번만 셉니다. 열쇠는 보고에 나가지 않고,
     # locator로 세면 locator 없는 MD·HWPX 문단이 한 건으로 뭉치고 표 칸은 두 건이 됩니다.
-    seen, kinds_hit, locs = set(), Counter(), []
+    # 여러 문단 칸은 칸 글(문단을 줄바꿈으로 이은 것)과 문단 글로 따로 나오므로, 이미 센 같은 종류 글
+    # 안에 들어 있는 글도 한 번으로 봅니다(agy F-05).
+    seen, kinds_hit, locs = {}, Counter(), []
     for text, loc in doc_search_items(ctx.out):
         kinds = [k for k in _markup_kinds(text) if k not in known]
-        if not kinds or (kinds[0], text.strip()[:30]) in seen:
+        key = nows(text)
+        if not kinds or any(key in prev for prev in seen.get(kinds[0], ())):
             continue
-        seen.add((kinds[0], text.strip()[:30]))
+        seen.setdefault(kinds[0], []).append(key)
         kinds_hit[kinds[0]] += 1
         locs.append(loc)
-    if seen:
+    if kinds_hit:
         shown = [f"{kind} {n}곳" for kind, n in kinds_hit.items()]
-        return entry("markup", "fail", f"{len(seen)}건: {', '.join(shown)}", _unique(locs))
+        total = sum(kinds_hit.values())
+        return entry("markup", "fail", f"{total}건: {', '.join(shown)}", _unique(locs))
     return entry("markup", "pass", "마크다운 표지 없음")
 
 

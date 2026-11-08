@@ -425,6 +425,24 @@ def test_r1_cell_token_fallback_needs_every_token_on_page():
     assert (pf, pl) == (0, None)
 
 
+
+def test_r1_plain_cell_needs_whole_text_on_page():
+    """리뷰 3차 M4: 기호 없는 칸은 낱말 맞추기를 쓰지 않습니다 — 앞 쪽의 「계획 검토 후 예산 수립」이
+    다음 쪽 끝 칸 「계획 수립」을 대신 찾아 쪽 나뉨을 놓치면 안 됩니다."""
+    import _checks_design
+
+    pages = [nows("구분 내용 계획 검토 후 예산 수립"), nows("계획 수립")]
+    pf, pl, _ = _checks_design._table_pages(pages, "구분", "계획 수립", 0)
+    assert (pf, pl) == (0, 1)
+
+
+def test_r1_symbol_cell_still_uses_word_fallback():
+    import _checks_design
+
+    assert _checks_design._on_page(nows("○○○ 부서장 (서명)"), "부서장 ○○○ (서명)", loose=True)
+    assert not _checks_design._on_page(nows("○○○ 부서장 (서명)"), "부서장 ○○○ (서명)")
+    assert not _checks_design._on_page(nows("수립 계획"), "계획 수립", loose=True)
+
 # --- R6 날짜는 번호가 아님 (종단 시험 F10) ------------------------------------------
 
 @pytest.mark.parametrize("text, shape", [
@@ -433,6 +451,15 @@ def test_r1_cell_token_fallback_needs_every_token_on_page():
     ("1. 추진 배경", "1."),
     ("1.1 현황", "1.1"),
     ("12. 기타", "1."),
+    # 리뷰 3차 M13: 로마 숫자·영문 괄호 번호는 번호, 법인 표기·가나다 밖 한글은 번호가 아님
+    ("Ⅰ. 개요", "Ⅰ."),
+    ("Ⅳ 결론", "Ⅰ."),
+    ("A) 첫째", "A)"),
+    ("(사) 한국협회", None),
+    ("(주)회사", None),
+    ("카. 열한째", "가."),
+    ("힣. 글", None),
+    ("(힣) 글", None),
 ])
 def test_r6_year_is_not_marker(text, shape):
     import _checks_design
@@ -448,5 +475,65 @@ def test_profile_extract_marker_matches_verify_rule():
 
     # 「1.1 현황」: 끝 점 없는 다단 번호를 추출만 놓치면 손대지 않은 결과가 R6에서 실패했습니다 (F11).
     for text in ("2026. 11. 12. 14:00", "2026.11.12. 회의", "1. 배경", "1.1 현황", "1.2. 계획", "가. 목적",
-                 "(1) 세부", "3) 셋째"):
+                 "(1) 세부", "3) 셋째", "(주) 회사", "(사) 협회", "카. 열한째", "힣. 글", "(가) 항목"):
         assert bool(_pe_common.line_marker(text)) == (_checks_design.shape_of(text.split()[0]) is not None), text
+
+
+# --- R4 토큰 값 꼴 (리뷰 3차 M8) ------------------------------------------------------
+
+@pytest.mark.parametrize("token", [
+    {"font": None, "pt": None, "bold": None},
+    {"line_spacing": 1.5},
+    {"font": "  ", "pt": True, "bold": "yes"},
+])
+def test_r4_unusable_token_is_not_compared(token):
+    """null·빈 글·bool pt 같은 토큰은 비교하지 않은 것으로 칩니다(신규 모드 skip 판정의 바탕)."""
+    import _checks_design
+
+    assert _checks_design._token_mismatch("h1", ("맑은 고딕", 16.0, True), token) == (None, False)
+
+
+def test_r4_token_bold_compares_as_bool():
+    import _checks_design
+
+    assert _checks_design._token_mismatch("h1", ("맑은 고딕", 16.0, None), {"bold": False}) == (None, False)
+    bad, did = _checks_design._token_mismatch("h1", ("맑은 고딕", 16.0, False), {"bold": False})
+    assert did and bad is None
+    bad, did = _checks_design._token_mismatch("h1", ("맑은 고딕", 16.0, True), {"bold": False})
+    assert did and bad
+
+
+def test_r5_token_sets_skip_unusable_values():
+    import _checks_design
+
+    fonts, pts, _ = _checks_design._token_sets(
+        {"type": {"a": {"font": None, "pt": True}, "b": {"font": "바탕", "pt": 11}}})
+    assert fonts == {"바탕"} and pts == {11.0}
+
+
+# --- markup 오탐·중복 (agy F-05) -------------------------------------------------------
+
+def _markup(out_blocks):
+    from _checks_content import Ctx, check_markup
+    from _readers import Doc
+
+    ctx = Ctx({}, "sample", None, None, Path("out.hwpx"), Doc("hwpx", [Para("견본 글")]),
+              Doc("hwpx", out_blocks), None, None, None)
+    return check_markup(ctx)
+
+
+@pytest.mark.parametrize("text", [r"자료는 C:\_work\보고 폴더에 둔다", r"\\서버\_공유\자료",
+                                  "서명 ___서명___ 날짜", "__init__ 함수를 고친다", "a__b__c"])
+def test_markup_path_signature_identifier_pass(text):
+    assert _markup([Para(text)])["status"] == "pass", text
+
+
+def test_markup_double_underscore_bold_still_fails():
+    assert _markup([Para("신청 __135건__ 접수")])["status"] == "fail"
+
+
+def test_markup_multi_paragraph_cell_counted_once():
+    """여러 문단 칸은 칸 글과 문단 글로 두 번 읽히지만 한 건입니다."""
+    table = Table("t:1", [["**준비**\n둘째 줄"]], texts=["**준비**", "둘째 줄"])
+    r = _markup([table])
+    assert r["status"] == "fail" and r["detail"].startswith("1건"), r

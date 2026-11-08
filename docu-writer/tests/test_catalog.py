@@ -198,6 +198,9 @@ BAD = {
     "docx_no_reference": lambda d: d["themes"]["docx"].update(default={"tokens": "themes/docx/default.tokens.yaml"}),
     "file_missing": lambda d: d.update(fixed=_bad_fixed(file="fixed/없음.docx")),
     "profile_missing": lambda d: d.update(fixed=_bad_fixed(profile="fixed/없음.profile.yaml")),
+    # 리뷰 3차 M7: 경로가 있어도 폴더면 파일이 아닙니다.
+    "file_is_dir": lambda d: d.update(fixed=_bad_fixed(file="fixed")),
+    "profile_is_dir": lambda d: d.update(fixed=_bad_fixed(profile="fixed")),
 }
 
 
@@ -337,16 +340,19 @@ def test_relative_path_against_user_catalog(env):
 
 # --- 7·8 파일 없음·덮어쓰기 ------------------------------------------------------
 
-@pytest.mark.parametrize("name", ["부\n서.hwpx", "부\r서.hwpx", "부서.hwpx "])
+# 리뷰 3차 M7: str.splitlines가 줄 끝으로 보는 U+2028·U+0085·VT·FF도 한 줄 규칙을 깹니다.
+@pytest.mark.parametrize("name", ["부\n서.hwpx", "부\r서.hwpx", "부서.hwpx ", "부\u2028서.hwpx",
+                                  "부\x85서.hwpx", "부\x0b서.hwpx", "부\x0c서.hwpx"])
 def test_match_rejects_paths_breaking_line_based_protection(env, name):
     """보호 목록은 한 줄에 경로 하나(write_guard가 줄로 읽음) — 줄바꿈·앞뒤 공백이 든 경로는 거부."""
     touch(env["plugin"] / "themes/hwpx" / name)
     data = plugin_data()
     data["themes"]["hwpx"]["default"] = {"template_path": f"themes/hwpx/{name}"}
-    env["plugin_cat"] = write_catalog(env["plugin"], data)
+    # 이스케이프한 YAML로 씁니다 — 날 U+0085는 YAML이 공백으로 접어 경로가 바뀝니다.
+    env["plugin_cat"] = write_catalog(env["plugin"], None, raw=yaml.safe_dump(data, allow_unicode=False))
     proc = match(env, "아무 종류", "hwpx")
     assert_refused(proc, env)
-    assert "themes/hwpx" in proc.stderr
+    assert "themes/hwpx" in proc.stderr and "줄바꿈" in proc.stderr
 
 
 def test_match_removes_partial_route_on_write_failure(env, monkeypatch, capsys):
@@ -384,6 +390,48 @@ def test_match_removes_partial_route_on_write_failure(env, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "route.json" in captured.err
+
+
+def _catalog_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("catalog", CATALOG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_match_keeps_route_created_meanwhile(env, monkeypatch, capsys):
+    """리뷰 3차 M7: 검사와 「x」 열기 사이에 남이 만든 route.json은 지우지 않습니다."""
+    mod = _catalog_module()
+    real_open = open
+
+    def racing_open(file, mode="r", *args, **kwargs):
+        if "x" in mode:
+            Path(file).write_text("남의 것", encoding="utf-8")
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(mod, "open", racing_open, raising=False)
+    monkeypatch.setenv("DOCU_WRITER_TEMPLATES", str(env["user"]))
+    ret = mod.main(["--plugin-catalog", str(env["plugin_cat"]), "match",
+                    "--type", "보고서", "--format", "docx", "--out", str(env["out"])])
+    assert ret == 2
+    assert env["out"].read_text(encoding="utf-8") == "남의 것"
+    assert capsys.readouterr().out == ""
+
+
+def test_unreadable_user_catalog_exits_2(env):
+    """리뷰 3차 M7: 읽을 권한이 없는 카탈로그는 추적이 아니라 오류(2)입니다."""
+    if os.geteuid() == 0:
+        pytest.skip("root는 권한 없이도 읽음")
+    path = write_catalog(env["user"], {"catalog_version": 1, "fixed": []})
+    path.chmod(0)
+    try:
+        proc = match(env, "보고서", "docx")
+    finally:
+        path.chmod(0o600)
+    assert_refused(proc, env)
+    assert "Traceback" not in proc.stderr
 
 
 def test_missing_reference_doc(env):

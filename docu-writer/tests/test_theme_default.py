@@ -267,3 +267,43 @@ def test_build_default_write_failure_exits_2(tmp_path, monkeypatch, capsys):
     assert mod.main(["--out", str(tmp_path / "default.docx")]) == 2
     err = capsys.readouterr().err
     assert "오류" in err and "쓸 수 없습니다" in err
+
+
+class _HalfWriter:
+    """몇 바이트를 쓴 뒤 디스크가 찬 것처럼 실패하는 파일."""
+
+    def __init__(self, handle):
+        self._handle = handle
+
+    def write(self, data):
+        self._handle.write(data[:10])
+        raise OSError("디스크 가득 참")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._handle.close()
+        return False
+
+
+def test_save_new_removes_partial_docx(tmp_path, monkeypatch):
+    """리뷰 3차 M10: 「x」로 연 뒤 쓰다 실패하면 반쯤 쓴 DOCX를 남기지 않습니다."""
+    mod = _build_default_module()
+    real_open = open
+    monkeypatch.setattr(mod, "open", lambda f, m="r", *a, **k: _HalfWriter(real_open(f, m, *a, **k)),
+                        raising=False)
+    out = tmp_path / "default.docx"
+    with pytest.raises(OSError):
+        mod.save_new(docx.Document(), out)
+    assert not out.exists()
+
+
+def test_save_new_keeps_existing_file(tmp_path):
+    """이미 있는 파일은 FileExistsError로 거부하고 지우지 않습니다."""
+    mod = _build_default_module()
+    out = tmp_path / "default.docx"
+    out.write_bytes(b"old")
+    with pytest.raises(FileExistsError):
+        mod.save_new(docx.Document(), out)
+    assert out.read_bytes() == b"old"

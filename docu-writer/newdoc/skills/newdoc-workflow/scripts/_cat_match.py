@@ -25,7 +25,7 @@ def _path(catalog: Catalog, label: str, entry: dict, key: str) -> str | None:
     if value is None:
         return None
     path = resolve(catalog, value)
-    if not Path(path).exists():
+    if not Path(path).is_file():
         raise CatalogError(f"{label}의 {key} 파일이 없습니다: {path}")
     return path
 

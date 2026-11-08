@@ -5,7 +5,7 @@
 """
 from pathlib import Path
 
-from _cat_load import FORMATS, Catalog, normalize, resolve
+from _cat_load import FORMATS, Catalog, normalize, one_line, resolve
 
 FIXED_MODES = ("sample", "form")  # template-workflow 모드 — update는 기존 문서 고치기라 고정 견본에 없음
 
@@ -20,8 +20,13 @@ def _missing(catalog: Catalog, label: str, entry: dict, keys) -> list[str]:
     out = []
     for key in keys:
         value = entry.get(key)
-        if _text(value) and not Path(resolve(catalog, value)).exists():
-            out.append(f"{label}: {key} 파일이 없습니다: {resolve(catalog, value)}")
+        if not _text(value):
+            continue
+        path = resolve(catalog, value)
+        if not one_line(path):
+            out.append(f"{label}: {key} 경로에 줄바꿈·앞뒤 공백이 있습니다: {path!r}")
+        elif not Path(path).is_file():  # 폴더는 파일이 아님 (리뷰 3차 M7)
+            out.append(f"{label}: {key} 파일이 없습니다: {path}")
     return out
 
 

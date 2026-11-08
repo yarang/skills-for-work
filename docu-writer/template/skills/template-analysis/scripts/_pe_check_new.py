@@ -6,11 +6,12 @@
 import os
 import re
 
-from _pe_check import (LOCATOR_ROOTS, T_LOC_RE, check_conflicts, check_section_keys,
+from _pe_check import (LOCATOR_ROOTS, check_conflicts, check_section_keys,
                        get_sections, walk_strings)
 from _pe_common import no_space
 
 NEW_ANCHOR_RE = re.compile(r'^h:"(.*)"$')
+SPACED_T_LOC_RE = re.compile(r"(?:^|[/\s])(t:\d+)")  # 공백 섞인 글 안의 t:N도 찾음 (리뷰 3차 M12)
 FORBIDDEN_KEYS = ("source", "fields", "update")
 PATH_KEYS = ("reference_doc", "template_path", "pack_path")
 GD_CHOICES = ("preset", "template_path", "pack_path")
@@ -49,13 +50,17 @@ def check_new_anchors(sections, fails):
             fails.append(f"{label}: anchor {anchor!r}가 {seen[key]}와 겹침")
         else:
             seen[key] = label
+        if key and key != no_space(str(s.get("title") or "")):
+            # writer는 title을 그대로 제목으로 쓰고 doc-verify는 anchor 글로 섹션을 찾습니다 — 다르면 못 찾음
+            fails.append(f"{label}: anchor {anchor!r}의 제목 글이 title과 다름 (신규 모드는 같아야 함)")
 
 
 def check_no_table_locators(prof, fails):
     for root in LOCATOR_ROOTS:
-        for text in walk_strings(prof.get(root)):
-            if T_LOC_RE.search(text):
-                fails.append(f"{root}: {text} — 신규 모드에는 표 locator(t:N)가 없어야 함")
+        for text in walk_strings(prof.get(root), spaced=True):
+            m = SPACED_T_LOC_RE.search(text)
+            if m:  # 글 전체가 아닌 찾은 locator만 보고 (guide 같은 긴 글을 되풀이하지 않음)
+                fails.append(f"{root}: {m.group(1)} — 신규 모드에는 표 locator(t:N)가 없어야 함")
 
 
 def get_route(prof, fails):

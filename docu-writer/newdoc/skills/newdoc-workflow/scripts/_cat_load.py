@@ -60,6 +60,12 @@ def user_catalog_path() -> Path | None:
     return path if path.is_file() else None
 
 
+def one_line(path: str) -> bool:
+    """보호 목록(한 줄에 경로 하나)에 쓸 수 있는 경로인지. splitlines는 \n·\r 말고도
+    U+2028·U+0085·VT·FF에서 줄을 나누므로 그 문자가 든 경로도 거릅니다 (리뷰 3차 M7)."""
+    return len(path.splitlines()) == 1 and path == path.strip()
+
+
 def yaml_error_brief(exc: Exception) -> str:
     """YAML 읽기 오류를 원문 없이 — PyYAML 메시지는 틀린 줄을 그대로 보여 주므로(개인정보·비밀값)
     종류와 위치만 남깁니다(리뷰 3차 M9). 파일 오류(OSError)는 경로만 담으므로 그대로 둡니다."""
@@ -82,7 +88,7 @@ def load_catalog(path: Path, source: str) -> Catalog:
         raise CatalogError(f"카탈로그 파일이 없습니다: {path}")
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, UnicodeDecodeError) as err:
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as err:  # OSError: 권한 없음 등 (리뷰 3차 M7)
         raise CatalogError(f"카탈로그를 읽을 수 없습니다: {path}: {yaml_error_brief(err)}") from err
     if not isinstance(data, dict):
         raise CatalogError(f"카탈로그 최상위가 매핑이 아닙니다: {path}")

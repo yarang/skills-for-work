@@ -15,9 +15,12 @@ T_LOC_RE = re.compile(r"(?:^|/)t:(\d+)(?:/r:(\d+))?(?:/c:(\d+))?(?=/|$)")
 LOCATOR_ROOTS = ("fields", "structure", "update", "objects")
 
 
+FIELD_KEYS = ("id", "label", "locator")
+
+
 def missing(value) -> bool:
-    if value is None or value == "":
-        return True
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return True  # 공백뿐인 글도 비어 있음 (리뷰 3차 M12)
     return isinstance(value, (list, dict)) and not value
 
 
@@ -54,6 +57,9 @@ def get_sections(prof, fails):
     sections = structure.get("sections") if isinstance(structure, dict) else None
     if not isinstance(sections, list):
         fails.append("structure.sections 목록이 없음")
+        return []
+    if not sections:
+        fails.append("structure.sections가 비어 있음")
         return []
     for s in sections:
         if not isinstance(s, dict):
@@ -113,14 +119,15 @@ def check_anchors(sections, source: Path, fmt: str, fails):
         last = pos
 
 
-def walk_strings(value):
+def walk_strings(value, spaced: bool = False):
+    """프로파일 값 속 글. spaced가 아니면 공백 없는 글(locator 꼴)만 냅니다."""
     if isinstance(value, dict):
         for v in value.values():
-            yield from walk_strings(v)
+            yield from walk_strings(v, spaced)
     elif isinstance(value, list):
         for v in value:
-            yield from walk_strings(v)
-    elif isinstance(value, str) and value and not re.search(r"\s", value):
+            yield from walk_strings(v, spaced)
+    elif isinstance(value, str) and value and (spaced or not re.search(r"\s", value)):
         yield value
 
 
@@ -146,12 +153,45 @@ def check_locators(prof, tables, fails):
                     fails.append(f"{root}: {text} — {problem}")
 
 
+def field_problem(field) -> str:
+    """fields 항목 하나의 꼴 문제. 값(constraint 정규식 글)은 보고하지 않습니다."""
+    if not isinstance(field, dict):
+        return "사전이 아님"
+    absent = [k for k in FIELD_KEYS if k not in field or missing(field[k])]
+    if absent:
+        return f"칸이 없거나 비어 있음 — {', '.join(absent)}"
+    if "constraint" not in field:
+        return "constraint 키가 없음 (안내가 없으면 빈 글로 둠)"
+    constraint = field["constraint"]
+    if constraint is None:
+        return ""
+    if not isinstance(constraint, str):
+        return "constraint가 글이 아님"
+    if constraint.startswith("re:"):
+        try:
+            re.compile(constraint[3:])
+        except re.error as e:
+            return f"constraint 정규식이 틀림 ({e.msg})"
+    return ""
+
+
+def check_fields(fields, fails):
+    """form 모드 fields: id·label·locator가 있고 constraint의 re: 정규식이 풀리는지 (리뷰 3차 M13)."""
+    for i, field in enumerate(fields, 1):
+        problem = field_problem(field)
+        if problem:
+            fid = field.get("id") if isinstance(field, dict) and isinstance(field.get("id"), str) else ""
+            fails.append(f"fields {fid or f'{i}번째'}: {problem}")
+
+
 def check_mode(prof, sections, fails):
     mode = prof.get("mode")
     if mode == "form":
         fields = prof.get("fields")
         if not isinstance(fields, list) or not fields:
             fails.append("form 모드인데 fields가 하나도 없음")
+        else:
+            check_fields(fields, fails)
     if mode != "update":
         return
     update = prof.get("update") if isinstance(prof.get("update"), dict) else {}

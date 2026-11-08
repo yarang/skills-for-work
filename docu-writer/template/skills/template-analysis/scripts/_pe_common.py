@@ -18,8 +18,9 @@ PLACEHOLDER_CHARS = set("○◯〇")
 # 네 자리 숫자 + 점은 날짜의 연도(「2026. 11. 12.」)라 번호에서 뺌 — doc-verify YEAR와 같은 규칙
 MARKER_RE = re.compile(
     r"^(?:[□■◇◆○ㅇᄋ◦●\-–•·※▶☞]|(?!\d{4}\.)(?:\d+(?:\.\d+)+\.?|\d+[.)])|\(\d+\)|[①-⑳]"
-    r"|[가-하][.)]|\([가-하]\)|[A-Za-z][.)]|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.?)$"
+    r"|[가나다라마바사아자차카타파하][.)]|\([가나다라마바사아자차카타파하]\)|[A-Za-z][.)]|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.?)$"
 )
+CORP = {"(주)", "(사)", "(유)", "(재)", "(합)"}  # 법인 약칭은 번호가 아님 — doc-verify _checks_design.CORP와 같음
 
 
 class UsageError(Exception):
@@ -116,7 +117,7 @@ def last_cell(texts, at, warnings) -> str:
 def line_marker(text: str) -> str:
     """문단 글의 첫 공백 앞 토큰이 부호 모양이면 그 토큰 (doc-verify R6 규칙)."""
     parts = (text or "").split()
-    if parts and MARKER_RE.match(parts[0]):
+    if parts and parts[0] not in CORP and MARKER_RE.match(parts[0]):
         return parts[0]
     return ""
 

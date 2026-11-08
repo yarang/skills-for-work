@@ -107,6 +107,8 @@ def profile_mode(path: Path):
         prof = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
         raise UsageError(f"프로파일 YAML 오류: {yaml_error_brief(exc)}") from exc
+    except OSError as exc:  # 권한 없음·읽는 중 사라짐 — 추적 대신 사용 오류(2) (리뷰 3차 L2)
+        raise UsageError(f"프로파일을 읽지 못함: {exc.strerror or type(exc).__name__}") from exc
     return (prof.get("mode"), prof) if isinstance(prof, dict) else (None, None)
 
 

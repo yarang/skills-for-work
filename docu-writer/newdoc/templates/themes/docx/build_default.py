@@ -121,8 +121,14 @@ def save_new(document, out: Path) -> None:
     buffer = io.BytesIO()
     document.save(buffer)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "xb") as handle:
-        handle.write(buffer.getvalue())
+    handle = open(out, "xb")  # 「x」: 이미 있으면 FileExistsError — 남의 파일은 건드리지 않음
+    try:
+        with handle:
+            handle.write(buffer.getvalue())
+    except BaseException:
+        # 여기까지 왔으면 이 실행이 만든 파일입니다 — 쓰다 만 DOCX를 남기지 않습니다 (리뷰 3차 M10)
+        out.unlink(missing_ok=True)
+        raise
 
 
 def main(argv=None) -> int:
