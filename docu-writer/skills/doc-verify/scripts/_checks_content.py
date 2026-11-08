@@ -93,12 +93,18 @@ def check_residue(ctx: Ctx) -> dict:
 
 # 편집본 마크다운의 표지가 글자로 새어 든 자리 (종단 시험 F12: kordoc patch_document가
 # 요약 상자 글 앞에 「> 」를 그대로 넣음). 견본에 같은 꼴이 있으면 그 종류는 문서의 글로 봅니다.
+# 줄 머리 표지는 문단 안 줄바꿈(DOCX soft break, 여러 문단 표 칸) 뒤 줄에서도 찾습니다(re.M,
+# 리뷰 3차 M2). 줄 머리 공백은 [ \t]로만 — \s는 줄바꿈을 넘어 앞 줄과 이어 버립니다.
+# 「> 10 mg/L」·「> 0.5%」처럼 > 뒤가 수치이면 비교식으로 봅니다(리뷰 3차 M1). 「> 1. 추진」·「> 2) 」처럼
+# 수치 뒤에 목록 번호 표지(. 또는 ))가 오면 인용 표지가 새어 든 것으로 봅니다.
+# 끝 판정의 「,숫자」 제외는 「1,000.」이 「1」까지만 맞고 넘어가는 되짚기를 막습니다(codex review9).
+_NUMBER_AFTER = r"[ \t]*[+\-−±]?\d[\d,]*(?:\.\d+)?(?![\d.)]|,\d)"
 MARKUP = {
-    "인용 >": re.compile(r"^\s*>\s"),
-    "제목 #": re.compile(r"^\s*#{1,6}\s"),
+    "인용 >": re.compile(rf"^[ \t]*>[ \t](?!{_NUMBER_AFTER})", re.M),
+    "제목 #": re.compile(r"^[ \t]*#{1,6}[ \t]", re.M),
     "굵게 **": re.compile(r"\*\*[^*\s][^*]*\*\*|__[^_\s][^_]*__"),
     "탈출 \\": re.compile(r"\\[~*_#>|\[\]`-]"),
-    "표 |": re.compile(r"^\s*\|.*\|\s*$"),
+    "표 |": re.compile(r"^[ \t]*\|[^\n]*\|[ \t]*$", re.M),
 }
 
 
@@ -107,10 +113,12 @@ def _markup_kinds(text: str) -> list:
 
 
 def check_markup(ctx: Ctx) -> dict:
+    # MD 출력은 마크다운 자체가 출력 형식이라 표지가 모두 정상 문법이므로 어느 모드든 보지 않습니다
+    # (리뷰 3차 M1 — 견본 MD에 굵게가 없을 때 결과의 정상 **강조**가 fail이 되던 문제).
     # 신규 모드는 견본이 없으므로 「견본에 같은 꼴이 있으면 뺀다」 예외 없이 모든 표지를 봅니다.
-    # 다만 MD 출력은 마크다운 자체가 출력 형식이라 표지가 모두 정상 문법이므로 보지 않습니다.
-    if ctx.mode == "new" and ctx.out.fmt == "md":
-        return new_mode_skip("markup", "MD 출력은 마크다운이 곧 형식")
+    if ctx.out.fmt == "md":
+        why = "MD 출력은 마크다운이 곧 형식"
+        return new_mode_skip("markup", why) if ctx.mode == "new" else entry("markup", "skip", why)
     known = set() if ctx.mode == "new" else {
         kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
     # 보고에는 종류와 위치만 적습니다 — 결과 글은 양식 값(전화번호·이름)일 수 있습니다(리뷰 3차 H2).

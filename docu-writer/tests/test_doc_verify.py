@@ -8,6 +8,8 @@ import copy
 import hashlib
 import json
 import shutil
+import sys
+from pathlib import Path
 
 import pytest
 import yaml
@@ -152,7 +154,10 @@ def test_residue(samples, tmp_path):
 # --- markup (종단 시험 F12) ---------------------------------------------------------
 
 @pytest.mark.parametrize("text", ["> 신청 건수는 135건이다.", "## 추진 배경", "신청 **135건** 접수",
-                                  "신청 건수 135건\\~140건", "| 구분 | 내용 |"])
+                                  "신청 건수 135건\\~140건", "| 구분 | 내용 |", "> 1. 추진 배경", "> 1,000. 추진", "> 1,000) 항목",
+                                  # 문단 안 줄바꿈(soft break) 뒤 줄 머리 표지 (리뷰 3차 M2)
+                                  "요약\n> 신청 건수는 135건이다.", "요약\n## 추진 배경",
+                                  "요약\n| 구분 | 내용 |"])
 def test_markup_leak_fails(samples, tmp_path, text):
     """kordoc patch_document가 요약 상자 글 앞에 「> 」를 남긴 사례처럼 마크다운 표지가 글자로 남으면 실패."""
     _, r = verify(samples, tmp_path, profile(samples), output(samples, tmp_path, replace_body(text)))
@@ -164,6 +169,22 @@ def test_markup_plain_text_passes(samples, tmp_path):
     out = output(samples, tmp_path, replace_body("신청 건수는 135건(전년 대비 12% 증가)이다. a>b, 3*4"))
     _, r = verify(samples, tmp_path, profile(samples), out)
     assert r["markup"]["status"] == "pass", r["markup"]
+
+
+@pytest.mark.parametrize("text", ["> 10 mg/L 초과 시 재측정", "> 0.5% 이면 보고", "기준\n> 1,000건 이상"])
+def test_markup_comparison_is_not_quote(samples, tmp_path, text):
+    """리뷰 3차 M1: 줄 머리 「> 」 뒤가 수치면 비교식(초과)이지 인용 표지가 아닙니다."""
+    _, r = verify(samples, tmp_path, profile(samples), output(samples, tmp_path, replace_body(text)))
+    assert r["markup"]["status"] == "pass", r["markup"]
+
+
+def test_markup_md_output_skips_in_sample_mode(samples, tmp_path):
+    """리뷰 3차 M1: 견본 MD에 굵게·인용이 없어도 결과 MD의 정상 마크다운은 형식입니다(모드와 무관)."""
+    out = output(samples, tmp_path, fmt="md")
+    out.write_text(out.read_text(encoding="utf-8") + "\n신청 **135건** 접수\n\n> 참고: 전년 대비 증가\n",
+                   encoding="utf-8")
+    _, r = verify(samples, tmp_path, profile(samples, "md"), out, fmt="md")
+    assert r["markup"]["status"] == "skip", r["markup"]
 
 
 def test_markup_kind_in_source_is_document_text(samples, tmp_path):
@@ -201,15 +222,20 @@ def test_markup_report_has_no_output_text(samples, tmp_path):
     assert not _leaks(proc, r["markup"], "1234", "담당자"), r["markup"]
 
 
-def test_markup_counts_distinct_hits_without_locator(samples, tmp_path):
-    """MD 문단은 locator가 없어도 서로 다른 두 줄은 2건으로 셉니다(중복 제거는 글 기준으로 안에서만)."""
-    out = output(samples, tmp_path, fmt="md")
-    out.write_text(out.read_text(encoding="utf-8") + "\n신청 **135건** 접수\n\n처리 **120건** 완료\n",
-                   encoding="utf-8")
-    proc, r = verify(samples, tmp_path, profile(samples, "md"), out, fmt="md")
-    assert r["markup"]["status"] == "fail", r["markup"]
-    assert r["markup"]["detail"].startswith("2건"), r["markup"]
-    assert not _leaks(proc, r["markup"], "135건", "120건"), r["markup"]
+def test_markup_counts_distinct_hits_without_locator():
+    """HWPX 최상위 문단은 locator가 없어도 서로 다른 두 줄은 2건으로 셉니다(중복 제거는 글 기준).
+    (MD 출력은 리뷰 3차 M1로 markup을 보지 않으므로 locator 없는 HWPX 문단으로 확인합니다.)"""
+    sys.path.insert(0, str(DOC_VERIFY.parent))
+    from _checks_content import Ctx, check_markup
+    from _readers import Doc, Para
+
+    out = Doc("hwpx", [Para("신청 **135건** 접수"), Para("처리 **120건** 완료"), Para("신청 **135건** 접수")])
+    ctx = Ctx({}, "sample", None, None, Path("out.hwpx"), Doc("hwpx", [Para("견본 글")]), out,
+              None, None, None)
+    r = check_markup(ctx)
+    assert r["status"] == "fail", r
+    assert r["detail"].startswith("2건"), r
+    assert "135" not in json.dumps(r, ensure_ascii=False), r
 
 
 def test_markup_table_cell_counted_once(samples, tmp_path):

@@ -4,14 +4,14 @@
 
 ## 1. 현재 상태 (v0.3.0, 2026-11-06)
 
-> **견본 우선(1단계)에 더해 견본 없는 신규 작성(2단계)이 들어왔습니다.** 테스트 463건이 통과합니다. 2단계 종단 점검은 docx·hwpx·md 신규 작성 각 1건과, 법제처 공개 서식으로 만든 고정 견본 1건(기안문, `form` 모드)으로 했습니다. 1단계 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에, v0.3.0 회귀 종단 시험 결과는 [14장](#14-회귀-종단-시험-2026-11-06-v030)에 있습니다.
+> **견본 우선(1단계)에 더해 견본 없는 신규 작성(2단계)이 들어왔습니다.** 테스트 473건이 통과합니다. 2단계 종단 점검은 docx·hwpx·md 신규 작성 각 1건과, 법제처 공개 서식으로 만든 고정 견본 1건(기안문, `form` 모드)으로 했습니다. 1단계 시험 결과는 [13장](#13-종단-시험-결과-2026-11-04)에, v0.3.0 회귀 종단 시험 결과는 [14장](#14-회귀-종단-시험-2026-11-06-v030)에 있습니다.
 
 ![구현 상태](diagrams/implementation-status.svg)
 
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 규칙 | 에이전트 5개(`planner` 추가), 스킬 13개(`newdoc-workflow` 채움) | 완료 |
-| 테스트 | `tests/` `test_*.py` 12개 파일, 463건 (리뷰 회귀, 종단 시험 회귀, N9 리뷰 회귀, 리뷰 3차 회귀 포함) | **463 통과** (10장) |
+| 테스트 | `tests/` `test_*.py` 12개 파일, 473건 (리뷰 회귀, 종단 시험 회귀, N9 리뷰 회귀, 리뷰 3차 회귀 포함) | **473 통과** (10장) |
 | 스크립트 | 1단계 6개(`write_guard.py`, `profile_extract.py`, `patch_docx.py`, `patch_pptx.py`, `render.py`, `doc_verify.py`) + 2단계 `catalog.py`, `doc_verify.py` 신규 모드, `planner` 역할 hook | 완료 |
 | 테마 | 기본 DOCX 테마 `newdoc/templates/themes/docx/default.docx`(+토큰), HWPX는 kordoc 프리셋 | 완료 |
 | 시험 | 1단계 9개 경로(13장), 2단계 신규 3개 형식 + 고정 견본 `form` 1건(경로 B·동봉 프로파일 포함), v0.3.0 회귀 종단(14장) | **완료** |
@@ -237,7 +237,7 @@ cd <이 저장소>/docu-writer
 uv run --python 3.13 --with pytest,python-docx,python-pptx,pyyaml,lxml,pymupdf pytest tests
 ```
 
-2026-11-08 실행 결과는 `463 passed`입니다(약 90초, `test_render.py`·`test_render_fonts.py`는 `soffice`·`pandoc`이 있어야 합니다). lint는 `uvx ruff check --select F,E9 hooks template/skills/template-analysis/scripts skills/*/scripts newdoc/skills/*/scripts tests`로 봅니다.
+2026-11-08 실행 결과는 `473 passed`입니다(약 90초, `test_render.py`·`test_render_fonts.py`는 `soffice`·`pandoc`이 있어야 합니다). lint는 `uvx ruff check --select F,E9 hooks template/skills/template-analysis/scripts skills/*/scripts newdoc/skills/*/scripts tests`로 봅니다.
 
 종단 시험에서 나온 회귀 테스트는 docstring에 「종단 시험 F번호」를 적어 두었습니다. `test_e2e_chain.py`(③→⑥ 연결), `test_render_fonts.py`(F3), `test_workflow_snippets.py`(F2, SKILL.md의 셸 명령을 그대로 실행)가 이때 생겼습니다.
 
