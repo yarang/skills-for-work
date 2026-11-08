@@ -167,6 +167,22 @@ def dump_yaml(data) -> str:
     return yaml.safe_dump(plain(data), allow_unicode=True, sort_keys=False)
 
 
+def yaml_error_brief(exc: Exception) -> str:
+    """YAML 읽기 오류를 원문 없이 — PyYAML 메시지는 틀린 줄을 그대로 보여 주므로(개인정보·비밀값)
+    종류와 위치만 남깁니다(리뷰 3차 M9). 파일 오류(OSError)는 경로만 담으므로 그대로 둡니다."""
+    if isinstance(exc, OSError):
+        return str(exc)
+    if isinstance(exc, UnicodeDecodeError):
+        return f"UTF-8로 읽을 수 없음 ({exc.start}번째 바이트)"
+    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+    if mark is not None:
+        return f"{type(exc).__name__} ({mark.line + 1}행 {mark.column + 1}열)"
+    position = getattr(exc, "position", None)
+    if position is not None:
+        return f"{type(exc).__name__} ({position}번째 글자)"
+    return type(exc).__name__
+
+
 def emu_to_mm(emu) -> float:
     return round(int(emu) / 36000, 1)
 

@@ -9,7 +9,7 @@ import json
 import pytest
 import yaml
 
-from conftest import BODY_SENTENCE, EXPECTED_TABLES, PATCH_DOCX, uv
+from conftest import BODY_SENTENCE, EXPECTED_TABLES, PATCH_DOCX, PII_YAML, assert_no_pii, uv
 
 ALLOWED = ["Normal", "Title", "Heading 1", "List Bullet"]
 
@@ -262,3 +262,13 @@ def test_row_add_cloned_from_merged_row_drops_vmerge(merged, tmp_path):
     tr = Document(out).tables[0]._tbl.tr_lst[3]
     assert not list(tr.iter(qn("w:vMerge")))
     assert [c.text for c in Document(out).tables[0].rows[3].cells] == ["시행", "4"]
+
+
+def test_broken_edits_yaml_reports_line_only(samples, tmp_path):
+    """편집 목록은 양식 값을 담으므로 YAML 오류 보고에 원문을 옮기지 않습니다 (리뷰 3차 M9)."""
+    e = tmp_path / "edits.yaml"
+    e.write_text(PII_YAML, encoding="utf-8")
+    proc = uv(PATCH_DOCX, "apply", samples["docx"], "--edits", e,
+              "--profile", write_profile(tmp_path), "--out", tmp_path / "out.docx")
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert_no_pii(proc.stdout + proc.stderr)

@@ -27,7 +27,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _pe_common import UsageError, detect_format, dump_yaml, format_module, sha256_of  # noqa: E402
+from _pe_common import (UsageError, detect_format, dump_yaml, format_module, sha256_of,  # noqa: E402
+                        yaml_error_brief)
 
 PROFILE_FORMATS = ("docx", "pptx", "md")
 
@@ -105,7 +106,7 @@ def profile_mode(path: Path):
     try:
         prof = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
-        raise UsageError(f"프로파일 YAML 오류: {exc}") from exc
+        raise UsageError(f"프로파일 YAML 오류: {yaml_error_brief(exc)}") from exc
     return (prof.get("mode"), prof) if isinstance(prof, dict) else (None, None)
 
 

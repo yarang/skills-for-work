@@ -12,7 +12,7 @@ import shutil
 import pytest
 import yaml
 
-from conftest import BODY_SENTENCE, DOC_VERIFY, FIXTURES, uv
+from conftest import BODY_SENTENCE, DOC_VERIFY, FIXTURES, PII_YAML, assert_no_pii, uv
 
 IDS = ["hash", "residue", "markup", "placeholder", "fields", "scope", "r4_headings", "r5_tokens",
        "r6_numbering", "table_header", "length", "r1_tables", "rewrite"]
@@ -182,6 +182,43 @@ def test_markup_kind_in_source_is_document_text(samples, tmp_path):
     doc.save(out)
     _, r = verify({**samples, "docx": src}, tmp_path, profile({**samples, "docx": src}), out)
     assert r["markup"]["status"] == "pass", r["markup"]
+
+
+# --- 보고에 출력 글을 옮기지 않음 (리뷰 3차 H2) ---------------------------------------
+# 결과 문서의 글은 양식 값(전화번호·이름)일 수 있으므로 detail·locations·표준 출력에는
+# 검사 종류와 위치만 남깁니다. 필드 검사가 값 대신 「값(N자)」을 적는 것과 같은 규칙입니다.
+
+def _leaks(proc, entry, *needles):
+    seen = json.dumps(entry, ensure_ascii=False) + proc.stdout
+    return [n for n in needles if n in seen]
+
+
+def test_markup_report_has_no_output_text(samples, tmp_path):
+    out = output(samples, tmp_path, replace_body("담당자 연락처 **010-1234-5678** 확인"))
+    proc, r = verify(samples, tmp_path, profile(samples), out)
+    assert r["markup"]["status"] == "fail", r["markup"]
+    assert "굵게" in r["markup"]["detail"]
+    assert not _leaks(proc, r["markup"], "1234", "담당자"), r["markup"]
+
+
+def test_markup_counts_distinct_hits_without_locator(samples, tmp_path):
+    """MD 문단은 locator가 없어도 서로 다른 두 줄은 2건으로 셉니다(중복 제거는 글 기준으로 안에서만)."""
+    out = output(samples, tmp_path, fmt="md")
+    out.write_text(out.read_text(encoding="utf-8") + "\n신청 **135건** 접수\n\n처리 **120건** 완료\n",
+                   encoding="utf-8")
+    proc, r = verify(samples, tmp_path, profile(samples, "md"), out, fmt="md")
+    assert r["markup"]["status"] == "fail", r["markup"]
+    assert r["markup"]["detail"].startswith("2건"), r["markup"]
+    assert not _leaks(proc, r["markup"], "135건", "120건"), r["markup"]
+
+
+def test_markup_table_cell_counted_once(samples, tmp_path):
+    """표 칸 글은 칸·표 단위로 두 번 읽히지만 한 건입니다."""
+    def edit(doc):
+        doc.tables[0].cell(1, 0).paragraphs[0].runs[0].text = "**준비**"
+    _, r = verify(samples, tmp_path, profile(samples), output(samples, tmp_path, edit))
+    assert r["markup"]["status"] == "fail", r["markup"]
+    assert r["markup"]["detail"].startswith("1건"), r["markup"]
 
 
 # --- placeholder -----------------------------------------------------------------
@@ -377,6 +414,29 @@ def test_r6_numbering(samples, tmp_path, numbering, texts, status):
     assert r["r6_numbering"]["status"] == status, texts
 
 
+def test_r6_report_has_no_output_text(samples, tmp_path):
+    """「010.1234.5678」은 1.1 모양으로 읽힙니다 — 보고에는 모양만 적고 글 토큰은 옮기지 않습니다."""
+    prof = profile(samples)
+    prof["structure"]["numbering"] = ["1."]
+    proc, r = verify(samples, tmp_path, prof, output(samples, tmp_path, add_paras("010.1234.5678 연락처")))
+    assert r["r6_numbering"]["status"] == "fail", r["r6_numbering"]
+    assert "1.1" in r["r6_numbering"]["detail"]
+    assert not _leaks(proc, r["r6_numbering"], "1234", "연락처"), r["r6_numbering"]
+
+
+def test_r6_locator_fallback_has_no_output_text(samples, tmp_path):
+    """MD·HWPX 문단은 locator가 없습니다 — 위치는 글 앞부분이 아니라 문단 순번으로 적습니다."""
+    out = output(samples, tmp_path, fmt="md")
+    out.write_text(out.read_text(encoding="utf-8") + "\n010.1234.5678 연락처\n", encoding="utf-8")
+    prof = profile(samples, "md")
+    prof["structure"]["numbering"] = ["1."]
+    proc, r = verify(samples, tmp_path, prof, out, fmt="md")
+    assert r["r6_numbering"]["status"] == "fail", r["r6_numbering"]
+    assert r["r6_numbering"]["locations"], r["r6_numbering"]
+    assert all(loc.startswith("문단 ") for loc in r["r6_numbering"]["locations"]), r["r6_numbering"]
+    assert not _leaks(proc, r["r6_numbering"], "1234", "연락처"), r["r6_numbering"]
+
+
 # --- 표 머리행 ----------------------------------------------------------------------
 
 def test_table_header_mismatch_fails(samples, tmp_path):
@@ -487,6 +547,17 @@ def test_r1_table_split_warns(samples, tmp_path):
     assert r["r1_tables"]["status"] == "warn"
     assert "t:1" in r["r1_tables"]["locations"]
     assert "t:2" not in r["r1_tables"]["locations"]
+    assert not _leaks(proc, r["r1_tables"], "구분"), r["r1_tables"]  # 첫 칸 글은 옮기지 않음 (리뷰 3차 H2)
+
+
+def test_broken_profile_yaml_reports_line_only(samples, tmp_path):
+    """YAML 오류 보고는 줄·열만 — PyYAML 메시지의 원문 조각은 옮기지 않습니다 (리뷰 3차 M9)."""
+    pf = tmp_path / "profile.yaml"
+    pf.write_text(PII_YAML, encoding="utf-8")
+    proc = uv(DOC_VERIFY, "--profile", pf, "--source", samples["docx"], "--expect-sha256", sha256(samples["docx"]),
+              "--output", output(samples, tmp_path), "--out-dir", tmp_path / "verify")
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert_no_pii(proc.stdout + proc.stderr)
 
 
 def test_r1_tables_on_one_page_pass(samples, tmp_path):

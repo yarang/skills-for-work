@@ -9,7 +9,7 @@ import json
 import pytest
 import yaml
 
-from conftest import EXPECTED_TABLES, PATCH_PPTX, uv
+from conftest import EXPECTED_TABLES, PATCH_PPTX, PII_YAML, assert_no_pii, uv
 
 ALLOWED = ["Title Slide", "Title and Content", "Title Only"]
 
@@ -258,3 +258,14 @@ def test_slide_delete_conflicts_rejected(samples, tmp_path, edits):
     proc, out = apply(samples, tmp_path, edits)
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert not out.exists()
+
+
+def test_broken_edits_yaml_reports_line_only(samples, tmp_path):
+    """편집 목록은 양식 값을 담으므로 YAML 오류 보고에 원문을 옮기지 않습니다 (리뷰 3차 M9)."""
+    e = tmp_path / "edits.yaml"
+    e.write_text(PII_YAML, encoding="utf-8")
+    prof = tmp_path / "profile.yaml"
+    prof.write_text("profile_version: 1\n", encoding="utf-8")
+    proc = uv(PATCH_PPTX, "apply", samples["pptx"], "--edits", e, "--profile", prof, "--out", tmp_path / "out.pptx")
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert_no_pii(proc.stdout + proc.stderr, "line 2")

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import BODY_SENTENCE, EXPECTED_TABLES, FIXTURES, PROFILE_EXTRACT, uv
+from conftest import BODY_SENTENCE, EXPECTED_TABLES, FIXTURES, PII_YAML, PROFILE_EXTRACT, assert_no_pii, uv
 
 
 def tables(path):
@@ -479,3 +479,22 @@ def test_check_broken_yaml_profile_is_usage_error(samples, tmp_path, with_source
     assert proc.returncode == 2, proc.stdout + proc.stderr
     assert proc.stdout == ""
     assert "YAML" in proc.stderr
+
+
+def test_check_broken_profile_reports_line_only(tmp_path):
+    """프로파일 YAML 오류 보고는 줄·열만 — 원문 조각은 옮기지 않습니다 (리뷰 3차 M9)."""
+    p = tmp_path / "broken.yaml"
+    p.write_text(PII_YAML, encoding="utf-8")
+    proc = uv(PROFILE_EXTRACT, "check", p)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert_no_pii(proc.stdout + proc.stderr)
+
+
+def test_check_broken_tables_reports_line_only(valid, samples, tmp_path):
+    p = tmp_path / "checked.yaml"
+    p.write_text(yaml.safe_dump(valid, allow_unicode=True), encoding="utf-8")
+    t = tmp_path / "tables.yaml"
+    t.write_text(PII_YAML, encoding="utf-8")
+    proc = uv(PROFILE_EXTRACT, "check", p, "--source", samples["docx"], "--tables", t)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert_no_pii(proc.stdout + proc.stderr)

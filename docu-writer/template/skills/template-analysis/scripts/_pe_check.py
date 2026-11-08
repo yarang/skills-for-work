@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 from _pe_common import (MIN_SAMPLE_LEN, UsageError, detect_format, format_module, no_space,
-                        placeholder_only, sha256_of)
+                        placeholder_only, sha256_of, yaml_error_brief)
 
 MODES = ("sample", "form", "update", "new")
 SECTION_KEYS = ("id", "title", "level", "anchor", "kind", "required", "guide", "length")
@@ -32,8 +32,8 @@ def load_tables(tables_path, source: Path, fmt: str):
         return format_module(fmt).tables(source)[0]
     try:
         data = load_yaml_file(Path(tables_path), "--tables")
-    except yaml.YAMLError as exc:
-        raise UsageError(f"--tables YAML 오류: {exc}") from exc
+    except (yaml.YAMLError, UnicodeDecodeError) as exc:
+        raise UsageError(f"--tables YAML 오류: {yaml_error_brief(exc)}") from exc
     if not isinstance(data, dict) or not isinstance(data.get("tables"), list):
         raise UsageError("--tables에 tables 목록이 없음")
     return data["tables"]
@@ -218,7 +218,7 @@ def run_check(profile_path: Path, source: Path, tables_path):
     try:
         prof = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
-        return [f"프로파일이 YAML로 읽히지 않음: {exc}"]
+        return [f"프로파일이 YAML로 읽히지 않음: {yaml_error_brief(exc)}"]
     if not isinstance(prof, dict):
         return ["프로파일 최상위가 사전이 아님"]
     fails = []

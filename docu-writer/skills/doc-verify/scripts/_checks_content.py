@@ -5,6 +5,7 @@
 """
 import hashlib
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -112,15 +113,20 @@ def check_markup(ctx: Ctx) -> dict:
         return new_mode_skip("markup", "MD 출력은 마크다운이 곧 형식")
     known = set() if ctx.mode == "new" else {
         kind for text, _ in doc_search_items(ctx.src) for kind in _markup_kinds(text)}
-    hits, locs = [], []
+    # 보고에는 종류와 위치만 적습니다 — 결과 글은 양식 값(전화번호·이름)일 수 있습니다(리뷰 3차 H2).
+    # 표 칸 글은 칸·표 단위로 두 번 나오므로 (종류, 글) 열쇠로 한 번만 셉니다. 열쇠는 보고에 나가지 않고,
+    # locator로 세면 locator 없는 MD·HWPX 문단이 한 건으로 뭉치고 표 칸은 두 건이 됩니다.
+    seen, kinds_hit, locs = set(), Counter(), []
     for text, loc in doc_search_items(ctx.out):
         kinds = [k for k in _markup_kinds(text) if k not in known]
-        hit = kinds and f'{kinds[0]} "{text.strip()[:30]}"'
-        if hit and hit not in hits:  # 표 칸 글은 칸·행·표 단위로 여러 번 나오므로 한 번만 셉니다
-            hits.append(hit)
-            locs.append(loc)
-    if hits:
-        return entry("markup", "fail", f"{len(hits)}건: {brief(hits)}", _unique(locs))
+        if not kinds or (kinds[0], text.strip()[:30]) in seen:
+            continue
+        seen.add((kinds[0], text.strip()[:30]))
+        kinds_hit[kinds[0]] += 1
+        locs.append(loc)
+    if seen:
+        shown = [f"{kind} {n}곳" for kind, n in kinds_hit.items()]
+        return entry("markup", "fail", f"{len(seen)}건: {', '.join(shown)}", _unique(locs))
     return entry("markup", "pass", "마크다운 표지 없음")
 
 

@@ -108,9 +108,11 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/doc_verify.py" \
 - 결과: 통과 | 차단 (종료 코드 N)
   pass  hash          견본 sha256 일치
   fail  residue       3건: "2025년 상반기 실적" (2쪽) …
-  warn  r1_tables     표 2 「추진 일정」 첫 칸 3쪽, 끝 칸 4쪽
+  warn  r1_tables     표 t:2 첫 칸 3쪽, 끝 칸 4쪽
   skip  r5_tokens     MD는 서체 정보 없음
 ```
+
+`markup`·`r6_numbering`·`r1_tables`의 `detail`과 `locations`에는 결과 문서의 글을 적지 않습니다. 결과 글은 양식 값(이름·전화번호)일 수 있으므로 종류(`굵게 ** 2곳`), 부호 모양(`「1.1」`), 표·문단 위치(`t:2`, `p:3`, locator가 없으면 `문단 N`)만 냅니다. YAML 파일이 틀렸을 때도 오류 종류와 줄·열만 보이고 틀린 줄의 글은 보이지 않습니다.
 
 ## 실패했을 때
 

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import ROOT, uv
+from conftest import PII_YAML, ROOT, assert_no_pii, uv
 
 CATALOG = ROOT / "newdoc/skills/newdoc-workflow/scripts/catalog.py"
 ROUTE_KEYS = {
@@ -528,3 +528,11 @@ def test_fixed_mode_form_passes_through(env):
     assert proc.returncode == 0, proc.stderr
     got = route(env)
     assert (got["route"], got["mode"]) == ("fixed", "form")
+
+
+def test_catalog_yaml_error_reports_line_only(env):
+    """카탈로그 YAML 오류 보고에 원문을 옮기지 않습니다 (리뷰 3차 M9)."""
+    write_catalog(env["user"], None, raw="catalog_version: 1\n" + PII_YAML)
+    proc = match(env, "보고서", "docx")
+    assert_refused(proc, env)
+    assert_no_pii(proc.stderr, "3행")

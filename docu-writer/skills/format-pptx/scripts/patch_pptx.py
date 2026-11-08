@@ -54,12 +54,28 @@ def load_pptx(path: Path):
         raise UsageError(f"cannot open {path} as PPTX: {exc}") from exc
 
 
+def yaml_error_brief(exc: Exception) -> str:
+    """YAML error without source text: PyYAML echoes the offending line (PII, secrets),
+    so keep only the error type and position (review 3, M9). OSError carries only the path."""
+    if isinstance(exc, OSError):
+        return str(exc)
+    if isinstance(exc, UnicodeDecodeError):
+        return f"not valid UTF-8 (byte {exc.start})"
+    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+    if mark is not None:
+        return f"{type(exc).__name__} (line {mark.line + 1} column {mark.column + 1})"
+    position = getattr(exc, "position", None)
+    if position is not None:
+        return f"{type(exc).__name__} (character {position})"
+    return type(exc).__name__
+
+
 def load_yaml(path: Path, what: str):
     require_file(path, what)
     try:
         return yaml.safe_load(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
-        raise UsageError(f"cannot parse {what} {path}: {exc}") from exc
+        raise UsageError(f"cannot parse {what} {path}: {yaml_error_brief(exc)}") from exc
 
 
 def check_out(sample: Path, out: Path) -> None:

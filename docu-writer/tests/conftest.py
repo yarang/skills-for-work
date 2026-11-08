@@ -22,6 +22,16 @@ DOC_VERIFY = ROOT / "skills/doc-verify/scripts/doc_verify.py"
 
 BODY_SENTENCE = "2026년 상반기 신청 건수는 120건으로 전년보다 늘었다."
 
+# 둘째 줄(21열)이 틀린 YAML. PyYAML 오류 메시지는 틀린 줄을 그대로 보여 주므로, 보고가 원문을
+# 되풀이하면 이 번호가 보입니다(리뷰 3차 M9). 보고에는 줄·열만 있어야 합니다.
+PII_YAML = "name: a\nphone: 010-1234-5678: x\n"
+PII_DIGITS = "1234-5678"
+
+
+def assert_no_pii(text: str, line_hint: str = "2행") -> None:
+    assert PII_DIGITS not in text, text
+    assert line_hint in text, text
+
 EXPECTED_TABLES = {
     "hwpx": [
         {"at": "t:1", "rows": 1, "cols": 1, "first": "○○사업 추진계획(안)", "nested": 0},

@@ -190,14 +190,15 @@ def check_r6(ctx: Ctx) -> dict:
     allowed = {shape_of(n) or n for n in numbering if n}
     by_level: dict = {}
     problems, locs = [], []
-    for p in ctx.out.paras:
+    # 보고에는 부호 모양(「1.1」)과 문단 번호만 — 줄 머리 글은 전화번호·날짜 같은 값일 수 있습니다(리뷰 3차 H2)
+    for i, p in enumerate(ctx.out.paras, 1):
         shape = _marker(p)
         if shape is None:
             continue
         by_level.setdefault(p.level, Counter())[shape] += 1
         if allowed and shape not in allowed:
-            problems.append(f"「{p.text.split()[0]}」 번호 체계 밖")
-            locs.append(p.loc or nows(p.text)[:20])
+            problems.append(f"「{shape}」 모양 번호 체계 밖")
+            locs.append(p.loc or f"문단 {i}")
     for level, counts in by_level.items():
         if len(counts) > 1:
             problems.append(f"같은 단계에 부호 섞임 ({', '.join(counts)})")
@@ -281,7 +282,7 @@ def check_r1(ctx: Ctx) -> dict:
             continue
         seen += 1
         if pf != pl:
-            suspects.append(f"표 {table.at} 「{first_last(table)[0]}」 첫 칸 {pf + 1}쪽, 끝 칸 {pl + 1}쪽")
+            suspects.append(f"표 {table.at} 첫 칸 {pf + 1}쪽, 끝 칸 {pl + 1}쪽")  # 칸 글은 보고하지 않음(H2)
             locs.append(table.at)
     if suspects:
         return entry("r1_tables", "warn", "; ".join(suspects + notes), locs)
