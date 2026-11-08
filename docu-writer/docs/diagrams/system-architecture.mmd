@@ -1,0 +1,49 @@
+%% docu-writer 전체 구조: 메인 대화가 절차를 진행하고, 에이전트는 스킬을 불러 일하며, 결정적 일은 스크립트·외부 도구가, 쓰기 보호는 hook이 맡는다
+%%{init: {"flowchart": {"wrappingWidth": 360}}}%%
+flowchart TB
+  U(["사용자<br/>① 요구 · ④ 승인 · ⑧ 확인"])
+  subgraph MAIN["메인 대화 — 절차 스킬"]
+    direction LR
+    TW["template-workflow<br/>견본 있음 (1단계)"]
+    NW["newdoc-workflow<br/>견본 없음 (2단계)"]
+  end
+  subgraph AG["에이전트 5개 — 권한·모델이 다를 때만 나눔"]
+    direction LR
+    AN["analyst<br/>견본 → 프로파일"]
+    PL["planner<br/>목차 → 프로파일"]
+    RS["researcher<br/>근거표 (haiku)"]
+    WR["writer<br/>복사본에 작성"]
+    RV["reviewer ×3<br/>fact · style · design"]
+  end
+  SK["공유 스킬<br/>writing-principles<br/>info · visual · diagram · design-review<br/>format-hwpx · docx · pptx · markdown"]
+  subgraph CODE["스크립트 — 결정적 일 (PEP 723, uv run)"]
+    direction LR
+    C1["catalog.py<br/>profile_extract.py"]
+    C2["patch_docx.py<br/>patch_pptx.py"]
+    C3["render.py<br/>doc_verify.py"]
+  end
+  EXT[["외부 도구<br/>kordoc MCP (HWPX·HWP)<br/>soffice · pandoc · pymupdf"]]
+  WD[("작업 디렉터리<br/>.docu-writer/")]
+  HK{{"write_guard hook<br/>PreToolUse"}}
+
+  U <--> MAIN
+  MAIN -->|위임| AG
+  AG -->|불러옴| SK
+  AG --> CODE
+  MAIN -->|⑥ 직접 실행| C3
+  CODE --> EXT
+  AG -.->|쓰기 시도| HK
+  HK -.->|허용된 곳만| WD
+  MAIN --> WD
+
+  classDef main fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
+  classDef agent fill:#E1ECF7,stroke:#003366,color:#0A2540
+  classDef file fill:#FFFFFF,stroke:#9AA5B1,color:#28253D
+  classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
+  class U,TW,NW main
+  class AN,PL,RS,WR,RV agent
+  class SK,C1,C2,C3,EXT,WD file
+  class HK gate
+  style MAIN fill:#F7F8FA,stroke:#6B7B8C
+  style AG fill:#F4F8FC,stroke:#003366
+  style CODE fill:#FAFAFA,stroke:#9AA5B1

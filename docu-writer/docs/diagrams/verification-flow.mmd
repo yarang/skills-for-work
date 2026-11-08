@@ -1,0 +1,34 @@
+%% ⑥ 검증은 렌더와 결정적 검사 13개를 메인 대화가 직접 돌려 종료 코드로 판정하고, 통과한 것만 ⑦ 시각·사실·문체 리뷰로 넘긴다
+%%{init: {"flowchart": {"wrappingWidth": 360}}}%%
+flowchart LR
+  O[["⑤ 결과 파일"]] --> R["렌더<br/>render.py · kordoc"]
+  R --> PG["쪽별 PNG<br/>pages.json (쪽별 글)"]
+  O --> V
+  PG --> V
+  subgraph V["doc_verify.py — 검사 13개"]
+    direction TB
+    V1["보호<br/>hash"]
+    V2["내용<br/>residue · markup · placeholder<br/>fields · scope"]
+    V3["디자인<br/>r4 · r5 · r6 · table_header<br/>length · r1_tables"]
+    V4["대체본<br/>rewrite"]
+  end
+  V --> E{"종료 코드"}
+  E -->|"0 통과"| RV["⑦ reviewer ×3<br/>fact · style · design"]
+  E -->|"1 차단"| BK["fail 목록을 붙여<br/>⑤로 되돌림"]
+  E -->|"2 사용·환경 오류"| EN["경로·도구를 고쳐<br/>다시 실행 (통과 아님)"]
+  RV -->|"CRITICAL · HIGH"| BK
+  RV -->|"그 밖"| DL["⑧ 전달"]
+
+  classDef main fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
+  classDef agent fill:#E1ECF7,stroke:#003366,color:#0A2540
+  classDef file fill:#FFFFFF,stroke:#9AA5B1,color:#28253D
+  classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
+  classDef blind fill:#FBE9E7,stroke:#B23B2E,color:#5A1A12
+  classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
+  class O,PG,V1,V2,V3,V4 file
+  class R main
+  class E gate
+  class RV agent
+  class BK,EN blind
+  class DL done
+  style V fill:#F7F8FA,stroke:#6B7B8C

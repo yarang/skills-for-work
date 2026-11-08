@@ -1,0 +1,23 @@
+%% 개발 품질은 네 겹으로 지킨다: 단위 테스트, 실제 파일로 도는 종단 시험, 그 산출물을 HEAD 코드로 다시 돌리는 회귀, 외부 모델 리뷰. 찾은 결함은 고친 뒤 테스트로 굳힌다
+%%{init: {"flowchart": {"wrappingWidth": 360}}}%%
+flowchart LR
+  T1["<b>1. 단위 테스트</b><br/>커밋마다<br/>pytest 415건 (파일 12개)<br/>ruff F · E9"]
+  E1["<b>2. 종단 시험</b><br/>실제 견본 파일로<br/>1단계 9개 경로<br/>2단계 신규 3형식 + 고정 견본"]
+  G1["<b>3. 회귀</b><br/>종단 산출물을 HEAD로<br/>regress.py 19건<br/>정상 10 · 음성 9"]
+  X1["<b>4. 외부 리뷰</b><br/>작성자와 문맥 공유 안 함<br/>codex exec (read-only)<br/>agy (antigravity)"]
+  F{{"결함 F1~F17<br/>리뷰 지적"}}
+  FIX["수정<br/>+ 회귀 테스트 추가"]
+  T1 --> E1 --> G1 --> X1
+  E1 -.->|발견| F
+  X1 -.->|발견| F
+  F --> FIX
+  FIX -.->|테스트로 굳힘| T1
+
+  classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
+  classDef agent fill:#E1ECF7,stroke:#003366,color:#0A2540
+  classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
+  classDef main fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
+  class T1,E1,G1 done
+  class X1 agent
+  class F gate
+  class FIX main

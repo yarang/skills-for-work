@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" width="880" height="400" role="img" aria-labelledby="t d">
+  <title id="t">견본 우선 개념</title>
+  <desc id="d">견본 원본은 손대지 않고 복사본을 만든다. 복사본에서 번호 체계·표·글꼴·여백 같은 모양은 그대로 두고 글만 근거표의 새 내용으로 바꾼다. 근거가 없는 칸은 ○○ 자리표시로 남긴다.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#003366"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#28253D" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  <style>
+    text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; fill: #28253D; }
+    .h { font-size: 16px; font-weight: 700; }
+    .s { font-size: 12px; fill: #4A5563; }
+    .tiny { font-size: 11px; }
+    .old { fill: #9AA5B1; }
+    .new { fill: #003366; }
+  </style>
+
+  <rect width="880" height="400" fill="#FFFFFF"/>
+
+  <!-- 왼쪽: 견본 원본 -->
+  <text x="150" y="34" class="h" text-anchor="middle">견본 원본</text>
+  <text x="150" y="54" class="s" text-anchor="middle">손대지 않음 · sha256으로 대조</text>
+  <g filter="url(#shadow)">
+    <rect x="50" y="70" width="200" height="270" rx="4" fill="#FFFFFF" stroke="#9AA5B1" stroke-width="1.5"/>
+  </g>
+  <!-- 제목 띠 -->
+  <rect x="66" y="86" width="168" height="22" fill="#EEF0F3" stroke="#6B7B8C"/>
+  <rect x="96" y="94" width="108" height="6" rx="3" class="old"/>
+  <!-- □ 문단 -->
+  <text x="68" y="132" class="tiny">□</text>
+  <rect x="84" y="125" width="130" height="6" rx="3" class="old"/>
+  <text x="80" y="152" class="tiny">ㅇ</text>
+  <rect x="96" y="145" width="120" height="6" rx="3" class="old"/>
+  <text x="80" y="170" class="tiny">ㅇ</text>
+  <rect x="96" y="163" width="96" height="6" rx="3" class="old"/>
+  <!-- 표 -->
+  <rect x="66" y="184" width="168" height="66" fill="none" stroke="#6B7B8C"/>
+  <rect x="66" y="184" width="168" height="18" fill="#E1ECF7" stroke="#6B7B8C"/>
+  <line x1="122" y1="184" x2="122" y2="250" stroke="#6B7B8C"/>
+  <line x1="178" y1="184" x2="178" y2="250" stroke="#6B7B8C"/>
+  <line x1="66" y1="226" x2="234" y2="226" stroke="#6B7B8C"/>
+  <rect x="76" y="211" width="36" height="6" rx="3" class="old"/>
+  <rect x="132" y="211" width="36" height="6" rx="3" class="old"/>
+  <rect x="188" y="211" width="36" height="6" rx="3" class="old"/>
+  <rect x="76" y="235" width="30" height="6" rx="3" class="old"/>
+  <rect x="132" y="235" width="40" height="6" rx="3" class="old"/>
+  <rect x="188" y="235" width="26" height="6" rx="3" class="old"/>
+  <!-- □ 문단 2 -->
+  <text x="68" y="276" class="tiny">□</text>
+  <rect x="84" y="269" width="110" height="6" rx="3" class="old"/>
+  <text x="80" y="296" class="tiny">ㅇ</text>
+  <rect x="96" y="289" width="124" height="6" rx="3" class="old"/>
+  <text x="80" y="316" class="tiny">ㅇ</text>
+  <rect x="96" y="309" width="84" height="6" rx="3" class="old"/>
+  <!-- 자물쇠 -->
+  <g transform="translate(226,62)">
+    <circle cx="14" cy="14" r="16" fill="#FFF4D6" stroke="#B8860B" stroke-width="1.5"/>
+    <path d="M8.5,13 v-3 a5.5,5.5 0 0 1 11,0 v3" fill="none" stroke="#B8860B" stroke-width="2"/>
+    <rect x="6.5" y="13" width="15" height="10" rx="2" fill="#B8860B"/>
+  </g>
+
+  <!-- 가운데: 복사 → 내용만 교체 -->
+  <line x1="268" y1="205" x2="602" y2="205" stroke="#003366" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="300" y="150" width="270" height="40" rx="6" fill="#E1ECF7" stroke="#003366"/>
+  <text x="435" y="167" class="tiny" text-anchor="middle" style="font-weight:700;fill:#0A2540">① 복사본을 만든다</text>
+  <text x="435" y="182" class="tiny" text-anchor="middle" style="fill:#0A2540">원본이 아니라 출력 경로에 씀</text>
+  <rect x="300" y="220" width="270" height="56" rx="6" fill="#E3F2E1" stroke="#4C8C4A"/>
+  <text x="435" y="238" class="tiny" text-anchor="middle" style="font-weight:700;fill:#1B3A1A">② 글만 바꾼다</text>
+  <text x="435" y="253" class="tiny" text-anchor="middle" style="fill:#1B3A1A">번호 체계 · 표 · 글꼴 · 여백은 그대로</text>
+  <text x="435" y="268" class="tiny" text-anchor="middle" style="fill:#1B3A1A">새 글은 근거표(evidence)에서만</text>
+  <text x="435" y="300" class="s" text-anchor="middle">양식 프로파일이 "어디가 모양이고</text>
+  <text x="435" y="316" class="s" text-anchor="middle">어디가 내용인가"를 정한다</text>
+
+  <!-- 오른쪽: 결과 -->
+  <text x="720" y="34" class="h" text-anchor="middle">결과 (복사본)</text>
+  <text x="720" y="54" class="s" text-anchor="middle">같은 모양 · 새 내용</text>
+  <g filter="url(#shadow)">
+    <rect x="620" y="70" width="200" height="270" rx="4" fill="#FFFFFF" stroke="#003366" stroke-width="1.5"/>
+  </g>
+  <rect x="636" y="86" width="168" height="22" fill="#EEF0F3" stroke="#6B7B8C"/>
+  <rect x="660" y="94" width="120" height="6" rx="3" class="new"/>
+  <text x="638" y="132" class="tiny">□</text>
+  <rect x="654" y="125" width="138" height="6" rx="3" class="new"/>
+  <text x="650" y="152" class="tiny">ㅇ</text>
+  <rect x="666" y="145" width="104" height="6" rx="3" class="new"/>
+  <text x="650" y="170" class="tiny">ㅇ</text>
+  <rect x="666" y="163" width="118" height="6" rx="3" class="new"/>
+  <rect x="636" y="184" width="168" height="66" fill="none" stroke="#6B7B8C"/>
+  <rect x="636" y="184" width="168" height="18" fill="#E1ECF7" stroke="#6B7B8C"/>
+  <line x1="692" y1="184" x2="692" y2="250" stroke="#6B7B8C"/>
+  <line x1="748" y1="184" x2="748" y2="250" stroke="#6B7B8C"/>
+  <line x1="636" y1="226" x2="804" y2="226" stroke="#6B7B8C"/>
+  <rect x="646" y="211" width="40" height="6" rx="3" class="new"/>
+  <rect x="702" y="211" width="30" height="6" rx="3" class="new"/>
+  <rect x="758" y="211" width="38" height="6" rx="3" class="new"/>
+  <rect x="646" y="235" width="34" height="6" rx="3" class="new"/>
+  <!-- 근거 없는 칸: ○○ 자리표시 -->
+  <rect x="696" y="229" width="48" height="18" rx="3" fill="#FFF4D6" stroke="#B8860B" stroke-dasharray="3 2"/>
+  <text x="720" y="242" class="tiny" text-anchor="middle" style="fill:#4A3A0A">○○</text>
+  <rect x="758" y="235" width="30" height="6" rx="3" class="new"/>
+  <text x="638" y="276" class="tiny">□</text>
+  <rect x="654" y="269" width="96" height="6" rx="3" class="new"/>
+  <text x="650" y="296" class="tiny">ㅇ</text>
+  <rect x="666" y="289" width="130" height="6" rx="3" class="new"/>
+  <text x="650" y="316" class="tiny">ㅇ</text>
+  <rect x="666" y="309" width="100" height="6" rx="3" class="new"/>
+
+  <!-- 범례 -->
+  <g transform="translate(60,366)">
+    <rect x="0" y="0" width="28" height="6" rx="3" class="old"/>
+    <text x="36" y="7" class="s">견본의 글 — 남으면 residue 검사가 막음</text>
+    <rect x="300" y="0" width="28" height="6" rx="3" class="new"/>
+    <text x="336" y="7" class="s">새 글</text>
+    <rect x="400" y="-5" width="30" height="16" rx="3" fill="#FFF4D6" stroke="#B8860B" stroke-dasharray="3 2"/>
+    <text x="415" y="7" class="tiny" text-anchor="middle" style="fill:#4A3A0A">○○</text>
+    <text x="438" y="7" class="s">근거 없는 값 — 지어내지 않고 자리표시로</text>
+  </g>
+</svg>

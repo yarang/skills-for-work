@@ -1,0 +1,32 @@
+%% 견본 보호는 두 겹이다: 사전에는 hook이 에이전트의 쓰기 도구 호출을 막고, hook이 못 보는 길(메인 대화·Bash)은 ⑥의 사후 해시 대조가 잡는다
+%%{init: {"flowchart": {"wrappingWidth": 360}}}%%
+flowchart LR
+  W["파일 쓰기 시도"] --> Q{"누가?"}
+  Q -->|"docu-writer:* 에이전트<br/>Write · Edit · MultiEdit<br/>NotebookEdit · kordoc output_path"| G{{"사전: write_guard<br/>역할 × 경로 판정"}}
+  Q -->|"메인 대화<br/>(agent_type 없음)"| B1["검사하지 않음"]
+  Q -->|"Bash로 쓴 것"| B2["hook이 볼 수 없음"]
+  G -->|범위 밖 · protected-paths| D["거부<br/>(이유를 에이전트에 돌려줌)"]
+  G -->|허용 범위| OK["쓰기 진행"]
+  OK --> P
+  B1 --> P
+  B2 --> P
+  subgraph P["사후: ⑥ 해시 대조 — 마지막 그물"]
+    direction TB
+    H1["견본 sha256 = ①의 값<br/>(1단계 · doc_verify hash)"]
+    H2["materials.sha256<br/>(2단계 · 테마·참고 자료)"]
+    H3["approved.sha256<br/>(④ 승인한 profile · evidence)"]
+  end
+  P -->|하나라도 다름| X["차단 · 사용자에게 diff 보고"]
+  P -->|모두 같음| N["⑦ 리뷰로"]
+
+  classDef main fill:#EEF0F3,stroke:#6B7B8C,color:#28253D
+  classDef gate fill:#FFF4D6,stroke:#B8860B,color:#4A3A0A
+  classDef blind fill:#FBE9E7,stroke:#B23B2E,color:#5A1A12
+  classDef done fill:#E3F2E1,stroke:#4C8C4A,color:#1B3A1A
+  classDef file fill:#FFFFFF,stroke:#9AA5B1,color:#28253D
+  class W,Q,OK main
+  class G gate
+  class B1,B2,D,X blind
+  class N done
+  class H1,H2,H3 file
+  style P fill:#F7F8FA,stroke:#6B7B8C
