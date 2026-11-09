@@ -24,6 +24,19 @@ RESULTS=()  # pass | fail | skip
 
 has() { command -v "$1" >/dev/null 2>&1; }
 
+# find_up <파일> — 지금 디렉터리부터 저장소 루트(저장소가 아니면 /)까지 올라가며 찾습니다.
+# 워크스페이스 멤버는 잠금 파일이 워크스페이스 루트에만 있기 때문입니다.
+find_up() {
+  local d top
+  d="$(pwd -P)"
+  top="$(git rev-parse --show-toplevel 2>/dev/null || echo /)"
+  while :; do
+    [ -f "$d/$1" ] && return 0
+    { [ "$d" = "$top" ] || [ "$d" = / ]; } && return 1
+    d="$(dirname "$d")"
+  done
+}
+
 record() {
   NAMES+=("$1")
   KINDS+=("$2")
@@ -54,9 +67,9 @@ skip_check() {
 check_node() {
   [ -f package.json ] || return 0
   local pm=npm
-  if [ -f pnpm-lock.yaml ]; then
+  if find_up pnpm-lock.yaml; then
     pm=pnpm
-  elif [ -f yarn.lock ]; then
+  elif find_up yarn.lock; then
     pm=yarn
   fi
   if ! has node || ! has "$pm"; then
@@ -79,10 +92,12 @@ check_node() {
 check_python() {
   [ -f pyproject.toml ] || [ -f requirements.txt ] || return 0
 
-  # uv 프로젝트면 가상환경 안에서 실행합니다. 일부러 따옴표 없이 펼칩니다.
+  # uv 프로젝트(워크스페이스 멤버 포함)면 가상환경 안에서 실행합니다. 일부러 따옴표 없이 펼칩니다.
+  # --frozen: 매니페스트와 잠금 파일이 어긋나도 uv.lock을 다시 풀어 쓰지 않습니다(보호 경로).
+  # 멤버 디렉터리에서 실행하면 uv가 그 멤버를 대상으로 잡습니다.
   local run=""
-  if [ -f uv.lock ] && has uv; then
-    run="uv run"
+  if find_up uv.lock && has uv; then
+    run="uv run --frozen"
   fi
   py_has() { $run sh -c "command -v $1" >/dev/null 2>&1; }
 

@@ -108,6 +108,16 @@ in_base() {
   [ "$BASE" != "-" ] && git cat-file -e "$BASE:$1" 2>/dev/null
 }
 
+# 스냅숏에 그 경로(또는 그 아래 경로)가 있었는지 (추적하지 않던 보호 파일이 지워진 경우)
+in_snap() {
+  # DELETED 줄은 스냅숏 때 이미 없던 경로이므로 세지 않습니다.
+  P="$1" awk -F'\t' '$1 != "DELETED" {
+      q = substr($0, index($0, "\t") + 1)
+      if (q == ENVIRON["P"] || index(q, ENVIRON["P"] "/") == 1) { f = 1; exit }
+    }
+    END { exit !f }' "$SNAP"
+}
+
 # 테스트를 돌리면 생기는 캐시입니다. 기준 커밋에 없던 경로일 때만 통과시킵니다.
 # target/, node_modules/, coverage/ 는 소스 디렉터리 이름과 겹칠 수 있어 넣지 않습니다.
 # 그런 산출물은 저장소의 .gitignore로 빼 두세요(무시된 경로는 처음부터 비교하지 않습니다).
@@ -126,7 +136,9 @@ is_test_artifact() {
 #
 # TODO(사용자): 팀의 정책으로 바꾸세요. 정할 것:
 #   - 잠금 파일(package-lock.json, pnpm-lock.yaml, yarn.lock, Cargo.lock, uv.lock, go.sum):
-#     의존성을 추가한 행에서는 자연스럽게 바뀌지만, 병렬 행 두 개가 함께 바꾸면 병합 때 충돌합니다.
+#     의존성은 ④-1에서 메인 대화가 적용하므로 ⑥에서는 바뀌면 안 됩니다. 행 디렉터리 안과
+#     워크스페이스 루트의 잠금 파일은 dev-workflow가 --protect로 넘기므로 이 정책보다 먼저
+#     BLOCK됩니다. 여기서 allow나 report로 두지 마세요.
 #   - 워크스페이스 루트 매니페스트(루트 package.json, pnpm-workspace.yaml, Cargo.toml, go.work):
 #     모든 행에 영향을 줍니다.
 #   - 공용 설정(.gitignore, tsconfig.json, .editorconfig): 행 하나의 일로 바꿔도 되는지
@@ -200,11 +212,12 @@ cmd_check() {
     BASE="$(git rev-parse --verify -q "$BASE^{commit}")" || { echo "기준 커밋이 없습니다: ${source#--base=}" >&2; exit 2; }
   fi
 
-  # 보호 경로가 기준에도 지금에도 없으면 경로를 잘못 준 것입니다 (예: 행 디렉터리 기준 상대 경로).
+  # 보호 경로가 기준에도, 스냅숏에도, 지금에도 없으면 경로를 잘못 준 것입니다 (예: 행 디렉터리 기준 상대 경로).
+  # 스냅숏에만 있던 경로는 그 사이에 지워진 것이므로 아래 비교에서 보호 경로 위반으로 잡힙니다.
   local p i=0
   while [ "$i" -lt "${#PROTECT[@]}" ]; do
     p="${PROTECT[$i]}"
-    [ -e "$p" ] || in_base "$p" || { echo "보호 경로가 없습니다 (저장소 루트 기준인지 확인하세요): $p" >&2; exit 2; }
+    [ -e "$p" ] || in_base "$p" || in_snap "$p" || { echo "보호 경로가 없습니다 (저장소 루트 기준인지 확인하세요): $p" >&2; exit 2; }
     i=$((i + 1))
   done
 

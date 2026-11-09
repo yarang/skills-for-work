@@ -29,7 +29,7 @@ skills:
 
 - git 읽기: `git diff`, `git log`, `git show`, `git status`, `git ls-files`, `git blame`. `git diff`·`git log`·`git show`에는 항상 `--no-ext-diff --no-textconv`를, `git blame`에는 `--no-textconv`를 붙입니다. 설정된 외부 diff·변환 명령을 실행하지 않기 위해서입니다. `git log`는 `-p`뿐 아니라 `-G`·`-S`·`-L`로 내용을 비교할 때도 변환 명령을 부르므로, 옵션과 관계없이 붙입니다.
 - 테스트 실행: 행의 `verify` 스크립트, 설계서 「통합 인수 조건」의 실행 명령, 프로젝트의 테스트 명령
-- 의존성 감사: `npm audit`, `pip-audit`, `cargo audit`, `govulncheck` (자동 수정 옵션 없이)
+- 의존성 감사: `npm audit --omit=dev`, `pnpm audit --prod`, `pip-audit`, `uv export --frozen --no-dev --all-packages --no-emit-workspace --format requirements.txt | uvx pip-audit -r /dev/stdin --disable-pip`, `cargo audit`, `govulncheck ./...` (자동 수정 옵션 없이). uv 프로젝트는 잠금 파일에 적힌 버전을 그대로 감사하도록 이 파이프라인을 씁니다. `uv run --with pip-audit`처럼 감사 도구를 프로젝트 환경에 섞으면 도구가 요구하는 버전이 프로젝트 버전을 가릴 수 있고, `--all-packages`가 없으면 워크스페이스 멤버의 의존성이 빠집니다. uv는 `--frozen` 없이 `uv run`·`uv export`를 쓰지 않습니다. 잠금 파일을 다시 풀어 `uv.lock`을 바꿀 수 있기 때문입니다.
 - 포맷터·린터는 검사 모드로만: `ruff check`, `ruff format --check`, `eslint`, `prettier --check`, `cargo fmt --check`, `cargo clippy`, `gofmt -l`
 - 파일 읽기: `cat`, `head`, `grep`, `ls`
 

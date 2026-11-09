@@ -71,7 +71,7 @@ description: 보안 관점 리뷰 점검표입니다. 비밀 노출, 주입(SQL�
 | 언어 | 명령 |
 |---|---|
 | TypeScript | `npm audit --omit=dev` / `pnpm audit --prod` |
-| Python | `uv run pip-audit` 또는 `pip-audit` |
+| Python | uv 프로젝트는 `uv export --frozen --no-dev --all-packages --no-emit-workspace --format requirements.txt | uvx pip-audit -r /dev/stdin --disable-pip`, 그 밖에는 `pip-audit` (잠금 파일의 버전을 그대로 감사하고 워크스페이스 멤버까지 포함합니다. `--frozen`이 없으면 `uv.lock`이 바뀔 수 있습니다) |
 | Go | `govulncheck ./...` |
 | Rust | `cargo audit` |
 
