@@ -149,8 +149,8 @@ def h1_violation(ctx):
     entry = match_protected(ctx["rel"], entries)
     if protect_all or entry is not None:
         return (
-            "H1(보호 경로): %s 은(는) 이 호출의 보호 경로(%s)입니다. 인수·통합 테스트는 수정 금지입니다. "
-            "테스트가 틀렸다고 판단되면 구현을 멈추고, 근거를 보고서의 「계약 문제」에 적으세요."
+            "H1(보호 경로): %s 은(는) 이 호출의 보호 경로(%s)입니다. 인수·통합 테스트와 잠금 파일은 수정 금지입니다. "
+            "테스트가 틀렸거나 의존성 변경이 필요하다고 판단되면 구현을 멈추고, 근거를 보고서의 「계약 문제」에 적으세요."
             % (ctx["rel"], entry or ".")
         )
     return None

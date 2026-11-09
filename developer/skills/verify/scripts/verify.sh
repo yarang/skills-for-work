@@ -36,7 +36,8 @@ lock_dir() {
     for f in "$@"; do
       [ -f "$d/$f" ] && { echo "$d"; return 0; }
     done
-    { [ "$d" = "$top" ] || [ "$d" = / ]; } && return 1
+    # -ef: 대소문자만 다른 경로(APFS)나 별칭으로 들어와도 같은 디렉터리면 저장소 루트에서 멈춥니다.
+    { [ "$d" = "$top" ] || [ "$d" -ef "$top" ] || [ "$d" = / ]; } && return 1
     d="$(dirname "$d")"
   done
 }
@@ -100,16 +101,25 @@ check_python() {
 
   # uv 프로젝트(워크스페이스 멤버 포함)면 가상환경 안에서 실행합니다. 일부러 따옴표 없이 펼칩니다.
   # --frozen: 매니페스트와 잠금 파일이 어긋나도 uv.lock을 다시 풀어 쓰지 않습니다(보호 경로).
-  # 멤버 디렉터리에서 실행하면 uv가 그 멤버를 대상으로 잡습니다. 위에 uv.lock이 있어도
-  # 워크스페이스 멤버가 아닌 하위 프로젝트는 uv run이 실패하므로, 먼저 한 번 돌려 보고
-  # 실패하면 그 이유를 보이고 가상환경 밖에서 검사합니다.
+  # 멤버 디렉터리에서 실행하면 uv가 그 멤버를 대상으로 잡습니다. pyproject.toml이 없는
+  # 디렉터리(requirements.txt만 있음)는 uv 프로젝트가 아니므로 위의 uv 환경을 빌려 쓰지 않습니다.
+  # 위에 uv.lock이 있어도 워크스페이스 멤버가 아니면 uv가 자기 uv.lock을 찾다가 실패합니다.
+  # 그 경우만 가상환경 밖에서 검사합니다. uv tree로 먼저 보는 것은 uv run과 달리 .venv를 만들지 않기 때문입니다.
+  # 그 밖의 실패(빌드 실패, Python 버전, 손상된 잠금 파일)는 환경 준비 실패로 기록하고
+  # Python 검사를 멈춥니다. 전역 도구로 돌려 통과하면 가려지기 때문입니다.
+  # 가장 가까운 잠금 파일이 poetry.lock이면 poetry run을 쓰지 않고 현재 PATH에서 검사합니다.
   local run="" ld
-  if has uv && ld="$(lock_dir uv.lock poetry.lock)" && [ -f "$ld/uv.lock" ]; then
-    if uv run --frozen true >"$LOG_DIR/uv-probe.log" 2>&1; then
+  if [ -f pyproject.toml ] && has uv && ld="$(lock_dir uv.lock poetry.lock)" && [ -f "$ld/uv.lock" ]; then
+    if [ "$ld" != "$(pwd -P)" ] && ! uv tree --frozen --depth 0 >"$LOG_DIR/uv-probe.log" 2>&1 &&
+      grep -q 'Unable to find lockfile' "$LOG_DIR/uv-probe.log"; then
+      echo "── 참고: $ld 의 uv 워크스페이스 멤버가 아니어서 가상환경 밖에서 검사합니다"
+    elif uv run --frozen true >"$LOG_DIR/uv-probe.log" 2>&1; then
       run="uv run --frozen"
     else
-      echo "── 참고: 위의 uv.lock으로 uv run --frozen을 할 수 없어 가상환경 밖에서 검사합니다"
-      head -n 3 "$LOG_DIR/uv-probe.log" | sed 's/^/   /'
+      record "uv run --frozen (환경 준비)" test fail
+      echo "── 실패: uv run --frozen (환경 준비)"
+      tail -n 20 "$LOG_DIR/uv-probe.log" | sed 's/^/   /'
+      return 0
     fi
   fi
   py_has() { $run sh -c "command -v $1" >/dev/null 2>&1; }

@@ -12,15 +12,16 @@
 #   --protect 바꾸면 안 되는 경로 (여러 번). --allow보다 우선합니다.
 #   --strict  범위 밖 정책을 적용하지 않고, 허용 범위 밖 변경을 모두 위반으로 셉니다 (읽기 전용 역할).
 #
-# 경로는 저장소 루트 기준입니다. 줄바꿈이 든 경로는 지원하지 않습니다.
+# 경로는 저장소 루트 기준입니다(디렉터리 칸의 심볼릭 링크는 풀어서 비교하고, 저장소 밖이면 2).
+# 보호 경로는 대소문자까지 디스크와 같아야 합니다. 줄바꿈이 든 경로는 지원하지 않습니다.
 # 커밋(HEAD 이동)과 브랜치 변경도 위반입니다. .gitignore로 무시된 경로는 보지 않습니다.
-# 종료 코드: 0 통과, 1 위반, 2 사용법 오류
+# 종료 코드: 0 통과, 1 위반, 2 사용법·경로 오류 (없는 보호 경로, 대소문자 다름, 저장소 밖)
 #
 # macOS 기본 bash(3.2)에서도 돌도록 연관 배열과 빈 배열 펼치기를 쓰지 않습니다.
 set -uo pipefail
 
 usage() {
-  sed -n '4,17p' "$0" | sed 's/^# \{0,1\}//' >&2
+  sed -n '4,18p' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
 
@@ -29,21 +30,59 @@ PROTECT=()
 STRICT=0
 BASE=-
 
-# 저장소 루트 기준의 상대 경로로 맞춥니다: 절대 경로의 루트 부분, 앞의 ./, 뒤의 / 를 뗍니다.
+# 저장소 루트 기준의 상대 경로로 맞춥니다. 결과는 "." 또는 루트 기준 상대 경로이고,
+# 저장소 밖이면 "/"로 시작하는 절대 경로가 남습니다(cmd_check가 종료 코드 2로 거부).
+# 커널이 경로를 여는 순서대로 앞에서부터 한 칸씩 따라갑니다.
+#  - 상대 경로는 루트(물리 경로) 기준입니다. 빈 칸과 "."은 건너뜁니다.
+#  - 디렉터리로 있는 칸까지 오면 그 자리를 물리 경로로 바꿉니다(pwd -P). 그래서 macOS의
+#    /tmp → /private/tmp 같은 별칭도, 저장소 안 심볼릭 링크 디렉터리(acceptance → tests/acceptance)도
+#    git이 돌려주는 실제 경로와 같아집니다.
+#  - ".."은 지금까지 푼 물리 경로의 부모입니다. 심볼릭 링크 뒤의 ".."을 문자열로 먼저 접으면
+#    커널이 여는 곳과 달라지기 때문입니다. 아직 없는 칸 뒤의 ".."만 글자대로 지웁니다.
+# 두 번째 인수가 1이면 마지막 칸은 풀지 않습니다(심볼릭 링크 자체를 가리키도록). 끝이 "/"이면
+# 디렉터리를 뜻하므로 그때도 끝까지 풉니다.
 normalize() {
-  local p="$1"
-  case "$p" in
-    "$ROOT") p="." ;;
-    "$ROOT"/*) p="${p#"$ROOT"/}" ;;
-  esac
-  while :; do
+  local p="$1" cur rest="$1" last="" c d
+  case "$p" in /*) cur=/ ;; *) cur="$ROOT" ;; esac
+  if [ "${2:-0}" = 1 ]; then
     case "$p" in
-      ./*) p="${p#./}" ;;
-      */) p="${p%/}" ;;
-      *) break ;;
+      */ | . | .. | */. | */..) ;;
+      */*) last="${p##*/}" rest="${p%/*}" ;;
+      *) last="$p" rest="" ;;
     esac
+  fi
+  while [ -n "$rest" ]; do
+    c="${rest%%/*}"
+    case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+    case "$c" in
+      "" | .) continue ;;
+      ..) cur="${cur%/*}" cur="${cur:-/}" ;;
+      *) cur="${cur%/}/$c" ;;
+    esac
+    if [ -d "$cur" ] && d="$(cd -P "$cur" 2>/dev/null && pwd -P)"; then
+      cur="$d"
+    fi
   done
-  printf '%s' "$p"
+  [ -z "$last" ] || cur="${cur%/}/$last"
+  case "$cur" in
+    "$ROOT") cur="." ;;
+    "$ROOT"/*) cur="${cur#"$ROOT"/}" ;;
+  esac
+  printf '%s' "$cur"
+}
+
+# exists_exact <경로>: 대소문자까지 디스크와 똑같은 이름으로 있는지. macOS(APFS)는 대소문자를
+# 무시하므로 [ -e Tests/a.py ]가 tests/a.py를 찾아 참이 되지만, git이 돌려주는 경로와는
+# 문자열이 달라 보호 경로 비교에서 빠집니다. find -name은 디렉터리 항목 이름을 대소문자 구분으로 맞춥니다.
+exists_exact() {
+  local rest="$1" d="." c
+  [ "$rest" = "." ] && return 0
+  while [ -n "$rest" ]; do
+    c="${rest%%/*}"
+    case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+    [ -n "$(find "$d" -mindepth 1 -maxdepth 1 -name "$(printf '%s' "$c" | sed 's/[][*?\\]/\\&/g')" -print -quit 2>/dev/null)" ] || return 1
+    d="$d/$c"
+  done
 }
 
 # under <경로> <범위>: 경로가 범위(파일 또는 디렉터리)와 같거나 그 아래에 있는지
@@ -135,7 +174,7 @@ is_test_artifact() {
 # allow(조용히 통과) | report(통과하되 목록에 남김) | block(위반) 중 하나를 출력합니다.
 #
 # TODO(사용자): 팀의 정책으로 바꾸세요. 정할 것:
-#   - 잠금 파일(package-lock.json, pnpm-lock.yaml, yarn.lock, Cargo.lock, uv.lock, go.sum):
+#   - 잠금 파일(package-lock.json, pnpm-lock.yaml, yarn.lock, Cargo.lock, uv.lock, poetry.lock, go.sum):
 #     의존성은 ④-1에서 메인 대화가 적용하므로 ⑥에서는 바뀌면 안 됩니다. 행 디렉터리 안과
 #     워크스페이스 루트의 잠금 파일은 dev-workflow가 --protect로 넘기므로 이 정책보다 먼저
 #     BLOCK됩니다. 여기서 allow나 report로 두지 마세요.
@@ -160,7 +199,10 @@ cmd_snapshot() {
     /*) ;;
     *) out="$START_DIR/$out" ;;
   esac
-  under "$out" "$ROOT" && { echo "스냅숏 파일은 저장소 밖에 두세요: $out" >&2; exit 2; }
+  case "$(normalize "$out" 1)" in
+    /*) ;;
+    *) echo "스냅숏 파일은 저장소 밖에 두세요: $out" >&2; exit 2 ;;
+  esac
 
   base="$(git rev-parse --verify -q HEAD || echo -)"
   {
@@ -178,13 +220,29 @@ cmd_check() {
   local source="$1" ref_before=""
   shift
 
-  local arg
+  local arg full link
   for arg in "$@"; do
     case "$arg" in
       --allow=?*) ALLOW+=("$(normalize "${arg#--allow=}")") ;;
-      --protect=?*) PROTECT+=("$(normalize "${arg#--protect=}")") ;;
+      --protect=?*)
+        # 끝까지 푼 경로(링크가 가리키는 곳)와 마지막 칸을 풀지 않은 경로(링크 자체)를 둘 다 보호합니다.
+        # 링크가 저장소 밖을 가리키면 링크 자체만 보호합니다.
+        full="$(normalize "${arg#--protect=}")"
+        link="$(normalize "${arg#--protect=}" 1)"
+        if [ "$link" = "$full" ]; then
+          PROTECT+=("$full")
+        else
+          case "$full" in /*) ;; *) PROTECT+=("$full") ;; esac
+          PROTECT+=("$link")
+        fi
+        ;;
       --strict) STRICT=1 ;;
       *) usage ;;
+    esac
+  done
+  for arg in ${ALLOW[@]+"${ALLOW[@]}"} ${PROTECT[@]+"${PROTECT[@]}"}; do
+    case "$arg" in
+      /*) echo "저장소 밖 경로입니다 (저장소 루트 기준으로 주세요): $arg" >&2; exit 2 ;;
     esac
   done
 
@@ -217,7 +275,11 @@ cmd_check() {
   local p i=0
   while [ "$i" -lt "${#PROTECT[@]}" ]; do
     p="${PROTECT[$i]}"
-    [ -e "$p" ] || in_base "$p" || in_snap "$p" || { echo "보호 경로가 없습니다 (저장소 루트 기준인지 확인하세요): $p" >&2; exit 2; }
+    if [ -e "$p" ] || [ -L "$p" ]; then
+      exists_exact "$p" || { echo "보호 경로의 대소문자가 디스크와 다릅니다: $p" >&2; exit 2; }
+    else
+      in_base "$p" || in_snap "$p" || { echo "보호 경로가 없습니다 (저장소 루트 기준인지 확인하세요): $p" >&2; exit 2; }
+    fi
     i=$((i + 1))
   done
 
@@ -294,7 +356,7 @@ cmd_check() {
 
 main() {
   [ $# -ge 1 ] || usage
-  START_DIR="$(pwd)"
+  START_DIR="$(pwd -P)"
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "git 저장소가 아닙니다: $START_DIR" >&2; exit 2; }
   cd "$ROOT" || exit 2
 

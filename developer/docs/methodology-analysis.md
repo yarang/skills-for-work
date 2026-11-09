@@ -187,7 +187,7 @@ hook은 사후 스크립트를 **대체하지 않습니다.** hook은 사용자�
 
 | # | 이벤트 · 매처 | 대상 (`agent_type`) | 하는 일 | 메우는 빈틈 | 방법론 |
 |---|---|---|---|---|---|
-| H1 | `PreToolUse` · `Write\|Edit\|MultiEdit\|NotebookEdit` | `developer` | 테스트 파일 수정을 거부합니다 | 보호 테스트 수정을 지금은 `boundary-check.sh`가 **사후에** 잡습니다 | TDD |
+| H1 | `PreToolUse` · `Write\|Edit\|MultiEdit\|NotebookEdit` | `developer` | 보호 경로(인수·통합 테스트, 잠금 파일) 수정을 거부합니다. `Bash`로 하는 설치는 보지 않습니다 | 보호 테스트 수정을 지금은 `boundary-check.sh`가 **사후에** 잡습니다 | TDD |
 | H2 | 같음 | `tester` | 테스트 파일이 아닌 경로에 쓰기를 거부합니다 | RED 단계에서 구현이 섞이는 것 | TDD |
 | H3 | 같음 | `developer`, `tester` | 저장소(작업 디렉터리) 밖, `.env`·`.git/` 쓰기를 거부합니다 | `design.md` §8-1 「무시된 경로·저장소 밖 쓰기」 | 공통 불변식 |
 | H4 | `PreToolUse` · `Bash` | `work-standards:*` 전부 | `git commit/push/stash/tag/checkout -b`, 배포 명령을 거부합니다. `curl`·`wget`은 `researcher`만 허용합니다 | §8-1 「git 메타데이터·네트워크」, §7 「서브에이전트의 배포 실행 금지」 | DevOps |

@@ -95,7 +95,7 @@ skills_for_work/developer/              # 플러그인 루트
 - 순차 방식은 `snapshot`(호출 전 해시 기록) → `check`로 비교합니다. 호출 전부터 더럽던 파일도 내용 해시로 비교하므로, 에이전트가 되돌린 변경도 잡힙니다.
 - 병렬 worktree는 `check --base=<기준 커밋>`으로 기준 커밋과의 차이를 봅니다.
 - 두 방식 모두 HEAD가 기준에서 움직였거나(커밋) 브랜치가 바뀌었으면 위반입니다. 커밋하면 변경이 `git diff`에서 사라지므로, 이 확인이 없으면 커밋으로 경계를 피할 수 있습니다.
-- git 명령이 실패하거나 `--protect` 경로가 기준 커밋·스냅숏·작업 트리 어디에도 없으면 종료 코드 2입니다(스냅숏에만 있던 경로는 지워진 것이므로 위반 1). 오류를 "변경 0건, 통과"로 오인하지 않게 하기 위해서입니다.
+- git 명령이 실패하거나 `--protect` 경로가 기준 커밋·스냅숏·작업 트리 어디에도 없으면 종료 코드 2입니다(스냅숏에만 있던 경로는 지워진 것이므로 위반 1). 디스크와 대소문자가 다른 보호 경로(macOS는 `[ -e ]`가 대소문자를 무시하지만 git 경로와는 문자열이 달라 비교에서 빠집니다)와 저장소 밖 절대 경로도 2입니다. 경로는 커널이 여는 순서대로 앞에서부터 한 칸씩 따라가며, 디렉터리로 있는 칸까지는 물리 경로로 풉니다. 그래서 `/tmp` → `/private/tmp` 같은 별칭도, 저장소 안 심볼릭 링크 디렉터리(`acceptance` → `tests/acceptance`)도 git이 돌려주는 실제 경로와 맞고, 링크 뒤의 `..`도 커널과 같은 곳을 가리킵니다. 보호 경로는 링크가 가리키는 곳과 링크 자체를 함께 보호합니다. 스냅숏 파일 위치도 같은 방식으로 풀어 저장소 안이면 2입니다. 오류를 "변경 0건, 통과"로 오인하지 않게 하기 위해서입니다.
 - **기준 커밋에 없던** 테스트 캐시(`__pycache__`, `.pytest_cache`, `.coverage` 등)만 제외합니다. `target/`, `node_modules/`, `coverage/`는 소스 디렉터리 이름과 겹칠 수 있어(`src/target/`) 제외 목록에 넣지 않고, `.gitignore`에 맡깁니다. 허용 범위 밖 경로는 `classify_out_of_scope` 정책 함수가 `allow` / `report` / `block`으로 나눕니다.
 - **사후 확인**이라 막지는 못합니다. 위반은 되돌리기 전에 사용자에게 diff를 보여 줍니다.
 
@@ -144,8 +144,9 @@ skills_for_work/developer/              # 플러그인 루트
 | `boundary-check.sh` 보호 경로 삭제 (MEDIUM 18) | 스냅숏에만 있던 untracked 보호 파일·디렉터리를 지움 → 1 (이전에는 "보호 경로가 없습니다"로 2), 오타·접두사만 같은 경로(`tests/ac`) → 2 |
 | `boundary-check.sh` 스냅숏 때 이미 지워진(DELETED) 보호 경로 | 첫 커밋 전 add 뒤 지운 파일을 보호 → 2 (이전에는 DELETED 줄을 있던 것으로 세어 0) |
 | `verify.sh` uv 워크스페이스 멤버 | 루트에만 `uv.lock`이 있는 멤버에서 `uv run --frozen`으로 pytest 실행, 매니페스트를 잠금과 어긋나게 고쳐도 `uv.lock` 그대로 (이전에는 pytest를 못 찾아 건너뜀) |
-| `verify.sh` 가장 가까운 잠금 파일 | 루트 `pnpm-lock.yaml` 아래 자기 `package-lock.json`이 있는 행 → npm, 잠금 없는 멤버 → pnpm. 루트 uv 아래 비멤버 프로젝트 → `uv run --frozen` 실패 이유를 보이고 가상환경 밖에서 검사 |
-| uv 의존성 감사 | `uv export --frozen --no-dev --all-packages --no-emit-workspace … \| uvx pip-audit -r /dev/stdin --disable-pip`: 멤버의 `requests==2.30.0` 취약점 검출, `uv.lock` 그대로 |
+| `verify.sh` 가장 가까운 잠금 파일 | 루트 `pnpm-lock.yaml` 아래 자기 `package-lock.json`이 있는 행 → npm, 잠금 없는 멤버 → pnpm. 루트 uv 아래 비멤버 프로젝트 → `uv tree --frozen --depth 0`의 `Unable to find lockfile`만 가상환경 밖에서 검사(`.venv`를 만들지 않음), `requirements.txt`만 있는 하위 디렉터리 → 루트 uv 환경을 쓰지 않음. 손상된 `uv.lock`은 루트·멤버 모두 환경 준비 fail로 차단 |
+| uv 의존성 감사 | `set -o pipefail; uv export --frozen --no-dev --all-packages --no-emit-workspace --no-hashes … \| uvx pip-audit -r /dev/stdin --no-deps --disable-pip`: 멤버의 `requests==2.30.0` 취약점 검출, `uv.lock` 그대로. 로컬 경로 소스가 있으면 해시 모드는 `does not contain a hash`로 실패하고, 이 형태는 그 항목만 건너뛴 목록에 남김 (agy가 `git+file://` 소스로 실행해 같은 목록에 남는 것을 확인) |
+| `boundary-check.sh` 대소문자·심볼릭 링크 (macOS APFS, bash 3.2) | `--protect=Tests/…`(디스크는 `tests/`) → 2, `/tmp/…` 절대 경로 → `/private/tmp` 루트 기준으로 맞춰 보호 위반 1, 저장소 밖 절대 경로·`/`·`$ROOT/../x` → 2, `--protect=$ROOT/`(후행 `/`)는 저장소 전체 보호(이전에는 빈 문자열이 되어 보호가 빠짐), `tests/./acc/` 같은 표기 정리, 별칭 경로 아래 아직 없는 디렉터리 허용, `a[1].py` 같은 glob 문자 이름 정상. 저장소 안 링크 디렉터리 `acceptance` → `tests/acc`: 상대·물리 절대·링크 아래 파일로 보호 → 위반 1, 링크 자체 교체 → 위반 1, `acceptance/..` → `tests` 보호, 저장소 밖을 가리키는 링크 아래 `--allow` → 2. 스냅숏을 저장소 안(상대·`/tmp` 별칭)에 쓰려 하면 2 (19+2건) |
 
 ## 8. 남은 위험과 열린 질문
 
