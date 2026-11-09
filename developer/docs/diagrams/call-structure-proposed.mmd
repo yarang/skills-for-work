@@ -11,12 +11,12 @@ flowchart TD
   M -->|"⑤ Agent (테스트에 AC-n 표기)"| T[tester]
   M -->|"⑥ Agent"| D[developer]
 
-  M -->|"경계 확인 (②·⑤·⑥·⑧ 호출, ④-1 설치 앞뒤)"| BC[["boundary-check.sh"]]
+  M -->|"경계 확인 (②·⑤·⑥·⑧ 호출, ④-1 설치·⑦ⓒ 정리 앞뒤)"| BC[["boundary-check.sh"]]
 
   subgraph VER["⑦ 검증 (스크립트, 결정적)"]
     VS[["ⓐ verify.sh + 커버리지 게이트"]]
     IT[["ⓑ 통합 테스트"]]
-    TR[["ⓒ trace-check.sh<br/>AC-n ↔ 테스트"]]
+    TR[["ⓓ trace-check.sh<br/>AC-n ↔ 테스트"]]
   end
   M --> VS & IT & TR
 

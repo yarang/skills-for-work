@@ -9,7 +9,7 @@ description: Go 언어 표준입니다. gofmt·go vet·golangci-lint 툴체인, 
 
 - `gofmt`(또는 `goimports`)로 포맷하고, `go vet ./...`을 통과해야 합니다. 프로젝트에 `.golangci.yml`이 있으면 `golangci-lint run`도 통과해야 합니다.
 - Go 버전은 `go.mod`의 `go` 지시어를 따릅니다.
-- 의존성을 바꾼 뒤에는 `go mod tidy`를 실행합니다.
+- 의존성을 바꾼 뒤에는 `go mod tidy`를 실행합니다. 단, `dev-workflow` 파이프라인 안에서는 developer·tester가 실행하지 않습니다(`go.sum`은 보호 경로입니다). 메인 대화가 ④-1에서 `go get '<모듈>/...@<버전>'`으로 받고, 모든 행이 모인 뒤 ⑦ⓒ에서 `go mod tidy`를 실행합니다.
 
 ## 구조
 

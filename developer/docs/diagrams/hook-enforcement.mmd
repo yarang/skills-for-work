@@ -9,4 +9,4 @@ flowchart LR
   SA -->|"종료"| STOP{"SubagentStop hook<br/>H7 developer: verify.sh"}
   STOP -- "실패 → block + 이유" --> SA
   STOP -- 통과 --> M
-  M -->|"최종 그물 (사후)"| VER[["경계 확인: boundary-check<br/>⑦ⓐ verify + 커버리지 · ⑦ⓑ 통합 테스트<br/>⑦ⓒ trace-check (+ skill-log 대조)"]]
+  M -->|"최종 그물 (사후)"| VER[["경계 확인: boundary-check<br/>⑦ⓐ verify + 커버리지 · ⑦ⓑ 통합 테스트<br/>⑦ⓓ trace-check (+ skill-log 대조)"]]

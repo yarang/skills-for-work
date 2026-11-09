@@ -52,7 +52,7 @@
 | ③ 설계 | 행 = 디렉터리, 인수 조건에 ID 없음 | 행 = 바운디드 컨텍스트(= 디렉터리). `AC-n`, 계약 `version`, `## 설계 결정 (ADR)` 절, `## 설계 스킬` 목록 | DDD, Spec, CBD |
 | ④ 승인 | 설계서 + 실행 방식 | **+ 설계 스킬 목록**(경로 2의 근거) | — |
 | ⑤ 테스트 | 인수 조건마다 테스트 | 테스트 이름이나 마커에 `AC-n` | Spec, TDD |
-| ⑦ 검증 | ⓐ 행 verify → ⓑ 통합 테스트 (경계 확인은 ⑦ 밖에서 ②·⑤·⑥·⑧ 호출마다 감쌈) | ⓐ에 **커버리지 게이트**, **ⓒ `trace-check.sh`** 추가 | TDD, Spec |
+| ⑦ 검증 | ⓐ 행 verify → ⓑ 통합 테스트 → ⓒ Go 모듈 정리 (경계 확인은 ⑦ 밖에서 ②·⑤·⑥·⑧ 호출과 ④-1·⑦ⓒ 변경을 감쌈) | ⓐ에 **커버리지 게이트**, **ⓓ `trace-check.sh`** 추가 | TDD, Spec |
 | ⑧ 리뷰 | code / security | 설계 스킬이 목록에 있으면 `code` 관점 점검표에 설계 항목(애그리거트 경계, 용어 일치) 추가 | DDD, OOP |
 | ⑩ 배포 | 없음 | 메인 대화 + 사용자 승인. CI는 `verify.sh`와 같은 명령 | DevOps |
 
@@ -132,7 +132,7 @@ P2에서 `code-principles` 「층 사이의 우선순위」를 다음 문구로 
 | 순위 | 항목 | 바뀌는 파일 | 강제 방식 | 크기 |
 |---|---|---|---|---|
 | P1 | 커버리지 게이트 | `skills/verify/scripts/verify.sh`, `skills/verify/SKILL.md` | 스크립트 | 중 |
-| P1 | 인수 조건 ID와 추적 | `agents/architect.md`(출력 형식), `agents/tester.md`, `skills/dev-workflow/scripts/trace-check.sh`(신규), `dev-workflow` ⑦ⓒ | 스크립트 | 중 |
+| P1 | 인수 조건 ID와 추적 | `agents/architect.md`(출력 형식), `agents/tester.md`, `skills/dev-workflow/scripts/trace-check.sh`(신규), `dev-workflow` ⑦ⓓ | 스크립트 | 중 |
 | P1 | 스킬 선택 경로 2 | `agents/architect.md`, `skills/stack-detection/SKILL.md`, `dev-workflow` 핸드오프 형식 | 승인 관문 | 소 |
 | P2 | `domain-modeling` 스킬, 용어집, 컨텍스트 단위 행 분할 | `skills/domain-modeling/`(신규), `agents/architect.md`, `code-principles` 우선순위 | 리뷰 점검표 | 중 |
 | P2 | Spec 형식: `REQ-n`, ADR, 계약 버전 | `dev-workflow` ①④, `agents/architect.md` | 승인 관문 | 소 |
