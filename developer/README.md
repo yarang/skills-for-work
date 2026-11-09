@@ -42,6 +42,6 @@ claude --plugin-dir /path/to/skills_for_work/developer
 
 에이전트 본문의 금지 규칙(읽기 전용, 인수 테스트 수정 금지, 행 밖 수정 금지)은 플러그인 에이전트에서 강제할 수 없습니다. 그래서 메인 대화가 서브에이전트 앞뒤로 `skills/dev-workflow/scripts/boundary-check.sh`를 실행해, 바뀐 경로를 허용 범위·보호 경로와 비교합니다.
 
-허용 범위 밖 경로를 어떻게 다룰지는 같은 스크립트의 `classify_out_of_scope` 함수가 정합니다(`allow` / `report` / `block`). 기본값은 모두 `block`입니다. 잠금 파일, 워크스페이스 루트 매니페스트, 공용 설정을 팀 정책에 맞게 나누세요.
+허용 범위 밖 경로를 어떻게 다룰지는 같은 스크립트의 `classify_out_of_scope` 함수가 정합니다(`allow` / `report` / `block`). 기본값은 모두 `block`입니다. 워크스페이스 루트 매니페스트, 공용 설정을 팀 정책에 맞게 나누세요. 의존성 설치는 ⑤ 전에 메인 대화가 하므로(④-1) 행의 잠금 파일 변경은 정책이 아니라 위반으로 다룹니다.
 
 설계 배경은 [docs/design.md](docs/design.md)에 있습니다.

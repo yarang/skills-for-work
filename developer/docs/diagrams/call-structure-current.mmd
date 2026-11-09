@@ -2,6 +2,7 @@
 flowchart TD
   U([사용자]) -->|요청| M["메인 대화<br/>dev-workflow 스킬"]
   M -->|"④ 승인 요청"| U
+  M -->|"④-1 Bash: 「의존성 변경」 설치<br/>(⑤ 전)"| PM[["패키지 매니저"]]
 
   M -->|"② Agent"| R["researcher<br/>haiku · 읽기"]
   M -->|"③ Agent"| A["architect<br/>opus · 읽기"]
@@ -9,7 +10,7 @@ flowchart TD
   M -->|"⑥ Agent × 행"| D["developer<br/>sonnet · 쓰기"]
   M -->|"⑧ Agent × 2 관점"| V["reviewer<br/>sonnet · 읽기"]
 
-  M -->|"경계 확인 Bash<br/>(②·⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
+  M -->|"경계 확인 Bash<br/>(②·⑤·⑥·⑧ 호출, ④-1 설치 앞뒤)"| BC[["boundary-check.sh"]]
   M -->|"⑦ⓐ Bash (행마다)"| VS[["verify.sh"]]
   M -->|"⑦ⓑ Bash"| IT[["통합 테스트 명령<br/>(설계서 「통합 인수 조건」)"]]
   D -->|Bash| VS
