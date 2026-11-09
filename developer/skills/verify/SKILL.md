@@ -31,7 +31,9 @@ bash "${CLAUDE_SKILL_DIR}/scripts/verify.sh" <작업 디렉터리>
 | Rust | `cargo fmt --check` | `cargo clippy -D warnings` | (컴파일러) | `cargo test` 또는 `cargo nextest` |
 
 - TypeScript는 패키지 매니저를 잠금 파일로 고르고, `package.json`에 있는 스크립트만 실행합니다. 없는 스크립트는 `skip`으로 기록합니다.
-- Python은 대상 디렉터리나 그 위(저장소 루트까지)에 `uv.lock`이 있으면 `uv run --frozen`으로 가상환경 안에서 실행합니다. 워크스페이스 멤버도 루트 잠금 파일로 잡히고, `--frozen`이라 잠금 파일을 고치지 않습니다. Node의 `pnpm-lock.yaml`·`yarn.lock`도 같은 방식으로 찾습니다.
+- 잠금 파일은 대상 디렉터리부터 저장소 루트까지 올라가며 **가장 가까운 것**을 씁니다. 워크스페이스 멤버는 루트 잠금 파일로 잡히고, 자기 잠금 파일이 있는 하위 프로젝트는 상위 것에 끌려가지 않습니다.
+- Python은 그 잠금 파일이 `uv.lock`이면 `uv run --frozen`으로 가상환경 안에서 실행합니다. `--frozen`이라 잠금 파일을 고치지 않습니다. 워크스페이스 멤버가 아니어서 `uv run`이 실패하면 이유를 출력하고 가상환경 밖에서 검사합니다.
+- Node는 그 잠금 파일로 패키지 매니저를 고릅니다(`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, 그 밖에는 npm).
 - 도구가 없거나 설정이 없으면 `skip`입니다. `skip`을 통과로 볼지는 스크립트의 `decide_exit` 정책이 정합니다.
 
 ## 실패했을 때

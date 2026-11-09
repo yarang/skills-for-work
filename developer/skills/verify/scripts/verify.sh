@@ -24,14 +24,18 @@ RESULTS=()  # pass | fail | skip
 
 has() { command -v "$1" >/dev/null 2>&1; }
 
-# find_up <파일> — 지금 디렉터리부터 저장소 루트(저장소가 아니면 /)까지 올라가며 찾습니다.
-# 워크스페이스 멤버는 잠금 파일이 워크스페이스 루트에만 있기 때문입니다.
-find_up() {
-  local d top
+# lock_dir <잠금 파일>... — 지금 디렉터리부터 저장소 루트(저장소가 아니면 /)까지 올라가며,
+# 주어진 잠금 파일 중 하나라도 있는 가장 가까운 디렉터리를 출력합니다. 없으면 1.
+# 워크스페이스 멤버는 잠금 파일이 루트에만 있어 위로 찾아야 하고, 가장 가까운 것을 써야
+# 자기 잠금 파일이 있는 하위 프로젝트가 상위 잠금 파일에 끌려가지 않습니다.
+lock_dir() {
+  local d top f
   d="$(pwd -P)"
   top="$(git rev-parse --show-toplevel 2>/dev/null || echo /)"
   while :; do
-    [ -f "$d/$1" ] && return 0
+    for f in "$@"; do
+      [ -f "$d/$f" ] && { echo "$d"; return 0; }
+    done
     { [ "$d" = "$top" ] || [ "$d" = / ]; } && return 1
     d="$(dirname "$d")"
   done
@@ -66,11 +70,13 @@ skip_check() {
 
 check_node() {
   [ -f package.json ] || return 0
-  local pm=npm
-  if find_up pnpm-lock.yaml; then
-    pm=pnpm
-  elif find_up yarn.lock; then
-    pm=yarn
+  local pm=npm ld
+  if ld="$(lock_dir pnpm-lock.yaml yarn.lock package-lock.json npm-shrinkwrap.json)"; then
+    if [ -f "$ld/pnpm-lock.yaml" ]; then
+      pm=pnpm
+    elif [ -f "$ld/yarn.lock" ]; then
+      pm=yarn
+    fi
   fi
   if ! has node || ! has "$pm"; then
     skip_check "node" test "node 또는 $pm 이 없음"
@@ -94,10 +100,17 @@ check_python() {
 
   # uv 프로젝트(워크스페이스 멤버 포함)면 가상환경 안에서 실행합니다. 일부러 따옴표 없이 펼칩니다.
   # --frozen: 매니페스트와 잠금 파일이 어긋나도 uv.lock을 다시 풀어 쓰지 않습니다(보호 경로).
-  # 멤버 디렉터리에서 실행하면 uv가 그 멤버를 대상으로 잡습니다.
-  local run=""
-  if find_up uv.lock && has uv; then
-    run="uv run --frozen"
+  # 멤버 디렉터리에서 실행하면 uv가 그 멤버를 대상으로 잡습니다. 위에 uv.lock이 있어도
+  # 워크스페이스 멤버가 아닌 하위 프로젝트는 uv run이 실패하므로, 먼저 한 번 돌려 보고
+  # 실패하면 그 이유를 보이고 가상환경 밖에서 검사합니다.
+  local run="" ld
+  if has uv && ld="$(lock_dir uv.lock poetry.lock)" && [ -f "$ld/uv.lock" ]; then
+    if uv run --frozen true >"$LOG_DIR/uv-probe.log" 2>&1; then
+      run="uv run --frozen"
+    else
+      echo "── 참고: 위의 uv.lock으로 uv run --frozen을 할 수 없어 가상환경 밖에서 검사합니다"
+      head -n 3 "$LOG_DIR/uv-probe.log" | sed 's/^/   /'
+    fi
   fi
   py_has() { $run sh -c "command -v $1" >/dev/null 2>&1; }
 

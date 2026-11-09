@@ -144,6 +144,7 @@ skills_for_work/developer/              # 플러그인 루트
 | `boundary-check.sh` 보호 경로 삭제 (MEDIUM 18) | 스냅숏에만 있던 untracked 보호 파일·디렉터리를 지움 → 1 (이전에는 "보호 경로가 없습니다"로 2), 오타·접두사만 같은 경로(`tests/ac`) → 2 |
 | `boundary-check.sh` 스냅숏 때 이미 지워진(DELETED) 보호 경로 | 첫 커밋 전 add 뒤 지운 파일을 보호 → 2 (이전에는 DELETED 줄을 있던 것으로 세어 0) |
 | `verify.sh` uv 워크스페이스 멤버 | 루트에만 `uv.lock`이 있는 멤버에서 `uv run --frozen`으로 pytest 실행, 매니페스트를 잠금과 어긋나게 고쳐도 `uv.lock` 그대로 (이전에는 pytest를 못 찾아 건너뜀) |
+| `verify.sh` 가장 가까운 잠금 파일 | 루트 `pnpm-lock.yaml` 아래 자기 `package-lock.json`이 있는 행 → npm, 잠금 없는 멤버 → pnpm. 루트 uv 아래 비멤버 프로젝트 → `uv run --frozen` 실패 이유를 보이고 가상환경 밖에서 검사 |
 | uv 의존성 감사 | `uv export --frozen --no-dev --all-packages --no-emit-workspace … \| uvx pip-audit -r /dev/stdin --disable-pip`: 멤버의 `requests==2.30.0` 취약점 검출, `uv.lock` 그대로 |
 
 ## 8. 남은 위험과 열린 질문
