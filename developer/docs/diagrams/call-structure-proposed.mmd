@@ -10,7 +10,7 @@ flowchart TD
   M -->|"⑤ Agent (테스트에 AC-n 표기)"| T[tester]
   M -->|"⑥ Agent"| D[developer]
 
-  M -->|"경계 확인 (⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
+  M -->|"경계 확인 (②·⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
 
   subgraph VER["⑦ 검증 (스크립트, 결정적)"]
     VS[["ⓐ verify.sh + 커버리지 게이트"]]

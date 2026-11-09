@@ -9,7 +9,7 @@ flowchart TD
   M -->|"⑥ Agent × 행"| D["developer<br/>sonnet · 쓰기"]
   M -->|"⑧ Agent × 2 관점"| V["reviewer<br/>sonnet · 읽기"]
 
-  M -->|"경계 확인 Bash<br/>(⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
+  M -->|"경계 확인 Bash<br/>(②·⑤·⑥·⑧ 호출 앞뒤)"| BC[["boundary-check.sh"]]
   M -->|"⑦ⓐ Bash (행마다)"| VS[["verify.sh"]]
   M -->|"⑦ⓑ Bash"| IT[["통합 테스트 명령<br/>(설계서 「통합 인수 조건」)"]]
   D -->|Bash| VS

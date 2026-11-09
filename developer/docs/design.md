@@ -65,7 +65,7 @@ skills_for_work/developer/              # 플러그인 루트
 → ⑦ 검증 (메인: ⓐ 행 verify → ⓑ 통합 테스트)
 → ⑧ reviewer(code) + reviewer(security) → ⑨ 통합 (메인)
 
-⑤·⑥·⑧의 서브에이전트 호출은 모두 「경계 확인」으로 감쌉니다: 호출 전 snapshot, 호출 뒤 check.
+②·⑤·⑥·⑧의 서브에이전트 호출은 모두 「경계 확인」으로 감쌉니다: 호출 전 snapshot, 호출 뒤 check.
 ```
 
 자세한 단계 규칙, 핸드오프 형식, 생략 가능한 경우는 `skills/dev-workflow/SKILL.md`에 있습니다. 핵심만 적으면 다음과 같습니다.
@@ -83,6 +83,7 @@ skills_for_work/developer/              # 플러그인 루트
 
 | 단계 | 허용 | 보호 | 위반의 뜻 |
 |---|---|---|---|
+| ② researcher | 없음 (`--strict`) | — | 읽기 전용 위반 |
 | ⑤ tester | 테스트 위치 + 보고한 빈 껍데기 | — | 구현 코드 작성 |
 | ⑤ tester (통합) | 통합 테스트 위치 + 행 verify에서 빼는 설정 파일 | — | 통합 테스트 밖 변경 |
 | ⑥ developer | 행 디렉터리 + 설계서 「의존성 변경」의 그 행 경로 | 인수·통합 테스트 | 테스트 수정, 행 밖 변경, 커밋 |

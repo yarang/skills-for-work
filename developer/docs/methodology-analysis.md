@@ -52,7 +52,7 @@
 | ③ 설계 | 행 = 디렉터리, 인수 조건에 ID 없음 | 행 = 바운디드 컨텍스트(= 디렉터리). `AC-n`, 계약 `version`, `## 설계 결정 (ADR)` 절, `## 설계 스킬` 목록 | DDD, Spec, CBD |
 | ④ 승인 | 설계서 + 실행 방식 | **+ 설계 스킬 목록**(경로 2의 근거) | — |
 | ⑤ 테스트 | 인수 조건마다 테스트 | 테스트 이름이나 마커에 `AC-n` | Spec, TDD |
-| ⑦ 검증 | ⓐ 행 verify → ⓑ 통합 테스트 (경계 확인은 ⑦ 밖에서 ⑤·⑥·⑧ 호출마다 감쌈) | ⓐ에 **커버리지 게이트**, **ⓒ `trace-check.sh`** 추가 | TDD, Spec |
+| ⑦ 검증 | ⓐ 행 verify → ⓑ 통합 테스트 (경계 확인은 ⑦ 밖에서 ②·⑤·⑥·⑧ 호출마다 감쌈) | ⓐ에 **커버리지 게이트**, **ⓒ `trace-check.sh`** 추가 | TDD, Spec |
 | ⑧ 리뷰 | code / security | 설계 스킬이 목록에 있으면 `code` 관점 점검표에 설계 항목(애그리거트 경계, 용어 일치) 추가 | DDD, OOP |
 | ⑩ 배포 | 없음 | 메인 대화 + 사용자 승인. CI는 `verify.sh`와 같은 명령 | DevOps |
 
@@ -191,7 +191,7 @@ hook은 사후 스크립트를 **대체하지 않습니다.** hook은 사용자�
 | H2 | 같음 | `tester` | 테스트 파일이 아닌 경로에 쓰기를 거부합니다 | RED 단계에서 구현이 섞이는 것 | TDD |
 | H3 | 같음 | `developer`, `tester` | 저장소(작업 디렉터리) 밖, `.env`·`.git/` 쓰기를 거부합니다 | `design.md` §8-1 「무시된 경로·저장소 밖 쓰기」 | 공통 불변식 |
 | H4 | `PreToolUse` · `Bash` | `work-standards:*` 전부 | `git commit/push/stash/tag/checkout -b`, 배포 명령을 거부합니다. `curl`·`wget`은 `researcher`만 허용합니다 | §8-1 「git 메타데이터·네트워크」, §7 「서브에이전트의 배포 실행 금지」 | DevOps |
-| H5 | `PreToolUse` · `Write\|Edit\|Bash` 쓰기 | `reviewer`, `researcher` | 쓰기를 모두 거부합니다. 둘 다 「읽기」 역할인데 `Bash`가 있어 `tools` 목록만으로는 막히지 않습니다 | 읽기 전용 역할의 우회 쓰기 | — |
+| H5 | `PreToolUse` · `Write\|Edit\|Bash` 쓰기 | `reviewer`, `researcher` | 쓰기를 모두 거부합니다. 둘 다 「읽기」 역할인데 `Bash`가 있어 `tools` 목록만으로는 막히지 않습니다 | 읽기 전용 역할의 우회 쓰기. 저장소 안 쓰기는 지금 `boundary-check.sh --strict`가 ②·⑧ 모두 **사후에** 잡습니다. H5는 저장소 밖 쓰기와 원격 부작용(`gh` 쓰기 명령)을 호출 전에 막기 위해 여전히 필요합니다 | — |
 | H6 | `PostToolUse` · `Skill` | `work-standards:*` 전부 | `agent_id`, `agent_type`, 스킬 이름을 `.work-standards/skill-log.jsonl`에 남깁니다 | §8-1 「스킬을 실제로 불러왔는지는 자기 보고」. `trace-check.sh`가 설계서의 스킬 목록과 대조합니다 | Spec |
 | H7 | `SubagentStop` | `developer` | `verify.sh`(+커버리지)가 실패하면 `block`하고 실패 요약을 다음 지시로 돌려줍니다 | ⑥→⑦ 왕복을 서브에이전트 안에서 끝냅니다 | TDD |
 
@@ -302,4 +302,4 @@ H6은 §6의 「인수 조건 추적」(`trace-check.sh`)과 이어지므로 그
 - **중첩 저장소·submodule 안 쓰기는 「저장소 밖」으로 거부됩니다.** common-dir이 다르기 때문입니다. submodule을 고쳐야 하는 작업은 메인 대화가 직접 하거나 정책을 따로 정해야 합니다.
 - **`python3`가 hook PATH에 없으면 fail-open**입니다(exit 127). 경계 확인이 최종 그물입니다.
 - **세션 cwd가 조정자와 다른 저장소**이면 조정자 목록을 찾지 못하고 H1이 통과합니다.
-- P2(H4·H5 Bash 가드, `design.md` §8-1 정정), P3(H7)는 아직 하지 않았습니다.
+- P2(H4·H5 Bash 가드, `design.md` §8-1 정정), P3(H7)는 아직 하지 않았습니다. 그 사이 researcher는 본문의 `Bash` 허용 명령 목록과 ②의 `--strict` 경계 확인으로 버팁니다.
