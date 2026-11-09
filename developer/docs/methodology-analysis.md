@@ -302,4 +302,4 @@ H6은 §6의 「인수 조건 추적」(`trace-check.sh`)과 이어지므로 그
 - **중첩 저장소·submodule 안 쓰기는 「저장소 밖」으로 거부됩니다.** common-dir이 다르기 때문입니다. submodule을 고쳐야 하는 작업은 메인 대화가 직접 하거나 정책을 따로 정해야 합니다.
 - **`python3`가 hook PATH에 없으면 fail-open**입니다(exit 127). 경계 확인이 최종 그물입니다.
 - **세션 cwd가 조정자와 다른 저장소**이면 조정자 목록을 찾지 못하고 H1이 통과합니다.
-- P2(H4·H5 Bash 가드, `design.md` §8-1 정정), P3(H7)는 아직 하지 않았습니다. 그 사이 researcher는 본문의 `Bash` 허용 명령 목록과 ②의 `--strict` 경계 확인으로 버팁니다.
+- P2(H4·H5 Bash 가드, `design.md` §8-1 정정), P3(H7)는 아직 하지 않았습니다. 그 사이 researcher와 reviewer는 본문의 `Bash` 허용 명령 목록과 ②·⑧의 `--strict` 경계 확인으로 버팁니다.
