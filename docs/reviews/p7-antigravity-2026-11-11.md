@@ -1,6 +1,6 @@
 # P7 Antigravity 검토 (관점 spec, 2026-11-11)
 
-- 꾸러미: 범위 665bf31..dbe0245, 기준 docs/briefs/p7-p2-findings.md·docs/reviews/p2-trial-2026-11-10.md
+- 꾸러미: 범위 665bf31..dbe0245 (rebase 뒤 main `4232f50`), 기준 docs/briefs/p7-p2-findings.md·docs/reviews/p2-trial-2026-11-10.md
 - 실행: shared:review-packet run_agy.sh
 
 ## 원문
