@@ -175,6 +175,28 @@ def test_writer_outside_root_denied(repo, tmp_path):
     assert denied(call(repo, "book-writer:writer", "Write", tmp_path / "elsewhere.md"))
 
 
+def test_outside_root_reason_without_manifest_mentions_cwd(tmp_path):
+    # manifest.md를 찾지 못해 cwd가 루트가 된 경우, 밖 경로 거부 사유에
+    # cwd 경로와 "manifest.md를 찾지 못해" 이유가 들어갑니다.
+    cwd = tmp_path / "plain"
+    (cwd / "manuscript").mkdir(parents=True)
+    proc = call(cwd, "book-writer:writer", "Write", tmp_path / "elsewhere.md", cwd=cwd)
+    assert denied(proc)
+    reason = deny_reason(proc)
+    assert "manifest.md를 찾지 못해" in reason
+    assert os.path.realpath(cwd) in reason
+
+
+def test_outside_root_reason_with_manifest_mentions_root(repo, tmp_path):
+    # manifest.md를 찾은 루트의 밖 경로 거부 사유에 루트 경로와
+    # "세션 작업 디렉터리 기준"이 들어갑니다.
+    proc = call(repo, "book-writer:writer", "Write", tmp_path / "elsewhere.md")
+    assert denied(proc)
+    reason = deny_reason(proc)
+    assert os.path.realpath(repo) in reason
+    assert "세션 작업 디렉터리 기준" in reason
+
+
 def test_writer_dotdot_escape_denied(repo):
     assert denied(call(repo, "book-writer:writer", "Write",
                        str(repo / "manuscript/vol1/../../escape.md")))
@@ -274,3 +296,21 @@ def test_capturer_glob_boundaries(repo, rel, ok):
 ])
 def test_capturer_star_boundary(repo, rel, ok):
     assert denied(call(repo, "book-writer:capturer", "Write", repo / rel)) is not ok
+
+
+@pytest.mark.parametrize("rel", [
+    "research/raw/x.txt",                            # 실측 응답 원문 (발견 7)
+    "research/raw/sub/y.json",                       # raw/ 안의 더 깊은 경로
+])
+def test_capturer_raw_research_allowed(repo, rel):
+    assert not denied(call(repo, "book-writer:capturer", "Write", repo / rel))
+
+
+def test_capturer_research_notes_denied(repo):
+    # raw/ 밖의 research 문서는 여전히 거부합니다(기존 동작 유지).
+    assert denied(call(repo, "book-writer:capturer", "Write", repo / "research/notes.md"))
+
+
+def test_writer_research_raw_denied(repo):
+    # 실측 원문 자리는 capturer 전용입니다.
+    assert denied(call(repo, "book-writer:writer", "Write", repo / "research/raw/x.txt"))

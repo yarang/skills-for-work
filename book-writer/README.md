@@ -19,6 +19,23 @@ claude --plugin-dir <이 저장소>/book-writer
 
 ⑤ 단계의 외부 검토(Antigravity, 선택: EXAONE)는 `shared` 플러그인의 `shared:review-packet` 스킬을 쓰므로, 함께 설치해야 합니다.
 
+## 실행 조건
+
+- **book-writer 에이전트는 원고 저장소(`manifest.md`가 있는 곳)에서 연 세션에서 부릅니다.** 쓰기 가드가 세션 작업 디렉터리에서 위로 `manifest.md`를 찾아 원고 루트를 정하기 때문입니다. 다른 저장소의 세션에서 부르면 모든 원고 쓰기가 막힙니다.
+- 원고 저장소 밖의 실습 폴더를 capturer가 실측하려면, 세션을 `--add-dir <실습 폴더>`로 열어 그 폴더에 접근할 수 있어야 합니다.
+- writer의 검증 명령(빌드·예제 테스트·쪽수 확인)이 세션 허용 목록에 없으면 writer는 그 검증을 '확인 못 함'으로 넘기고 메인 세션이 대신 돌립니다. 원고 저장소 `.claude/settings.json`의 `permissions.allow`에 검증 명령을 두면 writer가 직접 돌릴 수 있습니다.
+
+  ```json
+  {
+    "permissions": {
+      "allow": [
+        "Bash(uv run pytest*)",
+        "Bash(uv run python scripts/build.py*)"
+      ]
+    }
+  }
+  ```
+
 ## 에이전트 5개
 
 | 에이전트 | 모델 | 하는 일 | 쓰는 곳 |
@@ -27,7 +44,7 @@ claude --plugin-dir <이 저장소>/book-writer
 | `book-writer:writer` | sonnet | ④ 집필(`draft`), ⑤⑥ 반영(`revise`), 표기 정리(`polish`) | `manuscript/`, `manifest.md`, `examples/` |
 | `book-writer:editor` | sonnet | ⑤ 독립 검토 — 지적과 판정만 남김 | `reviews/` |
 | `book-writer:researcher` | sonnet | 기술 사실·규격·표기 근거 조사 | `research/` |
-| `book-writer:capturer` | sonnet | 화면 실측·캡처. `probe`(원고 없이 동작 확인)와 `shoot`(촬영) 두 모드 | `manuscript/**/images/`, `research/measure-*.md` |
+| `book-writer:capturer` | sonnet | 화면 실측·캡처. `probe`(원고 없이 동작 확인)와 `shoot`(촬영) 두 모드 | `manuscript/**/images/`, `research/measure-*.md`, `research/raw/` |
 
 모델은 사람과 논의할 안을 만드는 planner만 opus이고, 나머지는 sonnet입니다. 스킬 배정과 상세 설계는 `docs/design.md`에 있습니다.
 

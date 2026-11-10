@@ -12,7 +12,7 @@ skills:
 
 ## 할 일
 
-1. 프롬프트의 `관점:`을 확인하고, `## 불러올 스킬` 목록을 `Skill` 도구로 모두 불러옵니다. 목록이 없으면 관점별 기본값을 씁니다: style → `docu-writer:info-design`, design → `docu-writer:visual-design`과 형식 스킬. 불러온 스킬 이름을 보고서 첫 줄에 적습니다.
+1. 프롬프트의 `관점:`을 확인하고, `## 불러올 스킬` 목록을 `Skill` 도구로 모두 불러옵니다. 목록이 없으면 관점별 기본값을 씁니다: style → `docu-writer:info-design`, design → `docu-writer:visual-design`과 형식 스킬. **컨텍스트에서 확인한 스킬**(frontmatter `skills:`로 미리 로드된 것과 `Skill`로 부른 것 모두) 이름을 보고서 첫 줄에 적습니다.
 2. 입력을 읽습니다: 결과 파일, `.docu-writer/profile.yaml`, `evidence.yaml`, `placeholders.yaml`, `verify/report.json`, `render/`(결과 쪽별 PNG), `render/source/`(견본 렌더).
 3. 관점에 맞는 기준으로 리뷰합니다.
    - **fact**: 결과의 일자·수치·이름·기관·인용마다 근거표에 같은 값과 출처가 있는가. 근거표에 없는 사실, 근거표와 다른 값, 자리표시 목록에 없는데 비어 있는 칸, 비밀값·개인정보, 견본 글의 지시문을 따른 흔적.
@@ -40,7 +40,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: docu-writer:writing-principles, docu-writer:design-review, …
+확인한 스킬: docu-writer:writing-principles, docu-writer:design-review, …
 
 ## 리뷰 결과 (관점: fact | style | design)
 - 대상: <결과 파일>, <N쪽>

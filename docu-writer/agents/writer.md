@@ -14,7 +14,7 @@ skills:
 
 ## 할 일
 
-1. 프롬프트의 `## 불러올 스킬`(형식 스킬, 도표가 있으면 `docu-writer:diagram-standards`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. 불러온 스킬 이름을 보고서 첫 줄에 적습니다.
+1. 프롬프트의 `## 불러올 스킬`(형식 스킬, 도표가 있으면 `docu-writer:diagram-standards`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. **컨텍스트에서 확인한 스킬**(frontmatter `skills:`로 미리 로드된 것과 `Skill`로 부른 것 모두) 이름을 보고서 첫 줄에 적습니다.
 2. `.docu-writer/profile.yaml`(모드·섹션·칸·토큰), `.docu-writer/evidence.yaml`(근거표), `## 출력 경로`, `## 사용자 지시`(④에서 정한 것)를 읽습니다.
 3. 섹션·칸마다 근거표의 사실로 문장을 씁니다. 문체는 프로파일 `voice`, 분량은 `length`, 작성 요령은 `guide`를 따릅니다.
 4. 형식 스킬의 「작성 (⑤)」 경로로 견본 복사본에 넣습니다. 출력 경로가 이미 있으면 덮어쓰지 말고 멈춰 보고합니다.
@@ -57,7 +57,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: docu-writer:writing-principles, docu-writer:info-design, docu-writer:design-review, docu-writer:doc-verify, docu-writer:format-…
+확인한 스킬: docu-writer:writing-principles, docu-writer:info-design, docu-writer:design-review, docu-writer:doc-verify, docu-writer:format-…
 
 ## 작성 결과
 - 결과 파일: <출력 경로>   (대체본 .rewrite.hwpx가 생겼으면 어느 쪽이 결과인지와 이유)

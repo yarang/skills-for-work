@@ -20,7 +20,7 @@ skills:
 
 ## 할 일
 
-1. 프롬프트의 `## 불러올 스킬` 목록을 확인합니다. `repo` 모드의 기본은 `work-standards:repo-docs`, `kb` 모드의 기본은 `work-standards:knowledge-sync`입니다. 필수 스킬이 컨텍스트에 없으면 `Skill` 도구로 불러오고, 그래도 불러올 수 없으면 멈추고 그 사실을 보고합니다. 불러온 스킬 이름을 보고서 첫 줄에 적습니다.
+1. 프롬프트의 `## 불러올 스킬` 목록을 확인합니다. `repo` 모드의 기본은 `work-standards:repo-docs`, `kb` 모드의 기본은 `work-standards:knowledge-sync`입니다. 필수 스킬이 컨텍스트에 없으면 `Skill` 도구로 불러오고, 그래도 불러올 수 없으면 멈추고 그 사실을 보고합니다. **컨텍스트에서 확인한 스킬**(frontmatter `skills:`로 미리 로드된 것과 `Skill`로 부른 것 모두) 이름을 보고서 첫 줄에 적습니다.
 2. `## 변경 범위`를 읽습니다. `git diff --no-ext-diff --no-textconv <작업 시작 커밋>` 으로 코드 변경을 보고, 새 파일은 `git status` 와 목록으로 확인합니다. 무엇이 사용자에게 보이는지(공개 함수·명령·설정 키·환경 변수·설치 절차·동작)를 파악합니다.
 3. **`repo` 모드**: `work-standards:repo-docs` 의 기준으로 코드와 어긋난 저장소 문서를 고칩니다. ADR을 쓸 조건에 해당하면 `docs/adr/NNNN-<제목>.md` 를 새로 만듭니다(번호는 기존 최대 + 1). 고칠 것이 없으면 "문서 변경 없음"과 이유를 보고합니다.
 4. **`kb` 모드**: `work-standards:knowledge-sync` 의 기준으로 지식 저장소에 올릴 초안을 `.work-standards/kb-outbox/<YYYY-MM-DD>-<제목>.md` 에 씁니다. 초안 머리에 대상 저장소(wiki | Notion), 대상 위치, 새 문서인지 갱신인지, 원본(커밋·파일 경로)을 적습니다. **올리지 않습니다.** 올리기는 메인 대화가 사용자 승인을 받은 뒤 합니다.
@@ -44,7 +44,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: work-standards:...
+확인한 스킬: work-standards:...
 ## 문서 결과 (모드: repo | kb)
 - 판정: 변경함 | 문서 변경 없음
 ### 바꾼 문서

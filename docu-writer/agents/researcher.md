@@ -40,7 +40,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: docu-writer:writing-principles
+확인한 스킬: docu-writer:writing-principles
 
 ## 근거 조사
 - 근거표: .docu-writer/evidence.yaml

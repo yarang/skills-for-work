@@ -41,7 +41,9 @@ claude-agents 저장소의 교재 집필 역할 5개(planner, writer, editor, re
 
 - **대상**: 서브에이전트 이름이 `book-writer:<역할>`로 시작할 때만 검사합니다. 메인 대화와 다른 플러그인은 그대로 둡니다.
 - **Bash로 우회하지 못하게**: 가드는 네 검사 도구만 보므로 Bash로 파일을 쓰면 가드가 보지 못합니다. 그래서 원고를 직접 쓰지 않는 planner·editor·researcher의 `tools`에서 Bash를 뺐습니다(탐색·조사는 Grep·Glob·Read·웹 도구로 합니다). writer(빌드·테스트·검사)와 capturer(앱 조작·캡처)는 Bash를 두되, 역할 파일의 행동 계약에 "Bash로 파일을 만들거나 고치지 않는다. 파일 쓰기는 Write·Edit로만 한다"를 적어 모든 파일 쓰기가 가드를 거치게 합니다.
-- **원고 루트 R**: 서브에이전트의 cwd에서 위로 올라가며 처음 만나는 `manifest.md`가 있는 디렉터리입니다. 없으면 cwd입니다.
+- **원고 루트 R**: **세션**의 작업 디렉터리(hook 입력의 `cwd`)에서 위로 올라가며 처음 만나는 `manifest.md`가 있는 디렉터리입니다. 없으면 세션 작업 디렉터리 자신입니다. 다른 저장소에서 연 세션이 book-writer 에이전트를 부르면 원고 루트를 찾지 못해 **모든 원고 쓰기가 막힙니다**(안전한 쪽으로 막히고, 거부 사유로 이유를 알려 줍니다). 원고 루트 밖 경로의 거부 사유는 두 종류입니다.
+    - `manifest.md`를 찾았을 때: `원고 루트(<root>, 세션 작업 디렉터리 기준) 밖 경로입니다 — 다른 원고 저장소에 쓰려면 그 저장소에서 세션을 여십시오`
+    - 못 찾았을 때: `세션 작업 디렉터리(<cwd>)와 그 위에서 manifest.md를 찾지 못해 <cwd>를 원고 루트로 봤습니다 — book-writer 에이전트는 원고 저장소에서 연 세션에서 부르십시오`
 - **기본 허용 경로**:
 
 | 역할 | 허용 |
@@ -50,7 +52,7 @@ claude-agents 저장소의 교재 집필 역할 5개(planner, writer, editor, re
 | writer | `manuscript/**`, `manifest.md`, `examples/**` |
 | editor | `reviews/**` |
 | researcher | `research/**` |
-| capturer | `manuscript/**/images/**`, `research/measure-*.md` |
+| capturer | `manuscript/**/images/**`, `research/measure-*.md`, `research/raw/**` (실측 응답 원문 텍스트) |
 
 - **모든 역할 공통**: R 밖 쓰기 거부, `.book-writer/` 안 쓰기 거부, `paths.json` 자체 쓰기 거부, 승인된 계획 문서(planner 포함) 수정 거부 — 문서 첫 10줄에 `상태: 승인`(`>` 인용, `**` 강조 허용)이 있으면 거부합니다.
 - **paths.json**: `.book-writer/paths.json`에 역할별 목록을 두면 기본값을 그 역할만 통째로 바꿉니다(병합하지 않습니다). JSON을 파싱할 수 없으면 그 책의 모든 쓰기를 거부합니다.

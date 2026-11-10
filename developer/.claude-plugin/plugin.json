@@ -1,6 +1,6 @@
 {
   "name": "work-standards",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "조사 → 설계 → 테스트 → 구현 → 검증 → 리뷰 개발 파이프라인. 역할은 에이전트 6개로, 분야 지식(계층·언어·프레임워크)은 스킬로 확장합니다.",
   "author": {
     "name": "yarang"

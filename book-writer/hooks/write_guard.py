@@ -21,7 +21,7 @@ DEFAULT_ALLOWLIST = {
     "writer": ["manuscript/**", "manifest.md", "examples/**"],
     "editor": ["reviews/**"],
     "researcher": ["research/**"],
-    "capturer": ["manuscript/**/images/**", "research/measure-*.md"],
+    "capturer": ["manuscript/**/images/**", "research/measure-*.md", "research/raw/**"],
 }
 # 승인 상태 표시: `상태: 승인`, `> 상태: **승인** (날짜)` 등을 잡습니다.
 APPROVED_LINE = re.compile(r"^\s*>?\s*상태\s*:\s*\**\s*승인")
@@ -42,17 +42,23 @@ def absolute(path, cwd):
     return resolve(path)
 
 
-def find_root(cwd):
-    """cwd에서 위로 올라가며 처음 만나는 manifest.md가 있는 디렉터리. 없으면 cwd.
-    돌려주는 루트는 대상 경로와 같은 resolve()로 정규화합니다(심볼릭 링크 해소)."""
+def find_root_with_flag(cwd):
+    """(루트, manifest.md를 찾았는지). 루트는 cwd에서 위로 올라가며 처음 만나는
+    manifest.md가 있는 디렉터리, 없으면 cwd. 돌려주는 루트는 대상 경로와 같은
+    resolve()로 정규화합니다(심볼릭 링크 해소)."""
     cur = cwd
     while True:
         if os.path.isfile(os.path.join(cur, "manifest.md")):
-            return resolve(cur)
+            return resolve(cur), True
         parent = os.path.dirname(cur)
         if parent == cur:
-            return resolve(cwd)
+            return resolve(cwd), False
         cur = parent
+
+
+def find_root(cwd):
+    """cwd에서 위로 올라가며 처음 만나는 manifest.md가 있는 디렉터리. 없으면 cwd."""
+    return find_root_with_flag(cwd)[0]
 
 
 def segment_regex(segment):
@@ -123,16 +129,26 @@ def allowed_globs(role, root):
     return DEFAULT_ALLOWLIST.get(role)
 
 
+def outside_reason(root, root_found, cwd):
+    """원고 루트 밖 경로일 때의 거부 사유. manifest.md를 찾았는지에 따라 나눕니다."""
+    if root_found:
+        return (f"원고 루트({root}, 세션 작업 디렉터리 기준) 밖 경로입니다"
+                " — 다른 원고 저장소에 쓰려면 그 저장소에서 세션을 여십시오")
+    return (f"세션 작업 디렉터리({cwd})와 그 위에서 manifest.md를 찾지 못해"
+            f" {cwd}를 원고 루트로 봤습니다"
+            " — book-writer 에이전트는 원고 저장소에서 연 세션에서 부르십시오")
+
+
 def decide(role, raw, cwd):
     """(허용 여부, 거부 사유). raw는 cwd 기준 원래 경로 문자열."""
     target = absolute(raw, cwd)
-    root = find_root(cwd)
+    root, root_found = find_root_with_flag(cwd)
     try:
         rel = os.path.relpath(target, root)
     except ValueError:  # 서로 다른 볼륨 — 루트 밖으로 칩니다.
-        return False, f"원고 저장소({root}) 밖 경로입니다"
+        return False, outside_reason(root, root_found, cwd)
     if rel == os.pardir or rel.startswith(os.pardir + os.sep):
-        return False, f"원고 저장소({root}) 밖 경로입니다"
+        return False, outside_reason(root, root_found, cwd)
     rel = rel.replace(os.sep, "/")
     if rel.split("/")[0] == GUARD_DIR:
         return False, f"{GUARD_DIR}/ 아래 파일은 어떤 역할도 쓸 수 없습니다"

@@ -13,7 +13,7 @@ skills:
 
 ## 할 일
 
-1. 프롬프트의 `## 불러올 스킬`(형식 스킬 하나, 예: `docu-writer:format-docx`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. 불러온 스킬 이름을 보고서 첫 줄에 적습니다.
+1. 프롬프트의 `## 불러올 스킬`(형식 스킬 하나, 예: `docu-writer:format-docx`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. **컨텍스트에서 확인한 스킬**(frontmatter `skills:`로 미리 로드된 것과 `Skill`로 부른 것 모두) 이름을 보고서 첫 줄에 적습니다.
 2. `## 문서 종류`, `## 목적·독자`, `## 출력 형식`, `## 경로`(`.docu-writer/route.json`)를 읽습니다. `## 자료 위치`는 목차를 정하는 데 **참고만** 합니다(파일 이름·목차 정도). 사실을 뽑아 프로파일에 적지 않습니다.
 3. 아래 「종류별 필수 섹션」에서 목차를 고르고, 목적·독자·분량에 맞게 더하거나 뺍니다. 목차는 **왜 → 무엇을 → 어떻게** 순서입니다. 분량 배분과 섹션마다 담을 형태(서술·목록·표·도표)는 `info-design`을 따릅니다.
 4. 섹션마다 `id`·`title`·`level`·`anchor`·`kind`·`required`·`guide`·`length`를 적습니다(아래 「프로파일 규칙」).
@@ -98,7 +98,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: docu-writer:writing-principles, docu-writer:info-design, docu-writer:template-analysis, docu-writer:format-…
+확인한 스킬: docu-writer:writing-principles, docu-writer:info-design, docu-writer:template-analysis, docu-writer:format-…
 
 ## 목차 설계: <문서 종류>
 - 출력·경로: <md | docx | hwpx> · <theme <형식/이름> | none>

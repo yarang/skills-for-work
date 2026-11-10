@@ -14,7 +14,7 @@ skills:
 
 ## 할 일
 
-1. 프롬프트의 `## 불러올 스킬`(형식 스킬 하나, 예: `docu-writer:format-docx`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. 불러온 스킬 이름을 보고서 첫 줄에 적습니다.
+1. 프롬프트의 `## 불러올 스킬`(형식 스킬 하나, 예: `docu-writer:format-docx`)을 `Skill` 도구로 **모두 먼저** 불러옵니다. 불러오기에 실패한 스킬은 이름을 추측해 바꾸지 말고 보고합니다. **컨텍스트에서 확인한 스킬**(frontmatter `skills:`로 미리 로드된 것과 `Skill`로 부른 것 모두) 이름을 보고서 첫 줄에 적습니다.
 2. `## 견본`, `## 모드`(sample | form | update), `## 갱신 요청`(update일 때)을 읽습니다.
 3. `template-analysis` 스킬의 「분석 절차」를 형식에 맞게 따릅니다.
    - 표 번호 목록은 `profile_extract.py tables`로 얻습니다. kordoc 마크다운의 표 개수로 세지 않습니다.
@@ -34,7 +34,7 @@ skills:
 ## 출력 형식
 
 ```
-불러온 스킬: docu-writer:writing-principles, docu-writer:template-analysis, docu-writer:visual-design, docu-writer:format-…
+확인한 스킬: docu-writer:writing-principles, docu-writer:template-analysis, docu-writer:visual-design, docu-writer:format-…
 
 ## 견본 분석: <견본 파일>
 - 형식·모드: <hwpx | docx | pptx | md> · <sample | form | update>
