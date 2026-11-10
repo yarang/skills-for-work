@@ -76,6 +76,7 @@ skills_for_work/
     │   ├── visual-design/        시각 디자인: 디자인 토큰, 서체·크기·여백·색·표
     │   ├── diagram-standards/    mermaid 우선, SVG, 개별 파일, 토큰 팔레트
     │   ├── design-review/        렌더 이미지 점검표
+    │   ├── deck-design/          견본 없는 교육·발표 덱의 시각 설계(직접 호출)
     │   ├── format-hwpx/          kordoc 경로 (parse·patch·fill·render)
     │   ├── format-docx/ (+scripts/patch_docx.py)
     │   ├── format-pptx/ (+scripts/patch_pptx.py)
@@ -228,6 +229,7 @@ Python 스크립트는 PEP 723 인라인 의존성을 적고 `uv run --python 3.
 | `visual-design` | 토큰을 **읽고 지킵니다**. 새 서체·색·스타일을 만들지 않습니다(`styles_allowed` 밖 금지) | 테마에서 토큰을 고릅니다 |
 | `diagram-standards` | 도표 색·글꼴을 프로파일 `design.diagram`에 맞춥니다 | 같음 |
 | `design-review` | 렌더 PNG를 프로파일 토큰과 대조합니다 | 같음 |
+| `deck-design` | 쓰지 않습니다. 견본 덱은 `format-pptx`가 견본 토큰대로 채웁니다 | 견본 없는 교육·발표 덱에 직접 불러 씁니다. 역할별 글자 크기 범위를 토큰으로 보고, 하한에서도 넘치면 슬라이드를 나눕니다 |
 
 **문서 디자인 규칙** (사용자 결정, 2026-11-04). `design-review` 스킬의 기준표이자 writer가 지킬 규칙입니다.
 

@@ -23,6 +23,7 @@
 | 디자인 | `visual-design` | 시각 디자인: 디자인 토큰 읽기와 지키기 |
 | 디자인 | `diagram-standards` | 도표·다이어그램: mermaid 우선, SVG, 프로파일 색·글꼴 |
 | 디자인 | `design-review` | 디자인 검수: 규칙 R1~R6, 렌더 이미지 점검표, 심각도 |
+| 디자인 | `deck-design` | 견본 없는 교육·발표 덱: 원고 md + visual 주석, 레이아웃 고르기, 글자 크기 범위·맞춤, PowerPoint 렌더 검수 |
 | 형식 | `format-hwpx`, `format-docx`, `format-pptx`, `format-markdown` | 형식별 분석·작성·렌더 경로 |
 | 도구 | `doc-verify` | 견본 해시·견본 문구 잔존·자리표시·R4~R6 등을 보는 결정적 검증과 렌더 스크립트 |
 
