@@ -23,14 +23,14 @@ claude --plugin-dir <이 저장소>/book-writer
 
 - **book-writer 에이전트는 원고 저장소(`manifest.md`가 있는 곳)에서 연 세션에서 부릅니다.** 쓰기 가드가 세션 작업 디렉터리에서 위로 `manifest.md`를 찾아 원고 루트를 정하기 때문입니다. 다른 저장소의 세션에서 부르면 모든 원고 쓰기가 막힙니다.
 - 원고 저장소 밖의 실습 폴더를 capturer가 실측하려면, 세션을 `--add-dir <실습 폴더>`로 열어 그 폴더에 접근할 수 있어야 합니다.
-- writer의 검증 명령(빌드·예제 테스트·쪽수 확인)이 세션 허용 목록에 없으면 writer는 그 검증을 '확인 못 함'으로 넘기고 메인 세션이 대신 돌립니다. 원고 저장소 `.claude/settings.json`의 `permissions.allow`에 검증 명령을 두면 writer가 직접 돌릴 수 있습니다.
+- writer의 검증 명령(빌드·예제 테스트·쪽수 확인)이 세션 허용 목록에 없으면 writer는 그 검증을 '확인 못 함'으로 넘기고 메인 세션이 대신 돌립니다. 원고 저장소 `.claude/settings.json`의 `permissions.allow`에 검증 명령을 두면 writer가 직접 돌릴 수 있습니다. 명령은 책의 집필 규칙(`WRITING.md`)이 정한 것으로 바꿔 넣습니다.
 
   ```json
   {
     "permissions": {
       "allow": [
-        "Bash(uv run pytest*)",
-        "Bash(uv run python scripts/build.py*)"
+        "Bash(<예제 테스트 명령>:*)",
+        "Bash(<빌드 명령>:*)"
       ]
     }
   }
