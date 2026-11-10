@@ -248,7 +248,7 @@ claude-agents 링크가 남아 있으면 접두사 없는 참조가 옛 스킬�
 - 기록: 원문은 `docs/reviews/<작업>-<provider>-<날짜>.md`, 판정 표는 같은 파일 끝에 덧붙입니다.
 
 ### 9.5 어디에 두는가
-- 꾸러미 형식, provider 능력표, 판정 확인 절차, provider 실행기(EXAONE 스크립트 등)는 스킬 `review-packet` 하나로 묶습니다.
+- 꾸러미 형식, provider 능력표, 판정 확인 절차, provider 실행기(EXAONE 스크립트 등)는 스킬 `review-packet` 하나로 묶습니다. 기본 절차는 Antigravity 하나로 검토하고(§9.7), 다른 provider는 능력표와 실행기만 갖춰 둡니다.
 - work-standards(⑧ 리뷰)와 book-writer(⑤ 초안 검토)가 함께 쓰므로, 이것이 `shared` 플러그인의 첫 스킬입니다(P5). §1의 "두 번째 사용처가 생기면 `shared`로" 조건을 충족합니다.
 - `dev-workflow` ⑧과 `book-workflow` ⑤는 "외부 provider 검토가 필요하면 `shared:review-packet`대로 꾸러미를 만든다"를 가리키기만 합니다.
 
@@ -258,7 +258,7 @@ claude-agents 링크가 남아 있으면 접두사 없는 참조가 옛 스킬�
 - 스킬 `exaone-review`: 옮기지 않고 내용을 흡수합니다. API 사실(컨텍스트, 속도 제한, `reasoning_effort`, 429 재시도), 줄 번호를 붙여 보내기, 「보낼 수 없는 것」 목록은 `review-packet`의 EXAONE 절과 실행기에 넣습니다.
 - 두 링크는 P3 전환 목록에 넣었습니다(§5 전환 절차).
 
-### 9.7 P5 작업 지시 전에 확인할 것
-- 코드 작업 지시서의 심각도를 `reviewer` 표(CRITICAL/HIGH/MEDIUM/LOW)로 바꾸는 것
-- provider 기본값: 구현이 Z.ai일 때 검토 기본을 Antigravity로 하고, EXAONE은 diff 단위의 두 번째 검토로 선택해서 쓰는 것
-- EXAONE `reasoning_effort` 기본값(`max`는 diff 39KB에 10~15분). 실행기 기본을 `high`로 둘지
+### 9.7 결정된 것 (2026-11-10, 사용자)
+1. **심각도는 역할별 표를 씁니다.** 코드는 `work-standards:reviewer`의 CRITICAL/HIGH/MEDIUM/LOW, 원고는 `book-writer:editor`의 blocker/major/minor입니다. 꾸러미는 역할의 표를 그대로 싣고, 앞으로 코드 작업 지시서도 `reviewer`의 표를 따릅니다.
+2. **검토 provider 기본값은 Antigravity 하나입니다.** Z.ai가 구현한 작업은 Antigravity로 검토합니다. EXAONE은 능력표에 남겨 두되 기본 절차에서는 부르지 않고, 사용자가 요청할 때만 씁니다.
+3. **EXAONE `reasoning_effort` 기본값은 `high`입니다.** 실행기 기본을 `high`로 두고, 필요하면 호출할 때 `max`로 올립니다.
