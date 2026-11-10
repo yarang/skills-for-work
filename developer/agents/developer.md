@@ -48,6 +48,7 @@ skills:
 
 ```
 불러온 스킬: work-standards:..., work-standards:...
+작업 종류: <feature | bugfix | refactor>
 
 ## 구현 결과: <행 / 디렉터리>
 ### 바꾼 파일
@@ -55,6 +56,7 @@ skills:
 
 ### 인수 테스트
 - 결과: <N/N 통과>
+- refactor 결과: 특성 테스트 GREEN N건(지금 코드)
 
 ### 검증
 <verify 스크립트의 요약 표와 결과>

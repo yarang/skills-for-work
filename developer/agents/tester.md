@@ -47,6 +47,7 @@ skills:
 
 ```
 불러온 스킬: work-standards:..., work-standards:...
+작업 종류: <feature | bugfix | refactor>
 
 ## 인수 테스트: <행 / 디렉터리 | 통합>
 ### 작성한 파일
@@ -55,6 +56,7 @@ skills:
 ### RED 확인
 - 명령: <실행한 명령>
 - 결과: <실패 N건, 모두 "구현 안 됨/기대 값 다름" 이유>
+- refactor 결과: 특성 테스트 GREEN N건(지금 코드) — RED 단계 없음
 
 ### 만든 빈 껍데기
 - <없음 | 경로와 시그니처>

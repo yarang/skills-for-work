@@ -10,6 +10,8 @@ check)대로 직접 호출해 bun.lock 보호를 확인합니다. 표준 라이�
 import os
 import subprocess
 
+import pytest
+
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 VERIFY_DIR = os.path.dirname(TESTS_DIR)  # skills/verify
 SKILLS_DIR = os.path.dirname(VERIFY_DIR)  # skills
@@ -21,6 +23,12 @@ PACKAGE_JSON = (
     '"lint": "eslint .", "test": "vitest run"}}\n'
 )
 
+# scripts에 test가 없는 package.json: 스크립트 존재 확인(건너뜀) 분기 검증용.
+PACKAGE_JSON_NO_TEST = (
+    '{"name": "fixture", "scripts": {"typecheck": "tsc --noEmit", '
+    '"lint": "eslint ."}}\n'
+)
+
 
 def write_file(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -28,11 +36,36 @@ def write_file(path, content):
         handle.write(content)
 
 
-class FakePM:
-    """가짜 패키지 매니저 실행 파일과 호출 로그.
+# 가짜 패키지 매니저 실행 파일(python3). 호출을 $CALLS_LOG에 한 줄로 남깁니다.
+# -e <코드>로 불리면 verify.sh의 스크립트 존재 확인(probe)이므로, 코드에 든 스크립트
+# 이름(s['<이름>'])을 뽑아 현재 디렉터리 package.json의 scripts에 있으면 0, 없으면 1을
+# 돌려줍니다. 그 밖의 호출(bun run test 등)은 언제나 0입니다.
+FAKE_BIN = r'''#!/usr/bin/env python3
+import json
+import os
+import re
+import sys
 
-    가짜 실행 파일은 "이름 인자…" 한 줄을 $CALLS_LOG에 남기고 exit 0합니다.
-    """
+name = os.path.basename(sys.argv[0])
+with open(os.environ["CALLS_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(name + " " + " ".join(sys.argv[1:]) + "\n")
+
+args = sys.argv[1:]
+if len(args) >= 2 and args[0] == "-e":
+    match = re.search(r"s\['([^']+)'\]", args[1])
+    if match:
+        try:
+            with open("package.json", encoding="utf-8") as handle:
+                scripts = json.load(handle).get("scripts") or {}
+        except (OSError, ValueError):
+            sys.exit(1)
+        sys.exit(0 if match.group(1) in scripts else 1)
+sys.exit(0)
+'''
+
+
+class FakePM:
+    """가짜 패키지 매니저 실행 파일과 호출 로그."""
 
     def __init__(self, base, names):
         self.bin_dir = os.path.join(str(base), "fake-bin")
@@ -40,10 +73,7 @@ class FakePM:
         os.makedirs(self.bin_dir)
         for name in names:
             script = os.path.join(self.bin_dir, name)
-            write_file(
-                script,
-                '#!/bin/sh\nprintf \'%%s\\n\' "%s $*" >> "$CALLS_LOG"\nexit 0\n' % name,
-            )
+            write_file(script, FAKE_BIN)
             os.chmod(script, 0o755)
 
     def run_verify(self, target):
@@ -105,6 +135,23 @@ def test_bun_lock_without_node_still_runs(tmp_path):
     assert "건너뜀" not in output
 
 
+def test_bun_lock_without_test_script_skips_bun_run_test(tmp_path):
+    pkg = os.path.join(str(tmp_path), "pkg")
+    write_file(os.path.join(pkg, "package.json"), PACKAGE_JSON_NO_TEST)
+    write_file(os.path.join(pkg, "bun.lock"), "# bun lock\n")
+    pm = FakePM(tmp_path, ("bun", "node", "npm", "pnpm"))
+    proc = pm.run_verify(pkg)
+    output = proc.stdout.decode("utf-8", "replace")
+    # 있는 스크립트(typecheck, lint)는 실행하고, test는 건너뜁니다.
+    # skip도 차단하는 임시 기본 정책이므로 종료 코드는 1입니다.
+    assert proc.returncode == 1, output
+    calls = pm.calls()
+    assert "bun run typecheck" in calls
+    assert "bun run test" not in calls
+    assert "건너뜀" in output
+    assert "test 스크립트가 없음" in output
+
+
 def test_child_package_lock_wins_over_parent_bun_lock(tmp_path):
     parent = os.path.join(str(tmp_path), "repo")
     child = os.path.join(parent, "pkg")
@@ -133,10 +180,27 @@ def test_no_lock_file_uses_npm_as_before(tmp_path):
     assert not [c for c in calls if c.startswith(("pnpm ", "yarn ", "bun "))]
 
 
-def test_boundary_check_blocks_bun_lock_change(tmp_path):
+def test_bun_lock_wins_over_npm_pnpm_locks_in_same_dir(tmp_path):
+    pkg = os.path.join(str(tmp_path), "pkg")
+    write_file(os.path.join(pkg, "package.json"), PACKAGE_JSON)
+    write_file(os.path.join(pkg, "bun.lock"), "# bun lock\n")
+    write_file(os.path.join(pkg, "package-lock.json"), "# npm lock\n")
+    write_file(os.path.join(pkg, "pnpm-lock.yaml"), "# pnpm lock\n")
+    pm = FakePM(tmp_path, ("bun", "node", "npm", "pnpm"))
+    proc = pm.run_verify(pkg)
+    output = proc.stdout.decode("utf-8", "replace")
+    assert proc.returncode == 0, output
+    calls = pm.calls()
+    # 같은 디렉터리에 잠금 파일이 여럿이면 bun → pnpm → yarn → npm 순서로 bun이 이깁니다.
+    assert "bun run test" in calls
+    assert not [c for c in calls if c.startswith(("npm ", "pnpm "))]
+
+
+@pytest.mark.parametrize("lock_name", ["bun.lock", "bun.lockb"])
+def test_boundary_check_blocks_bun_lock_change(tmp_path, lock_name):
     repo = os.path.join(str(tmp_path), "repo")
     write_file(os.path.join(repo, "pkg", "package.json"), PACKAGE_JSON)
-    write_file(os.path.join(repo, "pkg", "bun.lock"), "# lock v1\n")
+    write_file(os.path.join(repo, "pkg", lock_name), "# lock v1\n")
     write_file(os.path.join(repo, "pkg", "src", "main.js"), "export function main() {\n  return 1;\n}\n")
 
     def git(*args):
@@ -168,15 +232,15 @@ def test_boundary_check_blocks_bun_lock_change(tmp_path):
     snap = os.path.join(str(tmp_path), "outside.snap")
     assert run_bc("snapshot", snap).returncode == 0
 
-    write_file(os.path.join(repo, "pkg", "bun.lock"), "# lock v2\n")
+    write_file(os.path.join(repo, "pkg", lock_name), "# lock v2\n")
 
     # 행 디렉터리 안의 변경이므로 --allow만으로는 통과합니다.
     allowed = run_bc("check", snap, "--allow=pkg")
     assert allowed.returncode == 0, allowed.stdout.decode("utf-8", "replace")
 
     # 잠금 파일을 --protect에 넣으면 보호 경로 위반(block)으로 판정합니다.
-    blocked = run_bc("check", snap, "--allow=pkg", "--protect=pkg/bun.lock")
+    blocked = run_bc("check", snap, "--allow=pkg", "--protect=pkg/" + lock_name)
     output = blocked.stdout.decode("utf-8", "replace")
     assert blocked.returncode == 1, output
     assert "보호 경로" in output
-    assert "pkg/bun.lock" in output
+    assert "pkg/" + lock_name in output

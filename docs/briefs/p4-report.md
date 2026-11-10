@@ -68,3 +68,23 @@
 1. **Z.ai 위임 원칙**: 이번엔 직접 구현했습니다. 앞으로도 세션 지시가 있으면 직접 할까요, 아니면 zai 래퍼(opencode 키) 인증을 먼저 고칠까요?
 2. **Codex·Antigravity 검증 시점**: 커밋은 이 worktree에만 있고 push하지 않았습니다. 두 리뷰를 이 worktree 커밋 대상으로 언제 돌릴지 정해 주세요.
 3. **typecheck script 없는 프로젝트에서 `tsc --noEmit` 강제**(node-standards 항목, 충돌로 안 옮김): verify 정책을 바꾸는 결정이 필요하면 별도 작업 지시로 넣을지 결정해 주세요.
+
+## 검토 반영(1차)
+
+Antigravity 검토 지적 4건을 반영했습니다(2026-11-10). 고친 범위는 `developer/skills/verify/tests/test_verify_bun.py`, `developer/agents/tester.md`, `developer/agents/developer.md`, 이 보고서입니다.
+
+| # | 지적 | 무엇을 바꿨는지 |
+|---|---|---|
+| 1 | 가짜 실행 파일이 `-e` 호출에 항상 0을 돌려줘서, package.json에 스크립트가 없을 때 건너뛰는 분기를 검증하지 못함 | `FakePM`의 가짜 실행 파일을 python3 스크립트로 다시 씀. `-e <코드>`로 불리면 코드에서 스크립트 이름(`s['<이름>']`)을 뽑아 현재 디렉터리 `package.json`의 `scripts`에 있으면 0, 없으면 1을 돌려줌(그 밖의 호출은 종전대로 0). 신규 테스트 `test_bun_lock_without_test_script_skips_bun_run_test`: bun.lock + `scripts`에 test 없음 → `bun run typecheck`·`bun run lint`는 실행하고 `bun run test`는 부르지 않으며 "건너뜀 — test 스크립트가 없음" 출력(skip 차단 정책으로 종료 코드 1) |
+| 2 | 같은 디렉터리에 잠금 파일이 여럿일 때 bun이 선택되는 테스트 없음 | 신규 테스트 `test_bun_lock_wins_over_npm_pnpm_locks_in_same_dir`: `bun.lock` + `package-lock.json` + `pnpm-lock.yaml`이 같은 디렉터리에 있으면 `bun run test`가 불리고 `npm`·`pnpm` 호출은 없음 |
+| 3 | boundary-check 테스트에 `bun.lockb` 변경이 block되는 경우 없음 | 기존 `test_boundary_check_blocks_bun_lock_change`를 parametrize로 확장해 `bun.lock`·`bun.lockb` 두 케이스 모두 확인: 잠금 파일 내용 변경 → `--protect` 지정 시 보호 경로 위반(block, 종료 코드 1) |
+| 4 | `tester.md`·`developer.md` 출력 형식의 `### RED 확인` 칸이 refactor 작업에서 모호함 | 두 파일의 출력 형식 첫머리에 `작업 종류: <feature \| bugfix \| refactor>` 줄을 추가하고, tester는 `### RED 확인`, developer는 대응 칸인 `### 인수 테스트`에 refactor일 때 적을 줄(`특성 테스트 GREEN N건(지금 코드)`)을 명시. feature 흐름 문구(명령·실패 N건·N/N 통과)는 무변경 |
+
+검증 (`developer/`에서, 테스트 먼저 추가 → 실패 확인 → 고침 순서):
+
+| 명령 | 결과 |
+|---|---|
+| `uv run --with pytest pytest -q skills/verify/tests` (테스트만 추가, 가짜 실행 파일 교체 전) | **1 failed, 8 passed** — 실패: `test_bun_lock_without_test_script_skips_bun_run_test`. 지적 그대로 `scripts`에 test가 없는데 `pass test bun run test`로 통과하던 결함이 재현됨(RED). 신규 2건(bun 우선, `bun.lockb` block)은 기존 구현으로 통과 |
+| `uv run --with pytest pytest -q skills/verify/tests` (가짜 실행 파일 교체 후) | **9 passed**, 0 실패 |
+| `uv run --with pytest pytest -q hooks/tests skills/verify/tests` (전체) | **77 passed**, 0 실패 (기존 hooks/tests 68 + verify 9: 종전 6건 + 신규 2건 + parametrize 확장 1건) |
+| `bash -n skills/verify/scripts/verify.sh skills/dev-workflow/scripts/boundary-check.sh` | 통과 |
