@@ -1,7 +1,7 @@
 # 작업 지시서 P4: work-standards에 bun 지원과 작업 종류(bugfix·refactor) 추가
 
 > 근거: `docs/plans/2026-11-10-integrate-claude-agents.md` §4 (승인 2026-11-10)
-> 맡는 쪽: Z.ai 구현 에이전트. 검토: Codex·Antigravity가 이 문서의 「수용 기준」으로 판정합니다.
+> 맡는 쪽: Z.ai 구현 에이전트. 검토: Antigravity가 이 문서의 「수용 기준」으로 판정합니다.
 > P1과 병렬로 진행합니다. P1은 `book-writer/`만, P4는 `developer/`만 고칩니다.
 
 ## 목표

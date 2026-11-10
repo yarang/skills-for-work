@@ -1,7 +1,7 @@
 # 계획: claude-agents 통합과 book-writer 플러그인 추가
 
 > 상태: **승인** (2026-11-10, §7 결정 4건 반영). 단, §8 문서 관리 역할(P6)의 세부 설계는 **제안**이며 P6 시작 전에 확인받습니다.
-> 구현은 Z.ai API 에이전트가, 검토는 Codex·Antigravity가 맡습니다. 설계와 최종 검토는 Claude가 맡습니다.
+> 구현은 Z.ai API 에이전트가, 검토는 Antigravity가 맡습니다(2026-11-10부터 Codex 검토는 쓰지 않음). 설계와 최종 검토는 Claude가 맡습니다.
 
 ## 0. 배경과 결정된 것
 
@@ -136,12 +136,12 @@ Antigravity 검토는 결과 파일이 비어 있어 다시 돌려야 합니다.
 | 단계 | 내용 | 완료 기준 | 맡는 쪽 |
 |---|---|---|---|
 | **P0** | 플러그인 사이 스킬 참조 실측 | 기록 완료 | **완료** (2026-11-10) |
-| **P1** | book-writer 플러그인 작성(§2), Codex 지적 반영(§3) | `claude plugin validate book-writer` 통과, `write_guard` 테스트 통과, 마켓플레이스 등록 | 구현: Z.ai. 검토: Codex·Antigravity |
+| **P1** | book-writer 플러그인 작성(§2), Codex 지적 반영(§3) | `claude plugin validate book-writer` 통과, `write_guard` 테스트 통과, 마켓플레이스 등록 | 구현: Z.ai. 검토: Antigravity |
 | **P2** | 원고 저장소에서 시험 운용 | `--plugin-dir`로 띄워 이미 원고가 있는 장 하나에 `extract` → ⑤ 검토를 한 번 돌림. 마켓플레이스 설치에서도 실측 결과(§0)가 같은지 확인 | Claude(메인 대화) + 사람 |
 | **P3** | 전환 | 아래 "전환 절차"대로 진행. `~/.claude`에 claude-agents 흔적이 없고 플러그인 에이전트가 보임 | Claude. **실행 전에 사람 승인** |
-| **P4** | 코드 지식 이전(§4) | work-standards에 bun 지원과 작업 종류가 들어가고, 기존 검증 스크립트 테스트가 통과함 | 구현: Z.ai. 검토: Codex·Antigravity |
+| **P4** | 코드 지식 이전(§4) | work-standards에 bun 지원과 작업 종류가 들어가고, 기존 검증 스크립트 테스트가 통과함 | 구현: Z.ai. 검토: Antigravity |
 | **P5** | `shared` 추출 (조건부) | 두 번째 플러그인이 쓰기로 정한 스킬만 옮김. 후보는 docu-writer가 `korean-style`을 쓰는 경우, 세 researcher가 `research-principles`를 함께 쓰는 경우 | 별도 계획 |
-| **P6** | 문서 관리 역할(§8) | work-standards에 `documenter` 에이전트, `repo-docs`·`knowledge-sync` 스킬, 쓰기 가드 규칙이 들어가고 가드 테스트가 통과함 | 구현: Z.ai. 검토: Codex·Antigravity |
+| **P6** | 문서 관리 역할(§8) | work-standards에 `documenter` 에이전트, `repo-docs`·`knowledge-sync` 스킬, 쓰기 가드 규칙이 들어가고 가드 테스트가 통과함 | 구현: Z.ai. 검토: Antigravity |
 
 P1과 P4는 서로 의존하지 않으므로 병렬로 진행할 수 있습니다. P6은 P4와 같은 파일(`dev-workflow`, `write_guard.py`)을 고치므로 **P4가 끝난 뒤** 시작합니다. P2·P3와는 병렬로 진행할 수 있습니다.
 

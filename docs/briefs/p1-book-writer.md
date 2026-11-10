@@ -1,7 +1,7 @@
 # 작업 지시서 P1: book-writer 플러그인 작성
 
 > 근거: `docs/plans/2026-11-10-integrate-claude-agents.md` §2, §3 (승인 2026-11-10)
-> 맡는 쪽: Z.ai 구현 에이전트. 검토: Codex·Antigravity가 이 문서의 「수용 기준」으로 판정합니다.
+> 맡는 쪽: Z.ai 구현 에이전트. 검토: Antigravity가 이 문서의 「수용 기준」으로 판정합니다.
 
 ## 목표
 claude-agents 저장소의 교재 집필 역할·스킬을 이 마켓플레이스의 새 플러그인 `book-writer/`로 옮깁니다. 옮기면서 Codex 지적 14건을 고치고, 역할별 쓰기 가드 hook을 더합니다.
