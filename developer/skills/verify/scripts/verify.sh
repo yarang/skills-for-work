@@ -69,17 +69,30 @@ skip_check() {
   echo "── 건너뜀: $1 — $3"
 }
 
+# Node 검사의 패키지 매니저는 가장 가까운 잠금 파일로 고릅니다. 같은 디렉터리에
+# 잠금 파일이 여럿이면 bun → pnpm → yarn → npm 순서로 고릅니다. bun은 런타임을
+# 스스로 제공하므로 node가 없어도 됩니다(있는 것은 bun만 확인). package.json
+# 스크립트 존재 확인도 bun이면 bun -e로 합니다. node -e와 달리 bun -e의 인자
+# 전달은 버전에 따라 다를 수 있어 스크립트 이름을 코드에 넣어 확인합니다.
 check_node() {
   [ -f package.json ] || return 0
-  local pm=npm ld
-  if ld="$(lock_dir pnpm-lock.yaml yarn.lock package-lock.json npm-shrinkwrap.json)"; then
-    if [ -f "$ld/pnpm-lock.yaml" ]; then
+  local pm=npm probe=node ld
+  if ld="$(lock_dir bun.lock bun.lockb pnpm-lock.yaml yarn.lock package-lock.json npm-shrinkwrap.json)"; then
+    if [ -f "$ld/bun.lock" ] || [ -f "$ld/bun.lockb" ]; then
+      pm=bun
+      probe=bun
+    elif [ -f "$ld/pnpm-lock.yaml" ]; then
       pm=pnpm
     elif [ -f "$ld/yarn.lock" ]; then
       pm=yarn
     fi
   fi
-  if ! has node || ! has "$pm"; then
+  if [ "$pm" = bun ]; then
+    if ! has bun; then
+      skip_check "node" test "bun이 없음"
+      return 0
+    fi
+  elif ! has node || ! has "$pm"; then
     skip_check "node" test "node 또는 $pm 이 없음"
     return 0
   fi
@@ -88,7 +101,7 @@ check_node() {
   for pair in typecheck:type lint:lint test:test; do
     script="${pair%%:*}"
     kind="${pair##*:}"
-    if node -e 'const s=require("./package.json").scripts||{};process.exit(s[process.argv[1]]?0:1)' "$script"; then
+    if "$probe" -e "const s=require('./package.json').scripts||{};process.exit(s['$script']?0:1)"; then
       run_check "$pm run $script" "$kind" "$pm" run "$script"
     else
       skip_check "$pm run $script" "$kind" "package.json에 $script 스크립트가 없음"

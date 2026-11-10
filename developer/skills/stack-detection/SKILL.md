@@ -23,6 +23,14 @@ description: 작업할 디렉터리의 매니페스트(package.json, pyproject.t
 | `go.mod` | `work-standards:go-standards` |
 | `Cargo.toml` | `work-standards:rust-standards` |
 
+### bun 판별
+
+TypeScript 프로젝트에서 아래 근거 중 하나가 있으면 bun 프로젝트로 봅니다. 언어 스킬은 그대로 `typescript-standards`이고, 그 스킬의 「bun을 쓸 때」 절을 함께 적용합니다.
+
+- 잠금 파일: `bun.lock`, `bun.lockb`
+- `bunfig.toml`
+- `package.json`의 `packageManager: "bun@…"`
+
 ## 2. 프레임워크
 
 어느 필드를 볼지가 중요합니다. **기본은 런타임 의존성만 봅니다.** 테스트나 스토리북 때문에 `react`가 들어 있는 백엔드 패키지가 있기 때문입니다.

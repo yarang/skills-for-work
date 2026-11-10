@@ -174,7 +174,7 @@ is_test_artifact() {
 # allow(조용히 통과) | report(통과하되 목록에 남김) | block(위반) 중 하나를 출력합니다.
 #
 # TODO(사용자): 팀의 정책으로 바꾸세요. 정할 것:
-#   - 잠금 파일(package-lock.json, pnpm-lock.yaml, yarn.lock, Cargo.lock, uv.lock, poetry.lock, go.sum):
+#   - 잠금 파일(bun.lock, bun.lockb, package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml, yarn.lock, uv.lock, poetry.lock, Cargo.lock, go.sum):
 #     의존성은 ④-1에서 메인 대화가 적용하므로 ⑥에서는 바뀌면 안 됩니다. 행 디렉터리 안과
 #     워크스페이스 루트의 잠금 파일은 dev-workflow가 --protect로 넘기므로 이 정책보다 먼저
 #     BLOCK됩니다. 여기서 allow나 report로 두지 마세요.
