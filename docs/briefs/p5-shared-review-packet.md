@@ -12,7 +12,7 @@
 | 무엇 | 위치 |
 |---|---|
 | 승인된 설계 | 계획서 §9 전체 |
-| EXAONE 실행기 원본 A (스트리밍, 지시서+diff 묶음) | `/private/tmp/claude-501/-Users-yarang-working-tools-skills-for-work/2747d030-b8e8-4960-980e-d4f35690a44a/scratchpad/exaone_review.py` |
+| EXAONE 실행기 원본 A (스트리밍, 지시서+diff 묶음) | 파일은 세션 임시 폴더와 함께 사라졌습니다. 가져올 기능은 아래 「`scripts/exaone_review.py`」 절에 모두 적었습니다(스트리밍 SSE 수신, 지시서와 `git diff <기준>..HEAD` 묶음, 독립 리뷰어 system 메시지) |
 | EXAONE 실행기 원본 B (줄 번호, 429 재시도, effort·max_tokens, stdin) | `/Users/yarang/working/tools/claude-agents/skills/exaone-review/scripts/exaone_review.py`, 같은 폴더의 `../SKILL.md`(API 사실, 보낼 수 없는 것) |
 | 역할의 출력 형식·심각도 | `developer/agents/reviewer.md`, `book-writer/agents/editor.md` |
 | 고칠 절차 | `developer/skills/dev-workflow/SKILL.md`의 ⑧ 리뷰·경계 확인 절, `book-writer/skills/book-workflow/SKILL.md`의 ⑤ |
