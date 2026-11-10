@@ -202,7 +202,7 @@ class H7DocumenterTestCase(support.HookTestCase):
         )
 
     def test_allows_document_paths(self):
-        # README·CHANGELOG·MANUAL 시작 파일(어느 디렉터리든), docs/ 아래, kb-outbox 아래.
+        # 줄기가 README·CHANGELOG·MANUAL과 정확히 같은 파일(루트), docs/ 아래, kb-outbox 아래.
         for rel in (
             "README.md",
             "sub/README.md",
@@ -261,6 +261,47 @@ class H7DocumenterTestCase(support.HookTestCase):
                 )
             )
             self.assertIn("H3", reason)
+
+    def test_allows_exact_stem_document_names(self):
+        # 줄기가 정확히 readme·changelog·manual(대소문자 무시)이고 문서 확장자만
+        # 허용합니다. 확장자가 없어도 되고(줄기 readme), changelog·manual은 저장소 루트입니다.
+        for rel in (
+            "README.md",
+            "readme",
+            "sub/README.rst",
+            "CHANGELOG.md",
+            "MANUAL.txt",
+        ):
+            self.assert_allow(self.write_as_documenter(self.fixture(rel)))
+
+    def test_denies_prefix_only_and_non_document_extensions(self):
+        # 접두사만 같은 코드·테스트 파일과, 문서가 아닌 확장자(.sh, .py)는 거부합니다.
+        for rel in (
+            "src/manual_override.py",
+            "tests/manual_test.py",
+            "README.sh",
+            "sub/README.py",
+            "readme_generator.py",
+        ):
+            reason = self.assert_deny(self.write_as_documenter(self.fixture(rel)))
+            self.assertIn("H7", reason)
+
+    def test_denies_changelog_manual_outside_root(self):
+        # CHANGELOG·MANUAL은 저장소 루트에서만 씁니다(README는 어느 디렉터리든).
+        for rel in ("sub/CHANGELOG.md", "sub/MANUAL.md"):
+            reason = self.assert_deny(self.write_as_documenter(self.fixture(rel)))
+            self.assertIn("H7", reason)
+
+    def test_allows_docs_document_and_image_extensions(self):
+        # docs/ 아래는 문서·그림 확장자만 허용합니다.
+        for rel in ("docs/a.md", "docs/img/x.svg", "docs/adr/0001-x.md"):
+            self.assert_allow(self.write_as_documenter(self.fixture(rel)))
+
+    def test_denies_docs_code_and_build_files(self):
+        # docs/ 안의 코드·빌드·설정 파일은 거부합니다. Makefile은 확장자가 없습니다.
+        for rel in ("docs/conf.py", "docs/build.sh", "docs/Makefile"):
+            reason = self.assert_deny(self.write_as_documenter(self.fixture(rel)))
+            self.assertIn("H7", reason)
 
 
 class CanonicalPathTestCase(support.HookTestCase):

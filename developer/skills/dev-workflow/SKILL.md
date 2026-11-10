@@ -175,7 +175,7 @@ bash "$BC" check <임시 디렉터리>/<단계>-<행>.snap <옵션>
 | ⑦ⓒ Go 모듈 정리 (메인) | `--strict` + 모든 Go 모듈의 `--allow=<go.mod> --allow=<go.sum>` (한 번의 check에) | 모듈 파일 밖 변경 |
 | ⑧ reviewer ×2 | 옵션 없이 `--strict` (두 리뷰어를 한 snapshot과 한 check로 감쌈) | 읽기 전용 위반 |
 | ⑧-1 외부 검토 (메인) | 옵션 없이 `--strict` (Antigravity·EXAONE 호출 전후로 감쌈) | 외부 provider 호출 중 쓰기·커밋 |
-| ⑧-2 documenter | `--allow=docs --allow=.work-standards/kb-outbox` + 지금 있는 `README*`·`CHANGELOG*`·`MANUAL*` 파일마다 `--allow=<경로>` + `--protect=docs/designs` (있을 때) | 문서 범위 밖 변경 |
+| ⑧-2 documenter | `--allow=docs --allow=.work-standards/kb-outbox` + 지금 있는 README 파일(어느 디렉터리든, 문서 확장자)과 저장소 루트의 `CHANGELOG`·`MANUAL` 파일마다 `--allow=<경로>` + `--protect=docs/designs` (있을 때) | 문서 범위 밖 변경 |
 
 - ⑥에서 잠금 파일(`bun.lock`, `bun.lockb`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`, `poetry.lock`, `Cargo.lock`, `go.sum`)을 보호하는 까닭은, 행 디렉터리 안에 있으면 `--allow`에 묻혀 몰래 한 설치가 통과하기 때문입니다. bun·npm·pnpm·Yarn·uv·Cargo 워크스페이스는 멤버 디렉터리에서 설치해도 루트의 잠금 파일 하나를 바꾸므로, 루트 잠금 파일도 함께 보호합니다. 직접 쓰기(Write·Edit)는 hook이 그 자리에서 막고, 패키지 매니저 실행으로 바뀐 것은 범위 밖 정책과 관계없이 경계 확인에서 보호 경로 위반으로 잡힙니다(Bash를 막는 hook은 아직 없습니다). 없는 파일을 `--protect`에 주면 종료 코드 2가 나오므로 지금 있는 파일만 넣습니다. 매니페스트는 스크립트 항목 같은 정당한 수정이 있어 보호하지 않고, ⑧ 리뷰어의 의존성 대조에 맡깁니다.
 - 경로는 모두 **저장소 루트 기준**입니다. `--protect` 경로가 기준 커밋·스냅숏·지금 작업 트리 어디에도 없으면 오타로 보고 종료 코드 2로 끝납니다. 스냅숏에만 있던 경로는 지워진 것이므로 위반(1)입니다. 디스크와 대소문자가 다른 보호 경로, 저장소 밖 절대 경로도 2입니다.

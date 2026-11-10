@@ -10,9 +10,10 @@ PreToolUse(Write|Edit|MultiEdit|NotebookEdit)에서 실행됩니다.
   worktree 서브에이전트는 후보(가까운 toplevel부터)를 따라 조정자 작업 트리의
   목록을 찾습니다(_common.state_candidates 참고).
 - H2 쓰기 범위(tester): 테스트 경로 밖에서 git이 이미 추적 중인 파일
-- H7 쓰기 범위(documenter): README·CHANGELOG·MANUAL로 시작하는 파일(대소문자·
-  확장자 무관, 어느 디렉터리든), docs/ 아래(단 docs/designs/ 는 거부),
-  .work-standards/kb-outbox/ 아래만 허용하고 그 밖의 모든 경로는 거부합니다.
+- H7 쓰기 범위(documenter): 줄기 이름이 README·CHANGELOG·MANUAL과 정확히 같은
+  문서 확장자 파일(README는 어느 디렉터리든, CHANGELOG·MANUAL은 저장소 루트만),
+  docs/ 아래의 문서·그림 파일(단 docs/designs/ 는 거부), .work-standards/
+  kb-outbox/ 아래만 허용하고 그 밖의 모든 경로는 거부합니다.
 
 거부는 stdout의 JSON(permissionDecision: deny)으로 하고 exit 0으로 끝냅니다.
 거부 이유는 서브에이전트가 읽고 행동을 바꿀 수 있게 규칙·경로·대신할 행동을
@@ -37,8 +38,18 @@ ROLES = ("developer", "tester", "documenter")
 ENV_ALLOWED = (".env.example", ".env.sample", ".env.template")
 ENV_ALLOWED_FOLDED = tuple(name.casefold() for name in ENV_ALLOWED)
 
-# H7에서 문서 파일로 보는 이름 접두사입니다(대소문자 무시, 확장자 무관).
-DOC_NAME_PREFIXES = ("readme", "changelog", "manual")
+# H7에서 문서 파일로 보는 줄기 이름과 문서 확장자입니다(모두 대소문자 무시).
+# 줄기는 정확히 일치해야 합니다(readme_generator.py 는 접두사만 같은 코드 파일).
+# README는 어느 디렉터리에나 두지만 CHANGELOG·MANUAL은 저장소 루트에만 둡니다.
+DOC_NAME_STEMS = ("readme", "changelog", "manual")
+DOC_FILE_EXTS = ("", ".md", ".markdown", ".rst", ".txt", ".adoc")
+
+# H7에서 docs/ 아래에 허용하는 문서·그림 확장자입니다(대소문자 무시).
+# 코드·빌드·설정 파일(conf.py, build.sh, Makefile)은 여기에 없으므로 거부됩니다.
+DOCS_DIR_EXTS = (
+    ".md", ".markdown", ".rst", ".txt", ".adoc",
+    ".mmd", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+)
 
 # documenter가 H3(.work-standards/)의 예외로 쓸 수 있는 초안 디렉터리입니다.
 KB_OUTBOX = ".work-standards/kb-outbox"
@@ -159,14 +170,17 @@ def is_kb_outbox(rel):
 def h7_violation(ctx):
     """H7 documenter의 쓰기 범위. 위반이면 이유, 아니면 None을 돌려줍니다.
 
-    허용: README·CHANGELOG·MANUAL로 시작하는 파일 이름(대소문자·확장자 무관,
-    어느 디렉터리든), docs/ 아래(kb 초안의 .work-standards/kb-outbox/ 아래는 H3
-    예외로 이미 통과했습니다). 거부: docs/designs/(승인된 설계서), 그 밖의 모든
-    경로 — 코드·테스트·설정 파일은 documenter가 고치지 않습니다.
+    허용: 줄기 이름이 README·CHANGELOG·MANUAL과 정확히 같은(대소문자 무시) 문서
+    확장자 파일 — README는 어느 디렉터리든, CHANGELOG·MANUAL은 저장소 루트
+    에서만 —, docs/ 아래의 문서·그림 파일(kb 초안의 .work-standards/kb-outbox/
+    아래는 H3 예외로 이미 통과했습니다). 거부: docs/designs/(승인된 설계서),
+    docs/ 안의 코드·빌드·설정 파일, 그 밖의 모든 경로 — 코드·테스트·설정
+    파일은 documenter가 고치지 않습니다.
     """
     rel = ctx["rel"]
     folded = rel.casefold()
     parts = folded.split("/")
+    stem, ext = os.path.splitext(parts[-1])
     if parts[0] == "docs":
         if folded == "docs/designs" or folded.startswith("docs/designs/"):
             return (
@@ -174,15 +188,28 @@ def h7_violation(ctx):
                 "설계서는 고치지 않습니다. 설계가 바뀌어야 한다고 판단되면 "
                 "보고서의 「물어볼 것」에 근거와 함께 적으세요." % rel
             )
-        return None
-    name = parts[-1]
-    if name.startswith(DOC_NAME_PREFIXES):
-        return None
+        if ext in DOCS_DIR_EXTS:
+            return None
+        return (
+            "H7(documenter 쓰기 범위): %s 은(는) 문서·그림 확장자(md, markdown, rst, txt, adoc, "
+            "mmd, svg, png, jpg, jpeg, gif, webp)가 아닙니다. docs/ 아래에는 문서·그림 파일만 씁니다. "
+            "코드·빌드·설정을 바꿔야 하는 내용이면 보고서의 「물어볼 것」에 적고 직접 바꾸지 마세요." % rel
+        )
+    if stem in DOC_NAME_STEMS and ext in DOC_FILE_EXTS:
+        if stem == "readme" or len(parts) == 1:
+            return None
+        return (
+            "H7(documenter 쓰기 범위): %s 은(는) 하위 디렉터리의 %s 입니다. CHANGELOG·MANUAL은 "
+            "저장소 루트에만 쓰고(README는 어느 디렉터리든), 하위 디렉터리 안내는 README에 둡니다. "
+            "이 파일을 꼭 바꿔야 한다면 보고서의 「물어볼 것」에 적으세요." % (rel, stem.upper())
+        )
     if is_kb_outbox(rel):
         return None
     return (
-        "H7(documenter 쓰기 범위): %s 은(는) 문서 경로가 아닙니다. documenter는 README·CHANGELOG·MANUAL로 "
-        "시작하는 파일, docs/ 아래, .work-standards/kb-outbox/ 아래에만 씁니다. "
+        "H7(documenter 쓰기 범위): %s 은(는) 문서 경로가 아닙니다. documenter는 줄기 이름이 "
+        "README·CHANGELOG·MANUAL과 정확히 같은 문서 확장자(md, markdown, rst, txt, adoc) 파일"
+        "(README는 어느 디렉터리든, CHANGELOG·MANUAL은 저장소 루트), docs/ 아래의 문서·그림 파일, "
+        ".work-standards/kb-outbox/ 아래에만 씁니다. "
         "코드·테스트·설정을 바꿔야 하는 내용이면 보고서의 「물어볼 것」에 적고 직접 바꾸지 마세요." % rel
     )
 

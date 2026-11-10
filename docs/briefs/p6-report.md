@@ -67,3 +67,32 @@
 ## 5. 물어볼 것
 
 - 없음. `.work-standards/kb-outbox/` 는 hook 상태 디렉터리의 자체 `.gitignore`(`*`) 때문에 git에 올라가지 않는데, 이는 "올리기 전 승인 대기 초안" 설계(§8.4-1)와 맞으므로 그대로 두었습니다.
+
+## 검토 반영 (1차)
+
+> 근거: `docs/reviews/p6-antigravity-security-2026-11-10.md` 판정 표 — 채택 3건 (code 관점은 발견 없음). 테스트 먼저 추가해 RED(거부 계열 3건 실패) 확인 뒤 고침.
+
+### 바꾼 파일
+
+| 파일 | 내용 |
+|---|---|
+| `developer/hooks/write_guard.py` | H7 규칙 교체: `os.path.splitext` 로 줄기·확장자 분리, 줄기가 대소문자 무시로 정확히 `readme`·`changelog`·`manual` 일치(접두사 아님), 문서 확장자만(`""`, `.md`, `.markdown`, `.rst`, `.txt`, `.adoc`), README는 어느 디렉터리든·CHANGELOG·MANUAL은 저장소 루트만. `docs/` 아래는 문서·그림 확장자만 허용(`.md`·`.markdown`·`.rst`·`.txt`·`.adoc`·`.mmd`·`.svg`·`.png`·`.jpg`·`.jpeg`·`.gif`·`.webp`; `docs/designs/` 거부는 그대로). 상수 `DOC_NAME_PREFIXES` → `DOC_NAME_STEMS` + `DOC_FILE_EXTS`·`DOCS_DIR_EXTS`, 모듈 머리말·docstring·거부 이유 문구 갱신 |
+| `developer/hooks/tests/test_write_guard.py` | `H7DocumenterTestCase` 에 5건 추가(구현 전 RED 확인). 허용: `README.md`, `readme`, `sub/README.rst`, `CHANGELOG.md`, `MANUAL.txt`, `docs/a.md`, `docs/img/x.svg`, `docs/adr/0001-x.md` / 거부: `src/manual_override.py`, `tests/manual_test.py`, `README.sh`, `sub/README.py`, `sub/CHANGELOG.md`, `sub/MANUAL.md`, `readme_generator.py`, `docs/conf.py`, `docs/build.sh`, `docs/Makefile`. 기존 테스트 케이스는 그대로 두고 `test_allows_document_paths` 주석만 새 규칙에 맞게 수정 |
+| `developer/skills/knowledge-sync/SKILL.md` | 「무엇을 지식 저장소에 두는가」 표 아래에 계정·비밀 관리 안내 추가: 실제 비밀값·토큰·키·비밀번호는 초안에 넣지 않고 관리 도구·발급 절차·보관 위치만 적음 |
+| `developer/skills/dev-workflow/SKILL.md` | 경계 확인 표 ⑧-2 행의 `README*`·`CHANGELOG*`·`MANUAL*` glob 표기를 새 규칙에 맞게 수정(README는 어느 디렉터리든 문서 확장자, CHANGELOG·MANUAL은 루트) |
+| `developer/agents/documenter.md` | 규칙 "문서 파일만 씁니다"에 허용 경로 명시(줄기 정확히 일치 + 문서 확장자, README 어느 디렉터리·CHANGELOG·MANUAL 루트, `docs/` 문서·그림, kb 초안) |
+| `developer/docs/design.md` | §4 경계 확인 표 ⑧-2 행의 같은 glob 표기를 새 규칙에 맞게 수정 (dev-workflow 표의 복제본) |
+
+### 검증 결과
+
+| 명령 | 결과 |
+|---|---|
+| `uv run --with pytest pytest -q hooks/tests skills/verify/tests` (테스트 추가 직후) | 3 failed(거부 계열 — 기존 구현이 허용로 풀어버림), 기존 포함 나머지 통과 — 올바른 RED |
+| 같은 명령 (구현 후) | **90 passed** (기존 85 + 신규 5, 실패 0) |
+| `claude plugin validate developer` (저장소 루트에서) | 통과 |
+
+### 비고
+
+- `docs/reviews/` 두 파일(검토 원문·판정 표)은 손대지 않고 이 커밋에 그대로 포함했습니다.
+- `docs/briefs/p6-documenter.md` 는 이력 문서이므로 고치지 않았습니다.
+- `claude plugin validate developer` 는 `developer/` 안에서 실행하면 `developer/developer` 를 찾아 실패하므로 저장소 루트에서 실행했습니다.

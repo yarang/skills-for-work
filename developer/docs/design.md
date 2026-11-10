@@ -96,7 +96,7 @@ skills_for_work/developer/              # 플러그인 루트
 | ⑥ developer | 행 디렉터리 | 인수·통합 테스트 + 행 안과 워크스페이스 루트의 잠금 파일 | 테스트 수정, 의존성 설치, 행 밖 변경, 커밋 |
 | ⑦ⓒ Go 모듈 정리 (메인) | 모든 Go 모듈의 `go.mod`·`go.sum` (한 번의 check), `--strict` | — | 모듈 파일 밖 변경 |
 | ⑧ reviewer | 없음 (`--strict`) | — | 읽기 전용 위반 |
-| ⑧-2 documenter | `docs`, `.work-standards/kb-outbox`, 지금 있는 `README*`·`CHANGELOG*`·`MANUAL*` 파일 | `docs/designs` (있을 때) | 문서 범위 밖 변경 |
+| ⑧-2 documenter | `docs`, `.work-standards/kb-outbox`, 지금 있는 README 파일(어느 디렉터리든, 문서 확장자)과 저장소 루트의 `CHANGELOG`·`MANUAL` 파일 | `docs/designs` (있을 때) | 문서 범위 밖 변경 |
 
 - 순차 방식은 `snapshot`(호출 전 해시 기록) → `check`로 비교합니다. 호출 전부터 더럽던 파일도 내용 해시로 비교하므로, 에이전트가 되돌린 변경도 잡힙니다.
 - ⑥ developer가 바꾸면 안 되는 잠금 파일은 `bun.lock`, `bun.lockb`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`, `poetry.lock`, `Cargo.lock`, `go.sum`입니다(행 디렉터리 안과 워크스페이스 루트에 있는 것). `verify.sh`도 같은 목록으로 패키지 매니저를 고르며, 가장 가까운 잠금 파일이 bun이면 node 없이 bun으로 검사합니다.
