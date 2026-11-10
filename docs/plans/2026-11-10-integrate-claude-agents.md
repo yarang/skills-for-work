@@ -141,7 +141,7 @@ Antigravity 검토는 결과 파일이 비어 있어 다시 돌려야 합니다.
 | **P3** | 전환 | 아래 "전환 절차"대로 진행. `~/.claude`에 claude-agents 흔적이 없고 플러그인 에이전트가 보임 | **완료** (2026-11-10, 사용자 승인. work-standards·book-writer·docu-writer 설치) |
 | **P4** | 코드 지식 이전(§4) | work-standards에 bun 지원과 작업 종류가 들어가고, 기존 검증 스크립트 테스트가 통과함 | 구현: Z.ai. 검토: Antigravity |
 | **P5** | `shared` 만들기 — 첫 스킬은 `review-packet`(§9) | work-standards·book-writer가 함께 쓰는 검토 꾸러미 스킬과 provider 실행기가 `shared`에 있고, 두 플러그인의 검토 절차가 그것을 가리킴. 다른 후보(`korean-style`, `research-principles`)는 두 번째 사용처가 정해질 때 옮김 | 설계: Claude(§9 초안 승인 후 작업 지시서). 구현: Z.ai. 검토: Antigravity |
-| **P6** | 문서 관리 역할(§8) | work-standards에 `documenter` 에이전트, `repo-docs`·`knowledge-sync` 스킬, 쓰기 가드 규칙이 들어가고 가드 테스트가 통과함 | 구현: Z.ai. 검토: Antigravity |
+| **P6** | 문서 관리 역할(§8) | work-standards에 `documenter` 에이전트, `repo-docs`·`knowledge-sync` 스킬, 쓰기 가드 규칙이 들어가고 가드 테스트가 통과함 | **완료** (2026-11-10) |
 
 P1과 P4는 서로 의존하지 않으므로 병렬로 진행할 수 있습니다. P6은 P4와 같은 파일(`dev-workflow`, `write_guard.py`)을 고치므로 **P4가 끝난 뒤** 시작합니다. P2·P3와는 병렬로 진행할 수 있습니다.
 
