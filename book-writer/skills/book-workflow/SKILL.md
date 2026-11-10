@@ -7,7 +7,7 @@ description: 실습형 IT 교재의 장(또는 앞붙이)을 스토리 논의 �
 
 장 하나는 아래 여섯 단계를 순서대로 지납니다. **스토리와 내용은 사람과 논의해 승인받기 전에는 다음 단계로 넘어가지 않습니다.**
 글을 먼저 쓰고 나중에 방향을 고치면 다시 쓰는 비용이 가장 크기 때문입니다.
-book-principles는 '무엇을 지킬지', korean-style은 '어떻게 표기할지', 이 스킬은 '어떤 순서로 쓸지'를 적습니다.
+book-writer:book-principles는 '무엇을 지킬지', book-writer:korean-style은 '어떻게 표기할지', 이 스킬은 '어떤 순서로 쓸지'를 적습니다.
 책마다 다른 것(권·Part 구성, 도구, 분량)은 그 책의 집필 규칙 문서(CLAUDE.md가 가리키는 `WRITING.md`)와 `DECISIONS.md`가 정합니다.
 
 ## 0. 단계와 관문
@@ -64,7 +64,7 @@ book-principles는 '무엇을 지킬지', korean-style은 '어떻게 표기할�
 
 ## ⑤ 초안 검토
 - editor가 story·content·outline과 초안을 대조해 검토합니다(흐름, 목표 달성, 실습 재현성, 초보자 눈높이, 표기). 결과는 `templates/review.md` 형식으로 `reviews/editor-vol<N>-ch<NN>-<날짜>-r<회차>.md`에 남깁니다. 회차는 그 장·그 날짜의 기존 기록 다음 번호로 정해 같은 날 재검토가 덮어쓰지 않게 합니다.
-- 사용자 지침에 외부 검토가 있으면 같은 기준으로 Codex·Antigravity에도 맡깁니다. 기준 파일(이 스킬, book-principles, korean-style, 책의 집필 규칙)과 계획 문서를 함께 넘깁니다.
+- 사용자 지침에 외부 검토가 있으면 같은 기준으로 Codex·Antigravity에도 맡깁니다. 기준 파일(이 스킬, book-writer:book-principles, book-writer:korean-style, 책의 집필 규칙)과 계획 문서를 함께 넘깁니다.
   - `codex exec "<기준 파일 내용> … plans/vol1/ch02/와 manuscript/vol1/part1/ch02.md를 검토하라. 지적마다 파일:줄, 근거, 독자가 겪을 문제, 심각도"`
   - `agy -p "<같은 지시>"`
 - writer가 `revise` 모드로 반영합니다. 반영하지 않은 지적은 이유를 남깁니다.

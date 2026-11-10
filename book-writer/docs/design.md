@@ -40,6 +40,7 @@ claude-agents 저장소의 교재 집필 역할 5개(planner, writer, editor, re
 `hooks/write_guard.py`(PreToolUse, matcher `Write|Edit|MultiEdit|NotebookEdit`)가 역할별 쓰기를 검사합니다.
 
 - **대상**: 서브에이전트 이름이 `book-writer:<역할>`로 시작할 때만 검사합니다. 메인 대화와 다른 플러그인은 그대로 둡니다.
+- **Bash로 우회하지 못하게**: 가드는 네 검사 도구만 보므로 Bash로 파일을 쓰면 가드가 보지 못합니다. 그래서 원고를 직접 쓰지 않는 planner·editor·researcher의 `tools`에서 Bash를 뺐습니다(탐색·조사는 Grep·Glob·Read·웹 도구로 합니다). writer(빌드·테스트·검사)와 capturer(앱 조작·캡처)는 Bash를 두되, 역할 파일의 행동 계약에 "Bash로 파일을 만들거나 고치지 않는다. 파일 쓰기는 Write·Edit로만 한다"를 적어 모든 파일 쓰기가 가드를 거치게 합니다.
 - **원고 루트 R**: 서브에이전트의 cwd에서 위로 올라가며 처음 만나는 `manifest.md`가 있는 디렉터리입니다. 없으면 cwd입니다.
 - **기본 허용 경로**:
 

@@ -118,6 +118,16 @@ def test_root_found_from_subdirectory(repo, tmp_path):
                            repo / "manuscript/vol1/part1/ch01.md", cwd=cwd))
 
 
+def test_root_normalized_when_cwd_via_symlink(repo, tmp_path):
+    # 심볼릭 링크를 거친 cwd 아래에 manifest.md가 있어도, find_root가 돌려준
+    # 루트가 대상 경로와 같은 방식(realpath)으로 정규화되어 비교됩니다.
+    link = tmp_path / "book-link"
+    os.symlink(repo, link)
+    cwd = link / "manuscript" / "vol1"
+    assert not denied(call(repo, "book-writer:writer", "Write",
+                           repo / "manuscript/vol1/part1/ch01.md", cwd=cwd))
+
+
 def test_no_manifest_root_is_cwd(tmp_path):
     # manifest.md가 없으면 cwd 자체가 루트이므로, cwd 안 plans/** 는 허용됩니다.
     cwd = tmp_path / "plain"

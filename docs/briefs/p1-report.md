@@ -74,3 +74,22 @@ book-writer/ 22개 파일과 루트 수정 2건입니다.
 1. #9의 원고 저장소 쪽 결정이 필요합니다: 예시 저장소에서 CLAUDE.md(전부 Claude Code 기준)와 WRITING.md(Desktop 예외)의 도구 기준을 어느 쪽으로 통일할지요. 이 저장소는 읽기만 했습니다.
 2. 쓰기 가드 기본 허용 경로에서 capturer가 `research/measure-*.md` 외의 research 문서는 못 씁니다. 실측 기록 외 조사 메모를 capturer가 남겨야 한다면 `paths.json` 없이는 researcher에게 넘겨야 하는데, 기본 목록에 더 넣을지요.
 3. 이 커밋들은 push하지 않았습니다. git.agentthread.dev 업데이트(전역 제약)는 사용자 지시로 이번만 유보했습니다 — push 여부를 알려주세요.
+
+## 검토 반영(1차)
+
+Antigravity 검토 지적 4건(2026-11-10)을 반영했습니다. 커밋 하나로 묶고 push하지 않았습니다.
+
+| # | 심각도 | 바꾼 곳 | 무엇을 바꿨는지 |
+|---|---|---|---|
+| 1 | major | `agents/planner.md`·`agents/editor.md`·`agents/researcher.md` frontmatter, `agents/writer.md`·`agents/capturer.md` 「행동 계약」, `docs/design.md` 「쓰기 보호」 | Bash로 쓰기 가드를 우회하는 길을 막았습니다. planner·editor·researcher의 `tools`에서 Bash를 뺐습니다(세 파일 본문을 훑어 Bash 실행을 전제한 문장은 없었고, 탐색·조사는 이미 Grep·Glob·Read·웹 도구로 쓰여 있어 본문 수정은 필요하지 않았습니다). writer(빌드·테스트·검사)와 capturer(앱 조작·캡처)는 Bash를 유지하되, 행동 계약의 불변 조건에 "Bash로 파일을 만들거나 고치지 않습니다. 파일 쓰기는 Write·Edit로만 합니다(쓰기 가드가 Bash를 보지 못합니다)"를 넣고 Bash의 용도를 각각 명시했습니다. design.md 「쓰기 보호」에 이 결정을 「Bash로 우회하지 못하게」 글머리로 기록했습니다. |
+| 2 | minor | `agents/` 5개 본문·description, `skills/book-workflow/SKILL.md`, `skills/book-principles/SKILL.md`, `skills/book-research/SKILL.md` | 본문과 description에서 스킬을 가리키던 자리(book-workflow·book-principles·korean-style·book-research·screen-capture)에 모두 `book-writer:` 접두사를 붙였습니다. 스킬 frontmatter의 `name:`과 파일 경로 디렉터리 이름은 그대로 뒀습니다. 수정 뒤 grep으로 확인: 접두사 없는 언급은 스킬 `name:` 선언 5곳뿐입니다. |
+| 3 | minor | `skills/book-principles/SKILL.md` 「3. 결정 기록과 진행 상태」 | manifest 상태값 괄호 목록(`미착수/스토리/…`)을 지우고, "상태값은 book-writer:book-workflow 「0. 단계와 관문」의 상태값 목록을 따른다"로 가리키기만 하게 했습니다. 상태값 정의는 book-workflow 한 곳에만 남았습니다. |
+| 4 | minor | `hooks/write_guard.py` `find_root`, `hooks/tests/test_write_guard.py` | `find_root`가 돌려주는 원고 루트를 대상 경로와 같은 `resolve()`(realpath)로 정규화하도록 고쳤습니다(찾은 루트와 없을 때의 cwd 둘 다). 심볼릭 링크를 거친 cwd 아래에 manifest.md가 있는 경우의 테스트(`test_root_normalized_when_cwd_via_symlink`)를 먼저 추가했더니 **구현을 고치기 전에 이미 통과했습니다** — `main()`이 `find_root`에 넘기기 전에 이미 `os.path.realpath(cwd)`로 cwd를 정규화하고 있었기 때문입니다. 우회 경로가 있어 실패가 나오지는 않았지만, 계약("R도 같은 방식으로 정규화합니다")을 `main`의 사전 처리가 아니라 함수 자체가 보장하도록 고쳤고 테스트는 회귀 방지로 남겼습니다. |
+
+검증 명령과 결과:
+
+| 명령 | 결과 |
+|---|---|
+| `cd book-writer && uv run --python 3.13 --with pytest pytest hooks/tests -q` | 54 passed(이번에 더한 symlink cwd 테스트 1건 포함, 실패 0) |
+| `grep -rn '{{' book-writer/` | 매치 없음(자리표시자 잔존 0) |
+| `claude plugin validate book-writer` | Validation passed(아이콘 없음 경고 1건 — 1차 보고서와 동일한, 결과에 영향 없는 경고) |

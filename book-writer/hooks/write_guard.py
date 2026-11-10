@@ -43,14 +43,15 @@ def absolute(path, cwd):
 
 
 def find_root(cwd):
-    """cwd에서 위로 올라가며 처음 만나는 manifest.md가 있는 디렉터리. 없으면 cwd."""
+    """cwd에서 위로 올라가며 처음 만나는 manifest.md가 있는 디렉터리. 없으면 cwd.
+    돌려주는 루트는 대상 경로와 같은 resolve()로 정규화합니다(심볼릭 링크 해소)."""
     cur = cwd
     while True:
         if os.path.isfile(os.path.join(cur, "manifest.md")):
-            return cur
+            return resolve(cur)
         parent = os.path.dirname(cur)
         if parent == cur:
-            return cwd
+            return resolve(cwd)
         cur = parent
 
 
