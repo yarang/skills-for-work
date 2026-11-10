@@ -1,0 +1,17 @@
+{
+  "description": "book-writer 쓰기 가드: book-writer 서브에이전트의 Write·Edit·MultiEdit·NotebookEdit 호출을 역할별 허용 경로(planner는 plans/, writer는 manuscript/·manifest·examples/, editor는 reviews/, researcher는 research/, capturer는 그림 폴더와 실측 기록)와 원고 루트 밖 쓰기·승인된 계획 문서 보호로 호출 전에 검사합니다. 계약은 docs/design.md 「쓰기 보호」를 따릅니다.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${CLAUDE_PLUGIN_ROOT}/hooks/write_guard.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

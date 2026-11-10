@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "skills-for-work",
-  "description": "업무용 Claude Code 플러그인 모음: 개발 표준(work-standards)과 문서 작업(docu-writer)",
+  "description": "업무용 Claude Code 플러그인 모음: 개발 표준(work-standards), 문서 작업(docu-writer), 교재 집필(book-writer)",
   "owner": { "name": "yarang", "email": "yarang@gmail.com" },
   "plugins": [
     {
@@ -17,6 +17,13 @@
       "author": { "name": "yarang" },
       "category": "productivity",
       "source": "./docu-writer"
+    },
+    {
+      "name": "book-writer",
+      "description": "실습형 IT 교재를 6단계로 집필하는 역할 에이전트 5개, 집필 스킬 5개, 역할별 쓰기 가드",
+      "author": { "name": "yarang" },
+      "category": "productivity",
+      "source": "./book-writer"
     }
   ]
 }
