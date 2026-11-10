@@ -236,3 +236,49 @@ def test_finish_length_warns(tmp_path, server):
     result = run_script([], tmp_path, {"EXAONE_BASE_URL": base})
     assert result.returncode == 0, result.stderr
     assert "잘렸" in result.stderr
+
+
+def test_empty_data_lines_ignored(tmp_path, server):
+    """SSE 스트림의 빈 data: 줄은 건너뛰는지."""
+    base, handler = server
+    body = b"data: \n\n" + sse([delta(text="빈 줄 무시 후 본문", finish="stop")])
+    handler.queue = [(200, {}, body)]
+    result = run_script([], tmp_path, {"EXAONE_BASE_URL": base})
+    assert result.returncode == 0, result.stderr
+    assert "빈 줄 무시 후 본문" in (tmp_path / "out.md").read_text()
+
+
+def test_secret_attachment_blocks_send(tmp_path, server):
+    """가짜 키가 든 첨부는 전송하지 않고 종료 코드 3. stderr에는 값이 없어야 한다."""
+    base, handler = server
+    leak = tmp_path / "notes.md"
+    leak.write_text("첫 줄\nGITHUB_TOKEN=ghp_0123456789abcdefghijklmnop\n셋째 줄\n")
+    result = run_script([str(leak)], tmp_path, {"EXAONE_BASE_URL": base})
+    assert result.returncode == 3
+    assert "ghp_0123456789" not in result.stderr      # 값은 출력하지 않음
+    assert str(leak) in result.stderr                 # 어느 입력인지
+    assert ":2" in result.stderr                      # 몇 번째 줄인지
+    assert not handler.seen                           # 전송도 하지 않음
+
+
+def test_allow_secret_like_sends(tmp_path, server):
+    """--allow-secret-like면 비밀값 검사를 건너뛰고 전송한다."""
+    base, handler = server
+    leak = tmp_path / "notes.md"
+    leak.write_text("GITHUB_TOKEN=ghp_0123456789abcdefghijklmnop\n")
+    handler.queue = [reply([delta(text="ok", finish="stop")])]
+    result = run_script(["--allow-secret-like", str(leak)], tmp_path,
+                        {"EXAONE_BASE_URL": base})
+    assert result.returncode == 0, result.stderr
+    assert "ghp_0123456789" in user_content(handler)
+
+
+def test_plain_words_do_not_block(tmp_path, server):
+    """일반 단어(token, password)나 짧은 값만으로는 검사에 걸리지 않는다."""
+    base, handler = server
+    doc = tmp_path / "doc.md"
+    doc.write_text("token과 password라는 단어가 든 보통 문서\nMY_TOKEN=short\n")
+    handler.queue = [reply([delta(text="ok", finish="stop")])]
+    result = run_script([str(doc)], tmp_path, {"EXAONE_BASE_URL": base})
+    assert result.returncode == 0, result.stderr
+    assert handler.seen

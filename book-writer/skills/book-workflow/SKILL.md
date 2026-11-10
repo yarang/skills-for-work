@@ -65,7 +65,7 @@ book-writer:book-principles는 '무엇을 지킬지', book-writer:korean-style�
 
 ## ⑤ 초안 검토
 - editor가 story·content·outline과 초안을 대조해 검토합니다(흐름, 목표 달성, 실습 재현성, 초보자 눈높이, 표기). 결과는 `templates/review.md` 형식으로 `reviews/editor-vol<N>-ch<NN>-<날짜>-r<회차>.md`에 남깁니다. 회차는 그 장·그 날짜의 기존 기록 다음 번호로 정해 같은 날 재검토가 덮어쓰지 않게 합니다.
-- 사용자 지침에 외부 검토가 있으면 `shared:review-packet`대로 꾸러미를 만들어 Antigravity로 검토하고, `추가 검토: exaone`이면 EXAONE도 함께 돌린다. 기준 파일(이 스킬, `book-writer:book-principles`, `book-writer:korean-style`, 책의 집필 규칙)과 계획 문서를 꾸러미의 기준·참고 원본에 넣는다.
+- 사용자 지침에 외부 검토가 있으면 `shared:review-packet`대로 꾸러미를 만들어 Antigravity로 검토하고, `추가 검토: exaone`이면 EXAONE도 함께 돌립니다. 기준 파일(이 스킬, `book-writer:book-principles`, `book-writer:korean-style`, 책의 집필 규칙)과 계획 문서를 꾸러미의 기준·참고 원본에 넣습니다.
 - writer가 `revise` 모드로 반영하고, 지적마다 반영·미반영(이유)을 보고서의 '반영 기록'에 적습니다. writer는 `reviews/`에 쓰지 못하므로(쓰기 가드), **메인 세션이** 그 내용을 해당 검토 기록 끝 '반영 기록' 절에 옮겨 붙입니다. 다음 회차 editor는 이 절을 기준선으로 읽습니다.
 - 검토는 최대 2회 돕니다(`r1`, `r2`). 2회 뒤에도 blocker가 남으면 사람에게 올립니다.
 

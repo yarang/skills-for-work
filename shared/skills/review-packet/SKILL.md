@@ -23,7 +23,7 @@ description: 검토 역할과 실행 provider를 나누는 절차 — 검토 꾸
 
 - **역할**: `work-standards:reviewer`(코드) 또는 `book-writer:editor`(원고).
 - **관점**: `code | security | spec(명세 일치) | style(문체·표기)` 중 하나. **꾸러미 하나에 관점 하나**입니다. 한 번에 모든 관점을 보게 하면 얕아집니다.
-- **범위**: 기준 커밋과 대상 커밋, 대상 파일 목록(또는 "diff 전체"), 제외할 파일·디렉터리와 이유.
+- **범위**: 기준 커밋과 대상 커밋, 대상 파일 목록(또는 "diff 전체"), 제외할 파일·디렉터리와 이유. **diff 본문은 꾸러미에 넣지 않습니다.** 저장소를 읽는 provider(Antigravity)는 범위(커밋)로 가리키고 — 실행기가 저장소 안에서 agy를 부르므로 provider가 직접 읽습니다 — 저장소를 못 읽는 provider(EXAONE)에게는 실행기의 `--diff`가 diff를 첨부합니다. diff 본문을 넣으면 꾸러미가 Antigravity 실행기의 크기 상한(⑧절)에 걸립니다.
 - **기준**: ① 수용 기준(지시서·설계서의 해당 절 **원문**), ② 분야 기준(스킬 이름 목록 — 스킬을 못 읽는 provider에게는 본문을 첨부), ③ 심각도 정의.
 - **심각도는 역할의 표 그대로** 싣습니다. 코드는 `work-standards:reviewer`의 CRITICAL/HIGH/MEDIUM/LOW, 원고는 `book-writer:editor`의 blocker/major/minor입니다. 다른 척도를 만들지 않습니다.
 - **참고 원본**: 대조할 파일 경로. 저장소를 못 읽는 provider에게는 파일을 첨부합니다.
@@ -39,7 +39,7 @@ description: 검토 역할과 실행 provider를 나누는 절차 — 검토 꾸
 |---|---|---|---|---|---|---|
 | Claude 하위 에이전트 | `Agent` 도구 | 가능 | 가능(역할의 Bash 허용 목록) | 가능 | 빠름 | 기본값 |
 | Z.ai (GLM) | `claude-zai -p` | 가능 | 허용 목록 안에서 | `~/.claude`·플러그인 공유 | 보통 | 구현 provider와 같으면 검토에 쓰지 않음(② 원칙) |
-| Antigravity | `agy --mode plan --print "<꾸러미>"` | 가능 | 가능 | 불가(파일로 읽음) | 몇 분 | `-p` 바로 뒤에 다른 플래그를 두면 그 플래그를 지시문으로 먹음 |
+| Antigravity | `agy --sandbox --mode plan --print "<꾸러미>"` | 가능 | 가능(실행기가 `--sandbox`로 제한, 꾸러미 「규칙」이 읽기 전용을 못 박음) | 불가(파일로 읽음) | 몇 분 | `-p` 바로 뒤에 다른 플래그를 두면 그 플래그를 지시문으로 먹음 |
 | EXAONE | 채팅 API 스크립트(`api.exaone.ai/v1`, `k-exaone_v2.5`) | 불가 — 원본 첨부 | 불가 — 사실 자료 첨부 | 불가 — 스킬 본문 첨부 | 느림(추론, 초당 1회 제한). 컨텍스트 524,288 토큰 | 비스트리밍은 긴 응답에서 HTTP 500 → 스트리밍으로 받음. 외부 반출이므로 「보내지 않는 것」을 지킴 |
 
 - 능력에 따라 첨부할 것: **저장소 읽기가 불가하면 원본을, 스킬 로드가 불가하면 스킬 본문을, 명령 실행이 불가하면 사실 자료를** 꾸러미에 함께 넣습니다.
@@ -80,8 +80,8 @@ Antigravity(`run_agy.sh` — 저장소로 이동해 꾸러미를 지시문으로
 bash "${CLAUDE_SKILL_DIR}/scripts/run_agy.sh" <저장소> <꾸러미 파일> <결과 파일>
 ```
 
-- 종료 코드는 agy의 것을 그대로 돌려주고, 결과 파일이 비어 있으면 2로 끝납니다. agy의 stderr은 `<결과 파일>.err`에 남습니다.
-- Antigravity가 명령을 실행할 수 있으므로, 호출을 경계 확인으로 감싸는 것은 각 워크플로(`work-standards:dev-workflow` ⑧-1)가 정합니다.
+- 종료 코드는 agy의 것을 그대로 돌려주고, 결과 파일이 비어 있으면 2로 끝납니다. agy의 stderr은 `<결과 파일>.err`에 남습니다. 꾸러미·결과 경로는 상대 경로로 줘도 호출 위치 기준으로 풀립니다(실행기가 `cd` 전에 절대 경로로 바꿉니다).
+- Antigravity가 명령을 실행할 수 있으므로 실행기는 `agy --sandbox`(단말 제한)로 부르고, 꾸러미가 크기 상한(환경 변수 `AGY_MAX_PACKET_BYTES`, 기본 200000바이트)을 넘으면 종료 코드 2로 거부합니다. 경계 확인은 **사후**이고 작업 트리 안의 변경만 보므로(저장소 밖 파일·네트워크 요청은 못 봄), `--sandbox`와 꾸러미 「규칙」의 읽기 전용 불변식이 그 앞선 방어선입니다. 호출을 경계 확인으로 감싸는 것은 각 워크플로(`work-standards:dev-workflow` ⑧-1)가 정합니다.
 
 EXAONE(`exaone_review.py` — 꾸러미를 system·user 메시지로 묶어 스트리밍으로 받습니다):
 
@@ -93,8 +93,10 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/exaone_review.py" \
 # --stdin-label <이름>: 표준 입력(diff 등)을 함께 보낼 때
 # --effort low|medium|high|max: reasoning_effort (기본 high)
 # --max-tokens N: 최대 생성 토큰 (기본 16000)
+# --allow-secret-like: 사람이 안전함을 확인한 뒤 비밀값 검사를 건너뛸 때
 ```
 
+- **전송 직전에 키 형식 비밀값을 검사합니다**(⑦절 「보내지 않는 것」의 기계 안전장치). `sk-…`, `AKIA…`, `ghp_…`, `xox[bpas]-…`, PEM 프라이빗 키, `*_API_KEY=`/`*_TOKEN=`/`*_SECRET=`에 16자 이상 값. 걸리면 어느 입력의 몇 번째 줄인지만 stderr에 적고(값은 어디에도 적지 않습니다) 종료 코드 3으로 멈춥니다. 사람이 안전함을 확인했으면 `--allow-secret-like`로 넘깁니다. 일반 단어(`token`, `password`)만으로는 걸리지 않습니다.
 - 첨부 파일과 diff는 **줄 번호를 붙여** 보냅니다. 지적에 `파일:줄`을 달라고 꾸러미의 출력 형식에 적어 둡니다.
 - 429는 `Retry-After`를 따르거나 지수 백오프로 최대 5회 재시도합니다. 그 밖의 HTTP 오류는 종료 코드 1로 끝납니다.
 - 결과 파일에 검토 본문을 쓰고, stderr에 모델·추론 글자 수·`finish_reason`을 적습니다. `finish_reason`이 `length`면 답이 잘렸다는 경고가 나옵니다 — `--max-tokens`를 늘리거나 `--effort`를 낮춥니다.

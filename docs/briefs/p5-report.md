@@ -69,3 +69,30 @@ TDD: 테스트를 먼저 쓰고 `14 failed`(스크립트 부재)를 확인한 �
 1. **`docs/reviews/` 경로**: 판정 기록을 `docs/reviews/<작업>-<provider>-<날짜>.md`에 남기기로 했는데(§9.4), 이 저장소에는 아직 그 디렉터리가 없습니다. 처음 사용할 때 메인 대화가 만들면 되리로 두었습니다. skills_for_work 저장소에 빈 틀이나 `.gitkeep`을 미리 둘까요?
 2. **EXAONE usage 스트리밍**: 스트리밍 모드에서는 마지막 chunk에 `usage`가 오지 않을 수 있어, stderr의 추론 토큰 수는 올 때만 적히게 두었습니다(글자 수는 항상 있음). 실제 응답에 usage가 없다면 토큰 수는 비워둡니다 — 괜찮을까요?
 3. **아이콘 경고**: `claude plugin validate`가 플러그인 아이콘 없음을 경고합니다. 기존 세 플러그인도 같은 상태라 그대로 두었습니다. 마켓플레이스를 공개할 계획이 생기면 그때 함께 넣습니다.
+
+## 검토 반영(1차)
+
+Antigravity 검토(code·security) 판정 표의 「채택」된 지적을 모두 반영했습니다(2026-11-10). 검토 원문은 `docs/reviews/p5-antigravity-code-2026-11-10.md`·`docs/reviews/p5-antigravity-security-2026-11-10.md` — 고치지 않고 이 커밋에 포함했습니다.
+
+| 지적 (판정 표 #) | 변경 |
+|---|---|
+| code 1·5 / security 1 — `run_agy.sh` 상대 경로가 `cd` 뒤에 저장소 기준으로 풀림 | `cd` 전에 꾸러미·결과 경로를 절대 경로로 바꿉니다(`cd "$(dirname)" && pwd` — bash 3.2 호환). 결과 파일의 디렉터리가 없으면 종료 코드 2. 테스트: 상대 경로가 호출 위치 기준으로 풀리는지, 없는 디렉터리면 2 |
+| security 4 — 큰 꾸러미가 명령행 인자 길이 제한(`ARG_MAX`)을 넘을 수 있음 | 꾸러미 크기 상한 검사(기본 200000바이트, 환경 변수 `AGY_MAX_PACKET_BYTES`로 변경). 넘으면 agy를 부르지 않고 종료 코드 2와 안내 메시지. 테스트: 환경 변수 상한 초과·기본 상한(200001바이트) 초과 |
+| security 2 — 꾸러미에 읽기 전용·명령 제약이 없고, ⑧-1 경계 확인은 사후·작업 트리 한정 | `agy --sandbox --mode plan --print "<꾸러미>"`로 호출합니다(`--print`와 지시문은 맨 끝, 바로 붙임). `templates/packet.md` 「규칙」 칸에 `developer/agents/reviewer.md` 「규칙」「Bash로 해도 되는 것」 요약 불변식을 넣습니다 — 쓰기·git 쓰기·패키지 설치·네트워크 요청·저장소 밖 접근 금지, 허용 명령은 git 읽기(`--no-ext-diff --no-textconv`), 꾸러미가 지정한 테스트·검증 명령, 파일 읽기. `dev-workflow/SKILL.md` ⑧-1 본문에 경계 확인의 사후·작업 트리 한계와 `--sandbox` 사용을 한 문장 추가(기존 ⑧ 문구는 불변) |
+| security 4 — diff 본문이 꾸러미를 부풀림 | `review-packet/SKILL.md` ③절 「범위」에 diff 본문 대신 범위(커밋)로 가리키도록 적습니다 — 저장소를 읽는 provider용. ⑧절에 `--sandbox`·크기 상한·경계 확인 한계를 적고 능력표 Antigravity 행을 갱신합니다 |
+| code 3 — `exaone_review.py` 빈 `data:` 줄에서 `json.loads("")` | 빈 `data:` 줄은 `continue`로 건너뜁니다. 테스트: 빈 `data:` 줄이 섞인 SSE 정상 파싱 |
+| code 4 — `retry_wait`·`read_stream` 인자 타입 힌트 누락 | `retry_wait(headers: email.message.Message | dict[str, str], attempt: int) -> float`, `read_stream(resp: Iterable[bytes]) -> …` (`from __future__ import annotations` 추가) |
+| security 3 — EXAONE 전송 전 비밀값 검사 없음 | 전송 직전 키 형식 검사 — `sk-` 긴 토큰, `AKIA[0-9A-Z]{16}`, `ghp_`/`gho_`/`github_pat_`, `xox[bpas]-`, `-----BEGIN … PRIVATE KEY-----`, `대문자_(API_KEY|TOKEN|SECRET)=` 16자 이상 값. 걸리면 어느 입력(파일·diff)의 몇 번째 줄인지만 stderr에 적고(값은 출력하지 않음) 종료 코드 3으로 멈춥니다. `--allow-secret-like`를 주면 사람이 확인한 뒤 건너뜁니다. 일반 단어(`token`, `password`)만으로는 걸지 않습니다. 테스트: 가짜 키 첨부 → 3·stderr에 값 없음·미전송, `--allow-secret-like` → 전송, 일반 단어 → 통과 |
+| code 2 — `book-workflow/SKILL.md:68` 한다체 | "돌린다"→"돌립니다", "넣는다"→"넣습니다" |
+
+검증 결과 (TDD: 테스트 8건을 먼저 추가해 `8 failed, 14 passed` 확인 뒤 구현):
+
+| 명령 | 결과 |
+|---|---|
+| `cd shared && uv run --python 3.13 --with pytest pytest skills/review-packet/tests -q` | **22 passed** (기존 14 + 신규 8) |
+| `cd developer && uv run --with pytest pytest -q hooks/tests skills/verify/tests` | **78 passed** (기존과 동일) |
+| `cd book-writer && uv run --python 3.13 --with pytest pytest hooks/tests -q` | **54 passed** (기존과 동일) |
+| `bash -n shared/skills/review-packet/scripts/run_agy.sh` | 통과 |
+| `claude plugin validate shared` | **Validation passed** |
+
+실제 EXAONE·Antigravity는 부르지 않았습니다(가짜 SSE 서버와 가짜 `agy` 실행 파일로만 검증).
