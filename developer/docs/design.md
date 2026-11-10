@@ -37,7 +37,8 @@ skills_for_work/developer/              # 플러그인 루트
 │   ├── architect.md    (opus)    설계서 — 쓰기 없음, 텍스트로 반환
 │   ├── tester.md       (sonnet)  인수 테스트 먼저, RED 확인
 │   ├── developer.md    (sonnet)  GREEN, verify 실행
-│   └── reviewer.md     (sonnet)  읽기 전용, 관점: code | security
+│   ├── reviewer.md     (sonnet)  읽기 전용, 관점: code | security
+│   └── documenter.md   (sonnet)  문서 — README·MANUAL·CHANGELOG·ADR 갱신(repo), 지식 저장소 초안(kb)
 └── skills/
     ├── dev-workflow/ (+ scripts/boundary-check.sh)  절차 — 메인 대화가 파이프라인을 진행
     ├── code-principles/       ① 공통
@@ -54,7 +55,9 @@ skills_for_work/developer/              # 플러그인 루트
     ├── tauri-standards/       ④
     ├── stack-detection/       도구 — 매니페스트로 스킬 목록을 정함
     ├── verify/ (+ scripts/verify.sh)  도구 — 결정적 검사
-    └── security-review/       도구 — 보안 점검표
+    ├── security-review/       도구 — 보안 점검표
+    ├── repo-docs/             도구 — 저장소 문서 갱신 기준 (documenter repo 모드)
+    └── knowledge-sync/        도구 — 지식 저장소 초안 기준 (documenter kb 모드)
 ```
 
 ## 4. 파이프라인
@@ -63,9 +66,9 @@ skills_for_work/developer/              # 플러그인 루트
 ① 요구사항 (메인) → ② researcher → ③ architect → ④ 승인 (사용자)
 → ④-1 의존성 적용 (메인) → ⑤ tester (인수·통합 테스트, RED) → ⑥ developer (GREEN)
 → ⑦ 검증 (메인: ⓐ 행 verify → ⓑ 통합 테스트 → ⓒ Go 모듈 정리)
-→ ⑧ reviewer(code) + reviewer(security) → ⑨ 통합 (메인)
+→ ⑧ reviewer(code) + reviewer(security) → ⑧-2 문서 (documenter) → ⑨ 통합 (메인)
 
-②·⑤·⑥·⑧의 서브에이전트 호출과 ④-1·⑦ⓒ의 메인 대화 변경은 모두 「경계 확인」으로 감쌉니다: 전 snapshot, 뒤 check.
+②·⑤·⑥·⑧·⑧-2의 서브에이전트 호출과 ④-1·⑦ⓒ의 메인 대화 변경은 모두 「경계 확인」으로 감쌉니다: 전 snapshot, 뒤 check.
 ```
 
 자세한 단계 규칙, 핸드오프 형식, 생략 가능한 경우는 `skills/dev-workflow/SKILL.md`에 있습니다. 핵심만 적으면 다음과 같습니다.
@@ -80,6 +83,7 @@ skills_for_work/developer/              # 플러그인 루트
 - 순차 방식에서는 ⑨ 전까지 커밋하지 않아 새 파일이 `git diff`에 나오지 않습니다. 그래서 ⑧에는 메인 대화가 작업 시작 커밋과 파일 목록(`git diff --name-only` + untracked)을 넘깁니다. 리뷰어가 판정 기준을 추측하지 않도록 설계서 경로와 계약·인수 조건 원문도 함께 넘깁니다.
 - 행이 여럿이고 계약이 있으면 architect가 「통합 인수 조건」을 쓰고, tester가 `## 범위: 통합`으로 통합 테스트를 모든 행 디렉터리 밖에 씁니다. 행마다 GREEN이어도 계약 해석이 서로 다르면 함께 돌 때 깨지기 때문입니다.
 - 실행 방식은 ④에서 정합니다. **순차**(기본, 같은 작업 트리)와 **병렬 worktree**(행마다 `isolation: "worktree"`)가 있습니다. worktree는 커밋된 상태에서 만들어지므로, 병렬이면 ④-1의 의존성 변경과 ⑤의 결과를 작업 브랜치에 먼저 커밋해 기준 커밋으로 씁니다. 그래서 커밋 동의가 필요합니다.
+- ⑧-2 문서는 공개 API·설정·명령·동작이 바뀐 작업에만 돌립니다. documenter가 `repo` 모드로 저장소 문서(README·MANUAL·CHANGELOG·ADR)를 갱신하고, 지식 저장소에 남길 것이 있으면 `kb` 모드로 `.work-standards/kb-outbox/` 에 초안을 씁니다. 초안의 올리기는 메인 대화가 사용자 승인을 받은 뒤 하고, 문서는 ⑧·⑧-1 리뷰를 거치지 않으므로 ⑨에서 문서 diff를 함께 보여 줍니다.
 
 ### 경계 확인 (`boundary-check.sh`)
 
@@ -92,6 +96,7 @@ skills_for_work/developer/              # 플러그인 루트
 | ⑥ developer | 행 디렉터리 | 인수·통합 테스트 + 행 안과 워크스페이스 루트의 잠금 파일 | 테스트 수정, 의존성 설치, 행 밖 변경, 커밋 |
 | ⑦ⓒ Go 모듈 정리 (메인) | 모든 Go 모듈의 `go.mod`·`go.sum` (한 번의 check), `--strict` | — | 모듈 파일 밖 변경 |
 | ⑧ reviewer | 없음 (`--strict`) | — | 읽기 전용 위반 |
+| ⑧-2 documenter | `docs`, `.work-standards/kb-outbox`, 지금 있는 `README*`·`CHANGELOG*`·`MANUAL*` 파일 | `docs/designs` (있을 때) | 문서 범위 밖 변경 |
 
 - 순차 방식은 `snapshot`(호출 전 해시 기록) → `check`로 비교합니다. 호출 전부터 더럽던 파일도 내용 해시로 비교하므로, 에이전트가 되돌린 변경도 잡힙니다.
 - ⑥ developer가 바꾸면 안 되는 잠금 파일은 `bun.lock`, `bun.lockb`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`, `poetry.lock`, `Cargo.lock`, `go.sum`입니다(행 디렉터리 안과 워크스페이스 루트에 있는 것). `verify.sh`도 같은 목록으로 패키지 매니저를 고르며, 가장 가까운 잠금 파일이 bun이면 node 없이 bun으로 검사합니다.

@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""write_guard.py — developer·tester의 파일 쓰기를 도구 호출 전에 검사합니다 (H1·H2·H3).
+"""write_guard.py — developer·tester·documenter의 파일 쓰기를 도구 호출 전에 검사합니다 (H1·H2·H3·H7).
 
 PreToolUse(Write|Edit|MultiEdit|NotebookEdit)에서 실행됩니다.
 
-- H3 공통 불변식(developer·tester): .git/ 내부, 저장소 밖, .work-standards/, .env
+- H3 공통 불변식(developer·tester·documenter): .git/ 내부, 저장소 밖, .work-standards/, .env.
+  documenter만 .work-standards/kb-outbox/ 아래를 예외로 허용합니다(지식 저장소 초안).
 - H1 보호 경로(developer): .work-standards/protected-paths 의 경로. 격리
   worktree 서브에이전트는 후보(가까운 toplevel부터)를 따라 조정자 작업 트리의
   목록을 찾습니다(_common.state_candidates 참고).
 - H2 쓰기 범위(tester): 테스트 경로 밖에서 git이 이미 추적 중인 파일
+- H7 쓰기 범위(documenter): README·CHANGELOG·MANUAL로 시작하는 파일(대소문자·
+  확장자 무관, 어느 디렉터리든), docs/ 아래(단 docs/designs/ 는 거부),
+  .work-standards/kb-outbox/ 아래만 허용하고 그 밖의 모든 경로는 거부합니다.
 
 거부는 stdout의 JSON(permissionDecision: deny)으로 하고 exit 0으로 끝냅니다.
 거부 이유는 서브에이전트가 읽고 행동을 바꿀 수 있게 규칙·경로·대신할 행동을
@@ -25,13 +29,19 @@ import _common
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 
-# H1·H2의 대상 역할입니다. H5(reviewer·researcher의 쓰기 차단)는 P2 항목이라 여기에 없습니다.
-ROLES = ("developer", "tester")
+# H1·H2·H7의 대상 역할입니다. H5(reviewer·researcher의 쓰기 차단)는 P2 항목이라 여기에 없습니다.
+ROLES = ("developer", "tester", "documenter")
 
 # 예시용으로 허용되는 .env 계열 이름입니다. 거부 판정이 casefold 비교이므로 같은
 # 방식으로 내려 둡니다.
 ENV_ALLOWED = (".env.example", ".env.sample", ".env.template")
 ENV_ALLOWED_FOLDED = tuple(name.casefold() for name in ENV_ALLOWED)
+
+# H7에서 문서 파일로 보는 이름 접두사입니다(대소문자 무시, 확장자 무관).
+DOC_NAME_PREFIXES = ("readme", "changelog", "manual")
+
+# documenter가 H3(.work-standards/)의 예외로 쓸 수 있는 초안 디렉터리입니다.
+KB_OUTBOX = ".work-standards/kb-outbox"
 
 TEST_DIRS = ("tests", "test", "__tests__", "spec", "testdata", "e2e")
 TEST_EXTS = ("js", "jsx", "ts", "tsx", "mjs", "cjs")
@@ -64,13 +74,15 @@ def judge(data, role):
     if reason:
         return reason
     ctx = _common.build_context(data, raw, target)
-    reason = h3_violation(ctx)
+    reason = h3_violation(ctx, role)
     if reason:
         return reason
     if role == "developer":
         return h1_violation(ctx)
     if role == "tester":
         return h2_violation(ctx)
+    if role == "documenter":
+        return h7_violation(ctx)
     return None
 
 
@@ -103,8 +115,12 @@ def h3_git_target(target):
     return None
 
 
-def h3_violation(ctx):
-    """H3 공통 불변식(developer·tester). 위반이면 이유, 아니면 None을 돌려줍니다.
+def h3_violation(ctx, role=None):
+    """H3 공통 불변식(developer·tester·documenter). 위반이면 이유, 아니면 None.
+
+    role이 documenter면 .work-standards/kb-outbox/ 아래만 예외로 통과시킵니다.
+    (왜: 지식 저장소에 올릴 초안을 두는 유일한 허용 장소이고, 나머지
+    .work-standards/ — 보호 목록, 기록 — 은 여전히 막아야 하기 때문입니다.)
 
     거부 쪽 비교는 casefold로 합니다. (왜: 대소문자 무시 볼륨에서 .Env 나
     .WORK-STANDARDS 는 같은 파일을 여므로, 대소문자를 구분하는 볼륨의 드문
@@ -118,6 +134,8 @@ def h3_violation(ctx):
         )
     parts = ctx["rel"].split("/")
     if parts[0].casefold() == ".work-standards":
+        if role == "documenter" and is_kb_outbox(ctx["rel"]):
+            return None
         return (
             "H3(공통 불변식): %s 은(는) hook 상태 디렉터리(.work-standards/) 안입니다. "
             "에이전트는 이 안을 고치지 않습니다(보호 목록을 고쳐 가드를 끄는 일도 막습니다). "
@@ -130,6 +148,43 @@ def h3_violation(ctx):
             "예시 값이라면 .env.example에 쓰세요." % ctx["rel"]
         )
     return None
+
+
+def is_kb_outbox(rel):
+    """rel이 .work-standards/kb-outbox 아래인지. casefold로 비교합니다(H3와 같게)."""
+    folded = rel.casefold()
+    return folded == KB_OUTBOX or folded.startswith(KB_OUTBOX + "/")
+
+
+def h7_violation(ctx):
+    """H7 documenter의 쓰기 범위. 위반이면 이유, 아니면 None을 돌려줍니다.
+
+    허용: README·CHANGELOG·MANUAL로 시작하는 파일 이름(대소문자·확장자 무관,
+    어느 디렉터리든), docs/ 아래(kb 초안의 .work-standards/kb-outbox/ 아래는 H3
+    예외로 이미 통과했습니다). 거부: docs/designs/(승인된 설계서), 그 밖의 모든
+    경로 — 코드·테스트·설정 파일은 documenter가 고치지 않습니다.
+    """
+    rel = ctx["rel"]
+    folded = rel.casefold()
+    parts = folded.split("/")
+    if parts[0] == "docs":
+        if folded == "docs/designs" or folded.startswith("docs/designs/"):
+            return (
+                "H7(documenter 쓰기 범위): %s 은(는) 승인된 설계서 디렉터리(docs/designs/) 안입니다. "
+                "설계서는 고치지 않습니다. 설계가 바뀌어야 한다고 판단되면 "
+                "보고서의 「물어볼 것」에 근거와 함께 적으세요." % rel
+            )
+        return None
+    name = parts[-1]
+    if name.startswith(DOC_NAME_PREFIXES):
+        return None
+    if is_kb_outbox(rel):
+        return None
+    return (
+        "H7(documenter 쓰기 범위): %s 은(는) 문서 경로가 아닙니다. documenter는 README·CHANGELOG·MANUAL로 "
+        "시작하는 파일, docs/ 아래, .work-standards/kb-outbox/ 아래에만 씁니다. "
+        "코드·테스트·설정을 바꿔야 하는 내용이면 보고서의 「물어볼 것」에 적고 직접 바꾸지 마세요." % rel
+    )
 
 
 def h1_violation(ctx):

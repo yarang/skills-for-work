@@ -25,6 +25,7 @@ sys.path.insert(0, HOOKS_DIR)
 
 DEVELOPER = "work-standards:developer"
 TESTER = "work-standards:tester"
+DOCUMENTER = "work-standards:documenter"
 
 # 값은 P0 실측 기록의 모양(형식)만 따옵니다.
 SESSION_ID = "d9695227-a7b8-4117-af9f-6f8e8721c561"

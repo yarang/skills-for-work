@@ -1,5 +1,5 @@
 {
-  "description": "P1 쓰기 가드: work-standards 서브에이전트의 Write·Edit 쓰기를 공통 불변식(H3), developer 보호 경로(H1), tester 쓰기 범위(H2)로 호출 전에 검사하고, Skill 호출을 .work-standards/skill-log.jsonl에 기록합니다(H6). 최종 판정은 boundary-check.sh가 합니다.",
+  "description": "P1 쓰기 가드: work-standards 서브에이전트의 Write·Edit 쓰기를 공통 불변식(H3), developer 보호 경로(H1), tester 쓰기 범위(H2), documenter 쓰기 범위(H7)로 호출 전에 검사하고, Skill 호출을 .work-standards/skill-log.jsonl에 기록합니다(H6). 최종 판정은 boundary-check.sh가 합니다.",
   "hooks": {
     "PreToolUse": [
       {

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""write_guard.py(H1·H2·H3)의 테스트.
+"""write_guard.py(H1·H2·H3·H7)의 테스트.
 
 스크립트를 subprocess로 실행해 stdin에 hook 입력 JSON을 넣고, 출력과 종료
 코드를 확인합니다. 입력은 P0 실측 기록의 줄 모양(키 집합)을 따릅니다.
@@ -190,6 +190,77 @@ class H2TestCase(support.HookTestCase):
         # developer의 구현 파일 수정은 H1(보호 목록)으로만 판정합니다.
         proc = support.run_hook(support.WRITE_GUARD, self.write_input(self.fixture("src/calc.py")))
         self.assert_allow(proc)
+
+
+class H7DocumenterTestCase(support.HookTestCase):
+    """H7 documenter의 쓰기 범위: 문서 경로만 허용합니다."""
+
+    def write_as_documenter(self, path, cwd=None):
+        return support.run_hook(
+            support.WRITE_GUARD,
+            self.write_input(path, agent_type=support.DOCUMENTER, cwd=cwd),
+        )
+
+    def test_allows_document_paths(self):
+        # README·CHANGELOG·MANUAL 시작 파일(어느 디렉터리든), docs/ 아래, kb-outbox 아래.
+        for rel in (
+            "README.md",
+            "sub/README.md",
+            "CHANGELOG.md",
+            "MANUAL.md",
+            "docs/a.md",
+            "docs/adr/0001-x.md",
+            ".work-standards/kb-outbox/x.md",
+        ):
+            self.assert_allow(self.write_as_documenter(self.fixture(rel)))
+
+    def test_denies_non_document_paths(self):
+        # docs/designs/ 는 승인된 설계서라 문서여도 거부합니다. 나머지는 코드·설정 경로입니다.
+        for rel in (
+            "docs/designs/x.md",
+            "src/a.py",
+            "tests/test_a.py",
+            "package.json",
+            ".work-standards/protected-paths",
+            ".env",
+        ):
+            self.assert_deny(self.write_as_documenter(self.fixture(rel)))
+
+    def test_denies_designs_with_h7_reason(self):
+        reason = self.assert_deny(self.write_as_documenter(self.fixture("docs/designs/x.md")))
+        self.assertIn("H7", reason)
+        self.assertIn("docs/designs/x.md", reason)
+        self.assertIn("물어볼 것", reason)
+
+    def test_allows_lowercase_readme(self):
+        # 문서 시작 이름 비교는 대소문자를 무시합니다(readme.md).
+        self.assert_allow(self.write_as_documenter(self.fixture("readme.md")))
+
+    def test_denies_outside_repository(self):
+        # H3 공통 불변식(저장소 밖)은 documenter에도 적용됩니다.
+        outside = os.path.join(self.base, "outside.txt")
+        self.assert_deny(self.write_as_documenter(outside))
+
+    def test_denies_dotdot_escape_from_docs(self):
+        # docs/../src/a.py 는 정규화하면 src/a.py 이므로 문서 범위 밖입니다.
+        path = self.fixture("docs/../src/a.py")
+        reason = self.assert_deny(self.write_as_documenter(path))
+        self.assertIn("H7", reason)
+        self.assertIn("src/a.py", reason)
+
+    def test_h3_allows_kb_outbox_only_for_documenter(self):
+        # .work-standards/ 는 원래 H3 거부이지만, documenter의 kb-outbox 아래만 예외입니다.
+        reason = self.assert_deny(self.write_as_documenter(self.fixture(".work-standards/protected-paths")))
+        self.assertIn("H3", reason)
+        # developer·tester에게 kb-outbox는 여전히 H3 거부입니다.
+        for agent_type in (support.DEVELOPER, support.TESTER):
+            reason = self.assert_deny(
+                support.run_hook(
+                    support.WRITE_GUARD,
+                    self.write_input(self.fixture(".work-standards/kb-outbox/x.md"), agent_type=agent_type),
+                )
+            )
+            self.assertIn("H3", reason)
 
 
 class CanonicalPathTestCase(support.HookTestCase):

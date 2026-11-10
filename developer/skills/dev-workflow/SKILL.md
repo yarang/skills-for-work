@@ -1,6 +1,6 @@
 ---
 name: dev-workflow
-description: 기능 구현, 버그 수정, 리팩터링 같은 개발 작업을 조사 → 설계 → 테스트 → 구현 → 검증 → 리뷰 파이프라인으로 진행할 때 사용합니다. 메인 대화가 work-standards 에이전트(researcher, architect, tester, developer, reviewer)에게 일을 나눠 맡기고, 승인 관문과 통합을 맡는 절차입니다.
+description: 기능 구현, 버그 수정, 리팩터링 같은 개발 작업을 조사 → 설계 → 테스트 → 구현 → 검증 → 리뷰 파이프라인으로 진행할 때 사용합니다. 메인 대화가 work-standards 에이전트(researcher, architect, tester, developer, reviewer, documenter)에게 일을 나눠 맡기고, 승인 관문과 통합을 맡는 절차입니다.
 when_to_use: '"이 기능 만들어줘", "구현해줘", "개발 파이프라인으로 진행", "설계부터 해줘", 여러 파일이나 여러 계층에 걸친 변경'
 ---
 
@@ -15,9 +15,9 @@ when_to_use: '"이 기능 만들어줘", "구현해줘", "개발 파이프라인
 → ④-1 의존성 적용 (메인) → ⑤ tester (인수·통합 테스트, RED) → ⑥ developer (GREEN)
 → ⑦ 검증 (메인: ⓐ 행 verify → ⓑ 통합 테스트 → ⓒ Go 모듈 정리)
 → ⑧ reviewer(code) + reviewer(security) → ⑧-1 외부 검토 (메인: shared:review-packet)
-→ ⑨ 통합 (메인)
+→ ⑧-2 문서 (documenter) → ⑨ 통합 (메인)
 
-②·⑤·⑥·⑧의 서브에이전트 호출, ⑧-1의 외부 provider 호출과 ④-1·⑦ⓒ의 메인 대화 변경은 모두 「경계 확인」으로 감쌉니다: 전 snapshot, 뒤 check.
+②·⑤·⑥·⑧·⑧-2의 서브에이전트 호출, ⑧-1의 외부 provider 호출과 ④-1·⑦ⓒ의 메인 대화 변경은 모두 「경계 확인」으로 감쌉니다: 전 snapshot, 뒤 check.
 ```
 
 **스크립트 경로**: 경계 확인 스크립트는 `${CLAUDE_SKILL_DIR}/scripts/boundary-check.sh`입니다. Bash 도구는 호출이 끝나면 셸 변수를 잃으므로, `"$BC"`를 쓰는 Bash 호출은 **매번 첫 줄에** `BC="${CLAUDE_SKILL_DIR}/scripts/boundary-check.sh"`를 둡니다. 아래의 `$BC`는 모두 이 경로입니다.
@@ -34,6 +34,7 @@ when_to_use: '"이 기능 만들어줘", "구현해줘", "개발 파이프라인
 | ⑦ 검증 | 메인 대화 (스크립트) | 행 디렉터리, 통합 실행 명령 | 통과/실패 (사실) |
 | ⑧ 리뷰 | `work-standards:reviewer` ×2 | 변경 범위 + 스킬 목록 + 관점 | 심각도별 지적 |
 | ⑧-1 외부 검토 | 메인 대화 (`shared:review-packet`) | 검토 꾸러미 (관점별 code·security) | 심각도별 지적 + 판정 표 |
+| ⑧-2 문서 | `work-standards:documenter` | 변경 범위 + 설계서 경로 + 모드 | 바꾼 문서·초안 또는 "문서 변경 없음" |
 | ⑨ 통합 | 메인 대화 | — | 커밋·PR (사용자 확인 후) |
 
 ## 작업 종류
@@ -143,7 +144,17 @@ EOF
 
 **⑧-1 외부 검토**: `shared:review-packet` 스킬대로 검토 꾸러미를 만들어 Antigravity로 검토합니다. 꾸러미는 ⑧과 같은 관점 구분을 따라 `code`·`security` 각각 따로 만듭니다. 작업 지시서·설계서에 `추가 검토: exaone`이 있으면 같은 꾸러미를 EXAONE에도 보내 동시에 돌립니다. `shared:review-packet`을 불러올 수 없으면(플러그인 미설치) ⑧-1을 건너뛰지 않고 멈춰 사용자에게 `shared` 플러그인 설치를 안내합니다. 지적은 `shared:review-packet`의 판정 확인 절차대로 메인 대화가 원본에 대조해 판정하고(`docs/reviews/<작업>-<provider>-<날짜>.md`에 원문과 판정 표를 남깁니다), 채택된 CRITICAL·HIGH는 ⑧의 「되돌리기」와 같이 처리합니다. Antigravity가 명령을 실행할 수 있으므로 호출 앞뒤를 「경계 확인」(`--strict`)으로 감쌉니다. 경계 확인은 사후이고 작업 트리 안의 변경만 보므로(저장소 밖 파일·네트워크 요청은 못 봄), 실행기 `run_agy.sh`가 `--sandbox`로 agy를 부르고 꾸러미 「규칙」이 읽기 전용 불변식을 못 박습니다.
 
-## 경계 확인 (②·⑤·⑥·⑧·⑧-1의 호출마다, ④-1·⑦ⓒ의 메인 대화 변경)
+**⑧-2 문서**: 리뷰가 끝난 코드를 기준으로 저장소 문서를 맞춥니다.
+
+1. **대상 판단**: 공개 API·설정·명령·동작이 바뀐 작업만 대상입니다. 판단 근거는 설계서와 ⑥ 보고서의 변경 파일입니다. 해당이 없으면 documenter를 부르지 않고 "문서 변경 없음"을 기록하고 건너뜁니다.
+2. documenter를 `repo` 모드로 부릅니다. 넘기는 것은 ⑧과 같은 형식의 변경 범위(작업 시작 커밋·파일 목록)와 설계서 경로, `## 모드: repo`입니다. 지식 저장소에 남길 것이 있으면 `## 모드: kb`로 한 번 더 부릅니다.
+3. **kb 초안은 올리지 않습니다.** documenter가 `.work-standards/kb-outbox/` 에 쓴 초안을 메인 대화가 사용자에게 보여 주고 승인을 받은 뒤 MCP로 올립니다. 승인 없이는 올리지 않습니다.
+4. 문서는 ⑧·⑧-1 리뷰를 거치지 않으므로, ⑨에서 사용자 확인을 받을 때 문서 diff를 함께 보여 줍니다.
+5. ⑧-2 뒤에 되돌리기로 코드가 바뀌면 ⑧-2를 다시 합니다.
+
+**⑨ 통합**: ⑧-2의 문서 diff를 함께 보여 줍니다.
+
+## 경계 확인 (②·⑤·⑥·⑧·⑧-1·⑧-2의 호출마다, ④-1·⑦ⓒ의 메인 대화 변경)
 
 서브에이전트를 부르기 **전에** 상태를 기록하고, 끝난 **뒤에** 바뀐 경로를 범위와 비교합니다. 스냅숏 파일은 저장소 밖(임시 디렉터리)에 둡니다. 모두 스크립트의 종료 코드로 판정하며, 모델이 결과를 해석해 통과시키지 않습니다.
 
@@ -164,6 +175,7 @@ bash "$BC" check <임시 디렉터리>/<단계>-<행>.snap <옵션>
 | ⑦ⓒ Go 모듈 정리 (메인) | `--strict` + 모든 Go 모듈의 `--allow=<go.mod> --allow=<go.sum>` (한 번의 check에) | 모듈 파일 밖 변경 |
 | ⑧ reviewer ×2 | 옵션 없이 `--strict` (두 리뷰어를 한 snapshot과 한 check로 감쌈) | 읽기 전용 위반 |
 | ⑧-1 외부 검토 (메인) | 옵션 없이 `--strict` (Antigravity·EXAONE 호출 전후로 감쌈) | 외부 provider 호출 중 쓰기·커밋 |
+| ⑧-2 documenter | `--allow=docs --allow=.work-standards/kb-outbox` + 지금 있는 `README*`·`CHANGELOG*`·`MANUAL*` 파일마다 `--allow=<경로>` + `--protect=docs/designs` (있을 때) | 문서 범위 밖 변경 |
 
 - ⑥에서 잠금 파일(`bun.lock`, `bun.lockb`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`, `poetry.lock`, `Cargo.lock`, `go.sum`)을 보호하는 까닭은, 행 디렉터리 안에 있으면 `--allow`에 묻혀 몰래 한 설치가 통과하기 때문입니다. bun·npm·pnpm·Yarn·uv·Cargo 워크스페이스는 멤버 디렉터리에서 설치해도 루트의 잠금 파일 하나를 바꾸므로, 루트 잠금 파일도 함께 보호합니다. 직접 쓰기(Write·Edit)는 hook이 그 자리에서 막고, 패키지 매니저 실행으로 바뀐 것은 범위 밖 정책과 관계없이 경계 확인에서 보호 경로 위반으로 잡힙니다(Bash를 막는 hook은 아직 없습니다). 없는 파일을 `--protect`에 주면 종료 코드 2가 나오므로 지금 있는 파일만 넣습니다. 매니페스트는 스크립트 항목 같은 정당한 수정이 있어 보호하지 않고, ⑧ 리뷰어의 의존성 대조에 맡깁니다.
 - 경로는 모두 **저장소 루트 기준**입니다. `--protect` 경로가 기준 커밋·스냅숏·지금 작업 트리 어디에도 없으면 오타로 보고 종료 코드 2로 끝납니다. 스냅숏에만 있던 경로는 지워진 것이므로 위반(1)입니다. 디스크와 대소문자가 다른 보호 경로, 저장소 밖 절대 경로도 2입니다.
@@ -175,7 +187,7 @@ bash "$BC" check <임시 디렉터리>/<단계>-<행>.snap <옵션>
 - `.gitignore`로 무시된 경로(`.env`, 가상환경, `node_modules` 안)에 쓴 것은 보지 못합니다.
 - 저장소 밖과 원격의 부작용(임시 디렉터리 쓰기, `gh`로 이슈·댓글 만들기, 외부로 보낸 요청)도 보지 못합니다. ②·⑧처럼 `Bash`를 가진 읽기 역할은 에이전트 본문의 「Bash로 해도 되는 것」 허용 명령 목록이 이 틈을 맡습니다. 도구 호출 전에 막는 hook(H4·H5)은 아직 없습니다.
 
-플러그인 hook이 이 확인의 앞단에서 거부합니다. developer·tester의 쓰기를 도구 호출 전에 검사해, 보호 경로(H1), tester의 쓰기 범위(H2), 두 에이전트의 공통 불변식 — 저장소 밖, `.git/`, `.work-standards/`, `.env`(H3) — 을 어기는 호출을 그 자리에서 막고, 거부 이유를 서브에이전트가 그대로 받아 행동을 고칩니다. 다만 hook은 사용자 설정(`disableAllHooks`, 관리 설정)으로 꺼질 수 있으므로, 위의 snapshot·check는 그대로 유지합니다. hook은 앞단 가드레일이고, 이 스크립트가 최종 그물입니다. `.work-standards/`는 hook 상태 디렉터리이며 자체 `.gitignore`(`*`)로 무시되므로, 위의 변경 목록에 나오지 않습니다.
+플러그인 hook이 이 확인의 앞단에서 거부합니다. developer·tester·documenter의 쓰기를 도구 호출 전에 검사해, 보호 경로(H1), tester의 쓰기 범위(H2), documenter의 쓰기 범위(H7 — 문서 경로만, `docs/designs/` 와 그 밖은 거부), 세 역할의 공통 불변식 — 저장소 밖, `.git/`, `.work-standards/`(documenter는 `.work-standards/kb-outbox/` 아래만 예외), `.env`(H3) — 을 어기는 호출을 그 자리에서 막고, 거부 이유를 서브에이전트가 그대로 받아 행동을 고칩니다. 다만 hook은 사용자 설정(`disableAllHooks`, 관리 설정)으로 꺼질 수 있으므로, 위의 snapshot·check는 그대로 유지합니다. hook은 앞단 가드레일이고, 이 스크립트가 최종 그물입니다. `.work-standards/`는 hook 상태 디렉터리이며 자체 `.gitignore`(`*`)로 무시되므로, 위의 변경 목록에 나오지 않습니다.
 
 ## ⑦ 검증
 
