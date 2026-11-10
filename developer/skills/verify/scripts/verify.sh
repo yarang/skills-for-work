@@ -89,7 +89,7 @@ check_node() {
   fi
   if [ "$pm" = bun ]; then
     if ! has bun; then
-      skip_check "node" test "bun이 없음"
+      skip_check "bun" test "bun이 없음"
       return 0
     fi
   elif ! has node || ! has "$pm"; then

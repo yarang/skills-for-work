@@ -63,17 +63,30 @@ if len(args) >= 2 and args[0] == "-e":
 sys.exit(0)
 '''
 
+# 호출되면 호출 로그에 한 줄 남기고 exit 1 하는 가짜 실행 파일. verify.sh이 그
+# 도구를 절대 불러서는 안 된다는 것을, "불렸다면 로그에 흔적이 남는다"로 잡을 때 씁니다.
+FAIL_BIN = r'''#!/usr/bin/env python3
+import os
+import sys
+
+with open(os.environ["CALLS_LOG"], "a", encoding="utf-8") as handle:
+    handle.write(os.path.basename(sys.argv[0]) + " " + " ".join(sys.argv[1:]) + "\n")
+sys.exit(1)
+'''
+
 
 class FakePM:
     """가짜 패키지 매니저 실행 파일과 호출 로그."""
 
-    def __init__(self, base, names):
+    # names: 만들 가짜 실행 파일 이름. failing: 그중 호출되면 로그만 남기고
+    # exit 1 하는 파일(FAKE_BIN 대신 FAIL_BIN으로 만듦).
+    def __init__(self, base, names, failing=()):
         self.bin_dir = os.path.join(str(base), "fake-bin")
         self.log = os.path.join(str(base), "calls.log")
         os.makedirs(self.bin_dir)
         for name in names:
             script = os.path.join(self.bin_dir, name)
-            write_file(script, FAKE_BIN)
+            write_file(script, FAIL_BIN if name in failing else FAKE_BIN)
             os.chmod(script, 0o755)
 
     def run_verify(self, target):
@@ -89,6 +102,9 @@ class FakePM:
         )
 
     def calls(self):
+        # 도구가 한 번도 불리지 않으면 로그 파일이 없습니다.
+        if not os.path.exists(self.log):
+            return []
         with open(self.log, encoding="utf-8") as handle:
             return handle.read().splitlines()
 
@@ -123,15 +139,37 @@ def test_bun_lockb_runs_bun_run_test(tmp_path):
     assert not [c for c in calls if c.startswith("node")]
 
 
-def test_bun_lock_without_node_still_runs(tmp_path):
+def test_bun_lock_without_bun_skips_as_bun(tmp_path):
     pkg = os.path.join(str(tmp_path), "pkg")
     write_file(os.path.join(pkg, "package.json"), PACKAGE_JSON)
     write_file(os.path.join(pkg, "bun.lock"), "# bun lock\n")
-    pm = FakePM(tmp_path, ("bun",))  # PATH에 node가 없습니다.
+    pm = FakePM(tmp_path, ("node", "npm", "pnpm"))  # PATH에 bun이 없습니다.
+    proc = pm.run_verify(pkg)
+    output = proc.stdout.decode("utf-8", "replace")
+    # skip도 차단하는 임시 기본 정책이므로 종료 코드는 1입니다.
+    assert proc.returncode == 1, output
+    # 검사 이름이 node가 아니라 bun으로 기록되어야 합니다.
+    assert "건너뜀: bun — bun이 없음" in output
+    assert "건너뜀: node" not in output
+    # bun이 없으면 어떤 패키지 매니저도 부르지 않습니다.
+    assert pm.calls() == []
+
+
+def test_bun_lock_with_node_on_path_still_runs_bun(tmp_path):
+    pkg = os.path.join(str(tmp_path), "pkg")
+    write_file(os.path.join(pkg, "package.json"), PACKAGE_JSON)
+    write_file(os.path.join(pkg, "bun.lock"), "# bun lock\n")
+    # 시스템 node가 PATH에 있어도 전제가 깨지지 않게, 호출되면 로그를 남기고
+    # exit 1 하는 가짜 node를 PATH 앞에 둡니다. bun 분기가 node를 불렀다면
+    # 로그에 흔적이 남고 검사도 실패합니다.
+    pm = FakePM(tmp_path, ("bun", "node"), failing=("node",))
     proc = pm.run_verify(pkg)
     output = proc.stdout.decode("utf-8", "replace")
     assert proc.returncode == 0, output
-    assert "bun run test" in pm.calls()
+    calls = pm.calls()
+    assert "bun run test" in calls
+    # node 호출 로그가 비어 있어야 합니다(bun 분기는 node를 부르지 않음).
+    assert not [c for c in calls if c.startswith("node")]
     assert "건너뜀" not in output
 
 

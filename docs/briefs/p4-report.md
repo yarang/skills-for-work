@@ -88,3 +88,22 @@ Antigravity 검토 지적 4건을 반영했습니다(2026-11-10). 고친 범위�
 | `uv run --with pytest pytest -q skills/verify/tests` (가짜 실행 파일 교체 후) | **9 passed**, 0 실패 |
 | `uv run --with pytest pytest -q hooks/tests skills/verify/tests` (전체) | **77 passed**, 0 실패 (기존 hooks/tests 68 + verify 9: 종전 6건 + 신규 2건 + parametrize 확장 1건) |
 | `bash -n skills/verify/scripts/verify.sh skills/dev-workflow/scripts/boundary-check.sh` | 통과 |
+
+## 검토 반영(2차, EXAONE)
+
+EXAONE 검토 지적 minor 2건을 반영했습니다(2026-11-10). 고친 범위는 `developer/skills/verify/scripts/verify.sh`, `developer/skills/verify/tests/test_verify_bun.py`, 이 보고서입니다.
+
+| # | 지적 | 무엇을 바꿨는지 |
+|---|---|---|
+| 1 | `check_node`의 bun 분기에서 bun이 없을 때 검사 이름이 `node`로 기록됨(`skip_check "node" test "bun이 없음"` — 건너뜀 메시지와 요약 테이블 모두) | 테스트 `test_bun_lock_without_bun_skips_as_bun`(bun.lock 있음 + 가짜 bin에 bun 없음)을 먼저 추가해 실패를 확인한 뒤(RED), `skip_check "bun" test "bun이 없음"`으로 고침. 테스트는 종료 코드 1(skip 차단 임시 정책), "건너뜀: bun — bun이 없음" 출력, "건너뜀: node" 부재, 패키지 매니저 호출 로그가 비어 있음을 단언 |
+| 2 | "bun 잠금 + node 없음" 테스트(`test_bun_lock_without_node_still_runs`)가 PATH에 `/usr/bin` 등을 넣어, 시스템 node가 설치된 환경에서는 전제(node 없음)가 깨짐 | `test_bun_lock_with_node_on_path_still_runs_bun`로 다시 씀. `FakePM`에 `failing` 옵션을 더해, 가짜 실행 디렉터리에 호출되면 로그를 남기고 exit 1 하는 `node`(신규 `FAIL_BIN`)를 둠. node가 PATH에 있어도 전제가 깨지지 않고, bun 분기가 node를 부르지 않는다는 것을 node 호출 로그가 비어 있음으로 단언 |
+
+함께 손본 것: `FakePM.calls()`는 로그 파일이 아직 없으면(도구가 한 번도 불리지 않음) 빈 목록을 돌려주게 했습니다. 지적 1의 테스트처럼 아무 도구도 불리지 않는 경우를 잡기 위함입니다.
+
+검증 (`developer/`에서, 테스트 먼저 추가 → 실패 확인 → 고침 순서):
+
+| 명령 | 결과 |
+|---|---|
+| `uv run --with pytest pytest -q skills/verify/tests/test_verify_bun.py -k "without_bun or with_node_on_path"` (테스트만 추가, verify.sh 고치기 전) | **1 failed, 1 passed** — 실패: `test_bun_lock_without_bun_skips_as_bun`. 출력이 "건너뜀: node — bun이 없음"이고 요약에도 `skip test node`로 남아 검사 이름 단언에 걸림(RED). 재작성한 `test_bun_lock_with_node_on_path_still_runs_bun`은 기존 구현으로 통과(이미 node를 부르지 않음) |
+| `uv run --with pytest pytest -q hooks/tests skills/verify/tests` (verify.sh 수정 후, 전체) | **78 passed**, 0 실패 (hooks/tests 68 + verify 10: 종전 9건 − 재작성 1건 + 신규 2건) |
+| `bash -n skills/verify/scripts/verify.sh` | 통과 |
