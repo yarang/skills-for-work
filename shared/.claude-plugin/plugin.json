@@ -1,0 +1,9 @@
+{
+  "name": "shared",
+  "version": "0.1.0",
+  "description": "여러 플러그인이 함께 쓰는 공통 스킬. 첫 스킬 review-packet은 검토 역할과 실행 provider를 나누는 절차(검토 꾸러미, provider 능력표, 판정 확인, Antigravity·EXAONE 실행기)입니다.",
+  "author": {
+    "name": "yarang"
+  },
+  "license": "MIT"
+}

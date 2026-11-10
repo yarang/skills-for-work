@@ -19,7 +19,7 @@ book-writer:book-principles는 '무엇을 지킬지', book-writer:korean-style�
 | ② 내용 | 개념·실습·결과물·필요한 사실을 정합니다 | `plans/vol<N>/ch<NN>/content.md` | planner 초안 + researcher(사실) + capturer `probe`(실측 가능 여부) → 사람과 논의 | **사람 승인** |
 | ③ 구조 | 장 템플릿에 맞춰 절별 개요, 그림·표·코드 목록, 분량을 짭니다 | `plans/vol<N>/ch<NN>/outline.md` | planner | **사람 확인** — 메인 세션이 개요를 보여 주고 사람이 확인하면 메인 세션이 `승인`을 기록합니다. 답이 없으면 통과가 아닙니다 |
 | ④ 집필 | 개요대로 원고를 씁니다 | `manuscript/…/chNN.md` | writer(`draft`) | **변경 범위 검증** 통과(바꾼 파일만, 아래 「검증의 두 단계」) |
-| ⑤ 검토 | 초안을 독립적으로 검토하고 고칩니다 | `reviews/editor-<범위>-<날짜>-r<회차>.md` (범위: `vol<N>-ch<NN>`, 앞붙이는 `front-<이름>`) | editor + 외부 검토(Codex·Antigravity) → writer(`revise`) | blocker 0, major는 반영 또는 사유 |
+| ⑤ 검토 | 초안을 독립적으로 검토하고 고칩니다 | `reviews/editor-<범위>-<날짜>-r<회차>.md` (범위: `vol<N>-ch<NN>`, 앞붙이는 `front-<이름>`) | editor + 외부 검토(Antigravity, 선택: EXAONE) → writer(`revise`) | blocker 0, major는 반영 또는 사유 |
 | ⑥ 완료 | 실측·캡처를 채우고 상태를 닫습니다 | manifest `완료`, 실측 기록 | capturer(`shoot`) → writer → editor(변경분 재검토), 메인 세션 | **완료 검증** 통과 + **사람 승인** |
 
 - 각 산출물 맨 위에 `상태: 제안 | 논의 중 | 승인 (<날짜>)`과 '결정 사항' 목록을 둡니다. 승인된 문서를 바꾸려면 사람과 다시 논의합니다.
@@ -65,9 +65,7 @@ book-writer:book-principles는 '무엇을 지킬지', book-writer:korean-style�
 
 ## ⑤ 초안 검토
 - editor가 story·content·outline과 초안을 대조해 검토합니다(흐름, 목표 달성, 실습 재현성, 초보자 눈높이, 표기). 결과는 `templates/review.md` 형식으로 `reviews/editor-vol<N>-ch<NN>-<날짜>-r<회차>.md`에 남깁니다. 회차는 그 장·그 날짜의 기존 기록 다음 번호로 정해 같은 날 재검토가 덮어쓰지 않게 합니다.
-- 사용자 지침에 외부 검토가 있으면 같은 기준으로 Codex·Antigravity에도 맡깁니다. 기준 파일(이 스킬, book-writer:book-principles, book-writer:korean-style, 책의 집필 규칙)과 계획 문서를 함께 넘깁니다.
-  - `codex exec "<기준 파일 내용> … plans/vol1/ch02/와 manuscript/vol1/part1/ch02.md를 검토하라. 지적마다 파일:줄, 근거, 독자가 겪을 문제, 심각도"`
-  - `agy -p "<같은 지시>"`
+- 사용자 지침에 외부 검토가 있으면 `shared:review-packet`대로 꾸러미를 만들어 Antigravity로 검토하고, `추가 검토: exaone`이면 EXAONE도 함께 돌린다. 기준 파일(이 스킬, `book-writer:book-principles`, `book-writer:korean-style`, 책의 집필 규칙)과 계획 문서를 꾸러미의 기준·참고 원본에 넣는다.
 - writer가 `revise` 모드로 반영하고, 지적마다 반영·미반영(이유)을 보고서의 '반영 기록'에 적습니다. writer는 `reviews/`에 쓰지 못하므로(쓰기 가드), **메인 세션이** 그 내용을 해당 검토 기록 끝 '반영 기록' 절에 옮겨 붙입니다. 다음 회차 editor는 이 절을 기준선으로 읽습니다.
 - 검토는 최대 2회 돕니다(`r1`, `r2`). 2회 뒤에도 blocker가 남으면 사람에게 올립니다.
 

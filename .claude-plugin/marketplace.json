@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "skills-for-work",
-  "description": "업무용 Claude Code 플러그인 모음: 개발 표준(work-standards), 문서 작업(docu-writer), 교재 집필(book-writer)",
+  "description": "업무용 Claude Code 플러그인 모음: 개발 표준(work-standards), 문서 작업(docu-writer), 교재 집필(book-writer), 공통 스킬(shared)",
   "owner": { "name": "yarang", "email": "yarang@gmail.com" },
   "plugins": [
     {
@@ -24,6 +24,13 @@
       "author": { "name": "yarang" },
       "category": "productivity",
       "source": "./book-writer"
+    },
+    {
+      "name": "shared",
+      "description": "여러 플러그인이 함께 쓰는 공통 스킬 — 검토 꾸러미와 provider 실행기(review-packet)",
+      "author": { "name": "yarang" },
+      "category": "development",
+      "source": "./shared"
     }
   ]
 }

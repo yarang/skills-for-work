@@ -17,6 +17,8 @@ claude plugin install book-writer@skills-for-work
 claude --plugin-dir <이 저장소>/book-writer
 ```
 
+⑤ 단계의 외부 검토(Antigravity, 선택: EXAONE)는 `shared` 플러그인의 `shared:review-packet` 스킬을 쓰므로, 함께 설치해야 합니다.
+
 ## 에이전트 5개
 
 | 에이전트 | 모델 | 하는 일 | 쓰는 곳 |

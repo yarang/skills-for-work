@@ -34,6 +34,8 @@ claude --plugin-dir /path/to/skills_for_work/developer
 
 대화에서 "설계부터 해서 이 기능 만들어줘"처럼 요청하면 `dev-workflow` 스킬이 파이프라인을 진행합니다. 에이전트는 `work-standards:developer`처럼 이름 앞에 플러그인 이름이 붙습니다.
 
+⑧-1 외부 검토(Antigravity, 선택: EXAONE)는 `shared` 플러그인의 `shared:review-packet` 스킬을 쓰므로, 이 플러그인과 함께 `shared`를 설치해야 합니다.
+
 ## 검증 스크립트 정책
 
 `skills/verify/scripts/verify.sh`의 `decide_exit` 함수가 차단 정책을 정합니다. 기본값은 가장 엄격해서, 실패나 건너뛴 검사가 하나라도 있으면 차단합니다. 팀 정책에 맞게 바꾸세요.
