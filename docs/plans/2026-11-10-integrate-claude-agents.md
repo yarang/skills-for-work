@@ -248,7 +248,7 @@ claude-agents 링크가 남아 있으면 접두사 없는 참조가 옛 스킬�
 - 기록: 원문은 `docs/reviews/<작업>-<provider>-<날짜>.md`, 판정 표는 같은 파일 끝에 덧붙입니다.
 
 ### 9.5 어디에 두는가
-- 꾸러미 형식, provider 능력표, 판정 확인 절차, provider 실행기(EXAONE 스크립트 등)는 스킬 `review-packet` 하나로 묶습니다. 기본 절차는 Antigravity 하나로 검토하고(§9.7), 다른 provider는 능력표와 실행기만 갖춰 둡니다.
+- 꾸러미 형식, provider 능력표, 판정 확인 절차, provider 실행기(EXAONE 스크립트 등)는 스킬 `review-packet` 하나로 묶습니다. 기본 절차는 Antigravity로 검토하고, EXAONE은 선택 단계로 둡니다(§9.7). 그 밖의 provider는 능력표와 실행기만 갖춰 둡니다.
 - work-standards(⑧ 리뷰)와 book-writer(⑤ 초안 검토)가 함께 쓰므로, 이것이 `shared` 플러그인의 첫 스킬입니다(P5). §1의 "두 번째 사용처가 생기면 `shared`로" 조건을 충족합니다.
 - `dev-workflow` ⑧과 `book-workflow` ⑤는 "외부 provider 검토가 필요하면 `shared:review-packet`대로 꾸러미를 만든다"를 가리키기만 합니다.
 
@@ -260,5 +260,8 @@ claude-agents 링크가 남아 있으면 접두사 없는 참조가 옛 스킬�
 
 ### 9.7 결정된 것 (2026-11-10, 사용자)
 1. **심각도는 역할별 표를 씁니다.** 코드는 `work-standards:reviewer`의 CRITICAL/HIGH/MEDIUM/LOW, 원고는 `book-writer:editor`의 blocker/major/minor입니다. 꾸러미는 역할의 표를 그대로 싣고, 앞으로 코드 작업 지시서도 `reviewer`의 표를 따릅니다.
-2. **검토 provider 기본값은 Antigravity 하나입니다.** Z.ai가 구현한 작업은 Antigravity로 검토합니다. EXAONE은 능력표에 남겨 두되 기본 절차에서는 부르지 않고, 사용자가 요청할 때만 씁니다.
+2. **검토 provider는 Antigravity가 기본이고, EXAONE은 선택 항목입니다.** Z.ai가 구현한 작업은 Antigravity로 검토합니다. EXAONE은 검토 절차에 **선택 단계**로 들어갑니다.
+   - 켜는 방법: 작업 지시서나 설계서의 검토 줄에 `추가 검토: exaone`을 적거나, 사용자가 요청합니다. 메인 대화는 검토를 시작할 때 이 줄을 확인하고, 없으면 부르지 않습니다.
+   - 켜면 Antigravity와 **같은 꾸러미**를 EXAONE에도 보냅니다(diff 단위이므로 원본·스킬 본문·사실 자료 첨부). 둘을 동시에 돌리고, 지적은 §9.4대로 합쳐 판정합니다.
+   - EXAONE 결과가 늦거나 실패해도 Antigravity 판정으로 진행할 수 있습니다. 그 사실을 판정 기록에 적습니다.
 3. **EXAONE `reasoning_effort` 기본값은 `high`입니다.** 실행기 기본을 `high`로 두고, 필요하면 호출할 때 `max`로 올립니다.
