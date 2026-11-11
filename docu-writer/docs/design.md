@@ -76,7 +76,7 @@ skills_for_work/
     │   ├── visual-design/        시각 디자인: 디자인 토큰, 서체·크기·여백·색·표
     │   ├── diagram-standards/    mermaid 우선, SVG, 개별 파일, 토큰 팔레트
     │   ├── design-review/        렌더 이미지 점검표
-    │   ├── deck-design/          견본 없는 교육·발표 덱의 시각 설계(직접 호출)
+    │   ├── deck-design/ (+scripts/)  견본 없는 교육·발표 덱의 시각 설계(직접 호출), 생성기 build_deck.py
     │   ├── format-hwpx/          kordoc 경로 (parse·patch·fill·render)
     │   ├── format-docx/ (+scripts/patch_docx.py)
     │   ├── format-pptx/ (+scripts/patch_pptx.py)
